@@ -40,4 +40,16 @@ describe('parseOtpAuthUri', () => {
       parseOtpAuthUri('otpauth://totp/%E0?secret=JBSWY3DPEHPK3PXP')
     ).toThrow(InvalidOtpAuthUriError);
   });
+
+  it('rejects malformed percent-encoding in secret query params', () => {
+    expect(() =>
+      parseOtpAuthUri('otpauth://totp/alice?secret=%E0')
+    ).toThrow(InvalidOtpAuthUriError);
+  });
+
+  it('rejects malformed percent-encoding in issuer query params', () => {
+    expect(() =>
+      parseOtpAuthUri('otpauth://totp/alice?secret=JBSWY3DPEHPK3PXP&issuer=%E0')
+    ).toThrow(InvalidOtpAuthUriError);
+  });
 });

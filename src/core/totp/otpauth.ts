@@ -23,19 +23,14 @@ export function parseOtpAuthUri(uri: string): ParsedOtpAuthUri {
   }
 
   const rawLabel = url.pathname.replace(/^\//, '').trim();
+  const rawQuery = url.search.startsWith('?') ? url.search.slice(1) : url.search;
   const [issuerFromLabel, accountNameFromLabel] = splitRawLabel(rawLabel);
-  const issuer = (url.searchParams.get('issuer') ?? issuerFromLabel).trim();
+  const issuer = (getValidatedQueryParam(rawQuery, 'issuer') ?? issuerFromLabel).trim();
   const accountName = accountNameFromLabel.trim();
-  const secret = (url.searchParams.get('secret') ?? '').trim();
-  const digits = parsePositiveInteger(
-    url.searchParams.get('digits'),
-    DEFAULT_DIGITS
-  );
-  const period = parsePositiveInteger(
-    url.searchParams.get('period'),
-    DEFAULT_PERIOD
-  );
-  const algorithm = parseAlgorithm(url.searchParams.get('algorithm'));
+  const secret = (getValidatedQueryParam(rawQuery, 'secret') ?? '').trim();
+  const digits = parsePositiveInteger(getValidatedQueryParam(rawQuery, 'digits'), DEFAULT_DIGITS);
+  const period = parsePositiveInteger(getValidatedQueryParam(rawQuery, 'period'), DEFAULT_PERIOD);
+  const algorithm = parseAlgorithm(getValidatedQueryParam(rawQuery, 'algorithm'));
 
   if (!accountName) {
     throw new InvalidOtpAuthUriError('Account name is required.');
@@ -101,5 +96,39 @@ function splitRawLabel(rawLabel: string): [string, string] {
     throw new InvalidOtpAuthUriError('Label contains malformed percent-encoding.', {
       cause: error
     });
+  }
+}
+
+function getValidatedQueryParam(rawQuery: string, targetKey: string): string | null {
+  if (!rawQuery) {
+    return null;
+  }
+
+  for (const segment of rawQuery.split('&')) {
+    if (!segment) {
+      continue;
+    }
+
+    const separatorIndex = segment.indexOf('=');
+    const rawKey = separatorIndex === -1 ? segment : segment.slice(0, separatorIndex);
+    const rawValue = separatorIndex === -1 ? '' : segment.slice(separatorIndex + 1);
+    const key = decodeQueryComponent(rawKey, targetKey);
+
+    if (key === targetKey) {
+      return decodeQueryComponent(rawValue, targetKey);
+    }
+  }
+
+  return null;
+}
+
+function decodeQueryComponent(value: string, key: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch (error) {
+    throw new InvalidOtpAuthUriError(
+      `Query parameter "${key}" contains malformed percent-encoding.`,
+      { cause: error }
+    );
   }
 }
