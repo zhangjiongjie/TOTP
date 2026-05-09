@@ -88,12 +88,18 @@ function parseAlgorithm(value: string | null): TotpAlgorithm {
 function splitRawLabel(rawLabel: string): [string, string] {
   const separatorIndex = rawLabel.indexOf(':');
 
-  if (separatorIndex === -1) {
-    return ['', decodeURIComponent(rawLabel)];
-  }
+  try {
+    if (separatorIndex === -1) {
+      return ['', decodeURIComponent(rawLabel)];
+    }
 
-  return [
-    decodeURIComponent(rawLabel.slice(0, separatorIndex)),
-    decodeURIComponent(rawLabel.slice(separatorIndex + 1))
-  ];
+    return [
+      decodeURIComponent(rawLabel.slice(0, separatorIndex)),
+      decodeURIComponent(rawLabel.slice(separatorIndex + 1))
+    ];
+  } catch (error) {
+    throw new InvalidOtpAuthUriError('Label contains malformed percent-encoding.', {
+      cause: error
+    });
+  }
 }

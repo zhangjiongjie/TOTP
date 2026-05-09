@@ -34,4 +34,10 @@ describe('parseOtpAuthUri', () => {
       parseOtpAuthUri('otpauth://totp/alice?secret=JBSWY3DPEHPK3PXP&digits=1e2')
     ).toThrow(InvalidOtpAuthUriError);
   });
+
+  it('wraps malformed label percent-encoding as a domain error', () => {
+    expect(() =>
+      parseOtpAuthUri('otpauth://totp/%E0?secret=JBSWY3DPEHPK3PXP')
+    ).toThrow(InvalidOtpAuthUriError);
+  });
 });

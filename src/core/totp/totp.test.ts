@@ -26,6 +26,10 @@ describe('decodeBase32', () => {
     expect(() => decodeBase32('MY===A==')).toThrow(InvalidBase32Error);
   });
 
+  it('rejects invalid padding length', () => {
+    expect(() => decodeBase32('MZX=====')).toThrow(InvalidBase32Error);
+  });
+
   it('rejects non-zero trailing bits', () => {
     expect(() => decodeBase32('MZ')).toThrow(InvalidBase32Error);
   });
