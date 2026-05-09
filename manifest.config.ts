@@ -1,14 +1,18 @@
-// Source-side Manifest V3 definition for the extension.
-// public/manifest.json mirrors this shape for the current minimal build.
-export const manifest = {
-  manifest_version: 3,
-  name: 'TOTP App',
-  version: '0.1.0',
+import manifestJson from './public/manifest.json';
+
+type ManifestConfig = {
+  manifest_version: 3;
+  name: string;
+  version: string;
   action: {
-    default_popup: 'index.html'
-  },
-  permissions: ['storage'],
-  host_permissions: ['<all_urls>']
-} as const;
+    default_popup: string;
+  };
+  permissions: string[];
+  host_permissions: string[];
+};
+
+// public/manifest.json is the source of truth for the shipped extension manifest.
+// This file provides a typed view for TS-side consumers without duplicating values.
+export const manifest = manifestJson as ManifestConfig;
 
 export default manifest;
