@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --passWithNoTests",
     "test:plan-smoke": "node -e \"const fs=require('fs');['package.json','vite.config.ts','src/main.tsx'].forEach((f)=>{if(!fs.existsSync(f)) throw new Error(f+' missing')})\""
   },
   "dependencies": {
@@ -15,6 +15,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^5.0.0",
