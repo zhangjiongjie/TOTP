@@ -22,10 +22,8 @@ export function parseOtpAuthUri(uri: string): ParsedOtpAuthUri {
     throw new InvalidOtpAuthUriError('Only TOTP otpauth URIs are supported.');
   }
 
-  const label = decodeURIComponent(url.pathname.replace(/^\//, '')).trim();
-  const [issuerFromLabel, accountNameFromLabel] = label.includes(':')
-    ? label.split(':', 2)
-    : ['', label];
+  const rawLabel = url.pathname.replace(/^\//, '').trim();
+  const [issuerFromLabel, accountNameFromLabel] = splitRawLabel(rawLabel);
   const issuer = (url.searchParams.get('issuer') ?? issuerFromLabel).trim();
   const accountName = accountNameFromLabel.trim();
   const secret = (url.searchParams.get('secret') ?? '').trim();
@@ -62,6 +60,10 @@ function parsePositiveInteger(value: string | null, fallback: number): number {
     return fallback;
   }
 
+  if (!/^[0-9]+$/.test(value)) {
+    throw new InvalidOtpAuthUriError(`Expected a decimal integer, got: ${value}`);
+  }
+
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
     throw new InvalidOtpAuthUriError(`Expected a positive integer, got: ${value}`);
@@ -81,4 +83,17 @@ function parseAlgorithm(value: string | null): TotpAlgorithm {
   }
 
   throw new InvalidOtpAuthUriError(`Unsupported TOTP algorithm: ${value}`);
+}
+
+function splitRawLabel(rawLabel: string): [string, string] {
+  const separatorIndex = rawLabel.indexOf(':');
+
+  if (separatorIndex === -1) {
+    return ['', decodeURIComponent(rawLabel)];
+  }
+
+  return [
+    decodeURIComponent(rawLabel.slice(0, separatorIndex)),
+    decodeURIComponent(rawLabel.slice(separatorIndex + 1))
+  ];
 }

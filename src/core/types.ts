@@ -1,3 +1,5 @@
+import type { IconKey } from './icons/icon-registry';
+
 export type TotpAlgorithm = 'SHA1' | 'SHA256' | 'SHA512';
 
 export interface AccountRecord {
@@ -11,7 +13,7 @@ export interface AccountRecord {
   tags: string[];
   groupId: string | null;
   pinned: boolean;
-  iconKey: string | null;
+  iconKey: IconKey | null;
   updatedAt: string;
 }
 

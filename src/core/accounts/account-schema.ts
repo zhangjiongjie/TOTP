@@ -14,7 +14,7 @@ export function createAccountRecord(
     digits: input.digits,
     period: input.period,
     algorithm: input.algorithm,
-    tags: overrides?.tags ?? [],
+    tags: overrides?.tags ? [...overrides.tags] : [],
     groupId: overrides?.groupId ?? null,
     pinned: overrides?.pinned ?? false,
     iconKey: overrides?.iconKey ?? null,
