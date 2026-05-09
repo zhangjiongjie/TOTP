@@ -1,3 +1,5 @@
-import { bootstrapPopup } from './popup/bootstrap';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './popup/App';
 
-bootstrapPopup(document.getElementById('root'));
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
