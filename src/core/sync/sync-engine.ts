@@ -121,6 +121,16 @@ export function createSyncEngine({
         return createDisabledResult();
       }
 
+      const context = await loadContext(vaultStorage, syncStore, now);
+
+      if (!isPendingConflictCurrent(context.metadata.pendingConflict, payload)) {
+        return handleValidationFailure(
+          'Pending sync conflict is stale or no longer matches the current sync state',
+          context,
+          syncStore
+        );
+      }
+
       if (choice === 'remote') {
         const remoteSnapshot: WebDavRemoteSnapshot = {
           revision: payload.remote.revision,
@@ -582,4 +592,55 @@ function normalizeSyncError(
     retryable: true,
     statusCode: null
   };
+}
+
+async function handleValidationFailure(
+  message: string,
+  context: SyncContext,
+  syncStore: SyncMetadataStore
+): Promise<SyncRunResult> {
+  const error: SyncResultError = {
+    kind: 'validation',
+    message,
+    retryable: false,
+    statusCode: null
+  };
+
+  await syncStore.save({
+    lastStatus: 'validation-error',
+    lastError: message
+  });
+
+  return {
+    status: 'validation-error',
+    source: context.localVault ? 'local-cache' : 'none',
+    localRevision: context.localSnapshot?.revision ?? context.metadata.localRevision,
+    remoteRevision: context.metadata.remoteRevision,
+    localVault: context.localVault,
+    pendingConflict: context.metadata.pendingConflict,
+    error
+  };
+}
+
+function isPendingConflictCurrent(
+  current: PendingSyncConflict | null,
+  candidate: PendingSyncConflict
+): boolean {
+  if (!current) {
+    return false;
+  }
+
+  return (
+    current.kind === candidate.kind &&
+    current.detectedAt === candidate.detectedAt &&
+    current.baseRevision === candidate.baseRevision &&
+    current.baseFingerprint === candidate.baseFingerprint &&
+    current.local.revision === candidate.local.revision &&
+    current.local.fingerprint === candidate.local.fingerprint &&
+    current.local.updatedAt === candidate.local.updatedAt &&
+    current.remote.revision === candidate.remote.revision &&
+    current.remote.fingerprint === candidate.remote.fingerprint &&
+    current.remote.updatedAt === candidate.remote.updatedAt &&
+    current.remote.etag === candidate.remote.etag
+  );
 }

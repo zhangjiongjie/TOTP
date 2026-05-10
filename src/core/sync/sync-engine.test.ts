@@ -354,6 +354,55 @@ describe('createSyncEngine', () => {
     expect((await syncStore.load()).pendingConflict).toBeNull();
   });
 
+  it('rejects a stale pending conflict payload instead of overwriting newer sync state', async () => {
+    const vaultStorage = createMemoryVaultStorageAdapter();
+    const syncStore = createMemorySyncMetadataStore({
+      baseRevision: 'rev-base',
+      baseFingerprint: await createFingerprint(BASE_VAULT)
+    });
+
+    await vaultStorage.area.set({ vault: LOCAL_VAULT });
+
+    const engine = createSyncEngine({
+      profile: {
+        id: 'primary',
+        enabled: true,
+        baseUrl: 'https://dav.example.com',
+        filePath: '/vault.json'
+      },
+      vaultStorage,
+      syncStore,
+      client: {
+        download: vi.fn().mockResolvedValue({
+          revision: 'rev-remote',
+          updatedAt: '2026-05-10T11:00:00.000Z',
+          etag: '"etag-remote"',
+          encryptedVault: REMOTE_VAULT
+        } satisfies WebDavRemoteSnapshot),
+        upload: vi.fn()
+      },
+      now: () => '2026-05-10T11:30:00.000Z'
+    });
+
+    const conflictResult = await engine.syncNow();
+    const staleConflict = {
+      ...(conflictResult.pendingConflict as PendingSyncConflict),
+      detectedAt: '2026-05-10T09:00:00.000Z'
+    };
+
+    const resolved = await engine.resolveConflict(staleConflict, 'remote');
+
+    expect(resolved.status).toBe('validation-error');
+    expect(resolved.error).toMatchObject({
+      kind: 'validation',
+      retryable: false
+    });
+    expect((await vaultStorage.area.get('vault')).vault).toEqual(LOCAL_VAULT);
+    expect((await syncStore.load()).pendingConflict).toMatchObject({
+      detectedAt: '2026-05-10T11:30:00.000Z'
+    });
+  });
+
   it('preserves conflict context during background open sync so the UI can resolve it later', async () => {
     const vaultStorage = createMemoryVaultStorageAdapter();
     const syncStore = createMemorySyncMetadataStore({
