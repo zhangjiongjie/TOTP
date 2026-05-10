@@ -21,7 +21,11 @@ const emptySnapshot: SettingsSnapshot = {
   }
 };
 
-export function SettingsPage() {
+interface SettingsPageProps {
+  onBack?: () => void;
+}
+
+export function SettingsPage({ onBack }: SettingsPageProps = {}) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot>(emptySnapshot);
   const [webDavMessage, setWebDavMessage] = useState('');
   const [importExportMessage, setImportExportMessage] = useState('');
@@ -121,6 +125,11 @@ export function SettingsPage() {
                 type="button"
                 aria-label="Back"
                 onClick={() => {
+                  if (onBack) {
+                    onBack();
+                    return;
+                  }
+
                   window.location.hash = '#accounts';
                 }}
                 style={topActionStyle}

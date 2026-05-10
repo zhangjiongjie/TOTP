@@ -4,10 +4,11 @@ import { UnlockForm, type UnlockMode } from '../components/forms/UnlockForm';
 
 interface UnlockPageProps {
   mode: UnlockMode;
+  message?: string | null;
   onSubmit?: (password: string) => void;
 }
 
-export function UnlockPage({ mode, onSubmit }: UnlockPageProps) {
+export function UnlockPage({ mode, message = null, onSubmit }: UnlockPageProps) {
   const subtitle =
     mode === 'setup'
       ? '首次打开时先创建本地主密码，之后才能查看和同步验证码。'
@@ -25,6 +26,9 @@ export function UnlockPage({ mode, onSubmit }: UnlockPageProps) {
         }}
       >
         <UnlockForm mode={mode} onSubmit={onSubmit} />
+        {message ? (
+          <p style={{ margin: '14px 0 0', color: '#9d4156', lineHeight: 1.5 }}>{message}</p>
+        ) : null}
       </div>
     </PopupShell>
   );

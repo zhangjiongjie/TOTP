@@ -77,7 +77,17 @@ function TopActionButton({
   );
 }
 
-export function AccountListPage() {
+interface AccountListPageProps {
+  onOpenAdd?: () => void;
+  onOpenSettings?: () => void;
+  onOpenDetails?: (accountId: string) => void;
+}
+
+export function AccountListPage({
+  onOpenAdd,
+  onOpenSettings,
+  onOpenDetails
+}: AccountListPageProps = {}) {
   const [now, setNow] = useState(() => Date.now());
   const [accounts, setAccounts] = useState<Awaited<ReturnType<typeof accountService.listAccounts>>>(
     []
@@ -128,6 +138,11 @@ export function AccountListPage() {
               <TopActionButton
                 label="Settings"
                 onClick={() => {
+                  if (onOpenSettings) {
+                    onOpenSettings();
+                    return;
+                  }
+
                   window.location.hash = '#settings';
                 }}
               />
@@ -138,6 +153,11 @@ export function AccountListPage() {
       floatingAction={
         <FloatingAddButton
           onClick={() => {
+            if (onOpenAdd) {
+              onOpenAdd();
+              return;
+            }
+
             window.location.hash = '#add';
           }}
         />
@@ -159,9 +179,19 @@ export function AccountListPage() {
               key={account.id}
               account={account}
               onOpenDetails={(accountId) => {
+                if (onOpenDetails) {
+                  onOpenDetails(accountId);
+                  return;
+                }
+
                 window.location.hash = `#detail/${accountId}`;
               }}
               onEdit={(accountId) => {
+                if (onOpenDetails) {
+                  onOpenDetails(accountId);
+                  return;
+                }
+
                 window.location.hash = `#detail/${accountId}`;
               }}
               onMoveGroup={(accountId) => {

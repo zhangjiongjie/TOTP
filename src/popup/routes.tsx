@@ -1,75 +1,89 @@
-import { useEffect, useState } from 'react';
 import { AddAccountPage } from './pages/AddAccountPage';
 import { AccountDetailPage } from './pages/AccountDetailPage';
 import { AccountListPage } from './pages/AccountListPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { UnlockPage } from './pages/UnlockPage';
-import type { UnlockMode } from './components/forms/UnlockForm';
 
-type PopupRoute =
+export type PopupRoute =
   | { name: 'accounts' }
   | { name: 'add' }
   | { name: 'settings' }
   | { name: 'detail'; accountId: string }
-  | { name: UnlockMode };
+  | { name: 'setup' | 'unlock' };
 
-function readRoute(): PopupRoute {
-  const hash = window.location.hash.replace('#', '');
+interface PopupRoutesProps {
+  route: PopupRoute;
+  unlockMessage?: string | null;
+  onNavigate: (route: PopupRoute) => void;
+  onUnlock: (password: string) => void;
+}
 
-  if (hash === 'add') {
+export function readRoute(hash = window.location.hash): PopupRoute {
+  const normalizedHash = hash.replace(/^#/, '');
+
+  if (normalizedHash === 'add') {
     return { name: 'add' };
   }
 
-  if (hash === 'settings') {
+  if (normalizedHash === 'settings') {
     return { name: 'settings' };
   }
 
-  if (hash.startsWith('detail/')) {
-    const accountId = hash.slice('detail/'.length);
+  if (normalizedHash.startsWith('detail/')) {
+    const accountId = normalizedHash.slice('detail/'.length);
     if (accountId) {
       return { name: 'detail', accountId };
     }
   }
 
-  if (hash === 'setup' || hash === 'unlock') {
-    return { name: hash };
+  if (normalizedHash === 'setup' || normalizedHash === 'unlock') {
+    return { name: normalizedHash };
   }
 
   return { name: 'accounts' };
 }
 
-export function PopupRoutes() {
-  const [route, setRoute] = useState<PopupRoute>(readRoute);
+export function writeRoute(route: PopupRoute) {
+  const nextHash =
+    route.name === 'accounts'
+      ? '#accounts'
+      : route.name === 'detail'
+        ? `#detail/${route.accountId}`
+        : `#${route.name}`;
 
-  useEffect(() => {
-    const handleHashChange = () => setRoute(readRoute());
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange();
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-  function navigate(nextRoute: PopupRoute) {
-    if (nextRoute.name === 'accounts') {
-      window.location.hash = '#accounts';
-    } else if (nextRoute.name === 'add') {
-      window.location.hash = '#add';
-    } else if (nextRoute.name === 'detail') {
-      window.location.hash = `#detail/${nextRoute.accountId}`;
-    } else {
-      window.location.hash = `#${nextRoute.name}`;
-    }
-    setRoute(readRoute());
+  if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
   }
+}
 
+export function isProtectedRoute(route: PopupRoute) {
+  return route.name !== 'setup' && route.name !== 'unlock';
+}
+
+export function routesEqual(left: PopupRoute, right: PopupRoute) {
+  return (
+    left.name === right.name &&
+    (left.name !== 'detail' || right.name !== 'detail' || left.accountId === right.accountId)
+  );
+}
+
+export function PopupRoutes({
+  route,
+  unlockMessage = null,
+  onNavigate,
+  onUnlock
+}: PopupRoutesProps) {
   if (route.name === 'setup' || route.name === 'unlock') {
-    return <UnlockPage mode={route.name} onSubmit={() => navigate({ name: 'accounts' })} />;
+    return (
+      <UnlockPage mode={route.name} message={unlockMessage} onSubmit={onUnlock} />
+    );
   }
 
   if (route.name === 'add') {
     return (
       <AddAccountPage
-        onBack={() => navigate({ name: 'accounts' })}
-        onAccountCreated={(accountId) => navigate({ name: 'detail', accountId })}
+        onBack={() => onNavigate({ name: 'accounts' })}
+        onAccountCreated={(accountId) => onNavigate({ name: 'detail', accountId })}
       />
     );
   }
@@ -78,15 +92,21 @@ export function PopupRoutes() {
     return (
       <AccountDetailPage
         accountId={route.accountId}
-        onBack={() => navigate({ name: 'accounts' })}
-        onDeleted={() => navigate({ name: 'accounts' })}
+        onBack={() => onNavigate({ name: 'accounts' })}
+        onDeleted={() => onNavigate({ name: 'accounts' })}
       />
     );
   }
 
   if (route.name === 'settings') {
-    return <SettingsPage />;
+    return <SettingsPage onBack={() => onNavigate({ name: 'accounts' })} />;
   }
 
-  return <AccountListPage />;
+  return (
+    <AccountListPage
+      onOpenAdd={() => onNavigate({ name: 'add' })}
+      onOpenSettings={() => onNavigate({ name: 'settings' })}
+      onOpenDetails={(accountId) => onNavigate({ name: 'detail', accountId })}
+    />
+  );
 }
