@@ -1,4 +1,12 @@
-const PBKDF2_ITERATIONS = 310_000;
+export const CURRENT_ENVELOPE_VERSION = 1;
+
+export const CURRENT_KDF_CONFIG = {
+  name: 'PBKDF2',
+  iterations: 310_000,
+  hash: 'SHA-256'
+} as const;
+
+export const CURRENT_CIPHER = 'AES-GCM' as const;
 
 export async function deriveAesKey(password: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey(
@@ -11,13 +19,13 @@ export async function deriveAesKey(password: string, salt: Uint8Array) {
 
   return crypto.subtle.deriveKey(
     {
-      name: 'PBKDF2',
+      name: CURRENT_KDF_CONFIG.name,
       salt: toArrayBuffer(salt),
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256'
+      iterations: CURRENT_KDF_CONFIG.iterations,
+      hash: CURRENT_KDF_CONFIG.hash
     },
     material,
-    { name: 'AES-GCM', length: 256 },
+    { name: CURRENT_CIPHER, length: 256 },
     false,
     ['encrypt', 'decrypt']
   );
@@ -36,10 +44,10 @@ export async function derivePasswordVerifier(
   );
   const bits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
+      name: CURRENT_KDF_CONFIG.name,
       salt: toArrayBuffer(salt),
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256'
+      iterations: CURRENT_KDF_CONFIG.iterations,
+      hash: CURRENT_KDF_CONFIG.hash
     },
     material,
     256

@@ -6,7 +6,13 @@ import {
   VaultIntegrityError,
   VaultParameterError
 } from './errors';
-import { deriveAesKey, derivePasswordVerifier } from './password';
+import {
+  CURRENT_CIPHER,
+  CURRENT_ENVELOPE_VERSION,
+  CURRENT_KDF_CONFIG,
+  deriveAesKey,
+  derivePasswordVerifier
+} from './password';
 
 const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
@@ -17,7 +23,13 @@ export interface VaultPayload {
 }
 
 export interface EncryptedVaultBlob {
-  version: number;
+  formatVersion: number;
+  kdf: {
+    name: string;
+    iterations: number;
+    hash: string;
+  };
+  cipher: string;
   salt: string;
   iv: string;
   ciphertext: string;
@@ -41,13 +53,15 @@ export async function encryptVault(
   const passwordVerifier = await derivePasswordVerifier(password, salt);
   const plaintext = new TextEncoder().encode(JSON.stringify(validatedVault));
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: toArrayBuffer(iv) },
+    { name: CURRENT_CIPHER, iv: toArrayBuffer(iv) },
     key,
     toArrayBuffer(plaintext)
   );
 
   return {
-    version: validatedVault.version,
+    formatVersion: CURRENT_ENVELOPE_VERSION,
+    kdf: { ...CURRENT_KDF_CONFIG },
+    cipher: CURRENT_CIPHER,
     salt: encodeBase64(salt),
     iv: encodeBase64(iv),
     ciphertext: encodeBase64(new Uint8Array(ciphertext)),
@@ -63,6 +77,7 @@ export async function decryptVault(
   assertEncryptedVaultBlob(encryptedVault);
 
   try {
+    assertSupportedEncryptionMetadata(encryptedVault);
     const salt = decodeBase64(encryptedVault.salt);
     const iv = decodeBase64(encryptedVault.iv);
     const expectedVerifier = decodeBase64(encryptedVault.passwordVerifier);
@@ -74,7 +89,7 @@ export async function decryptVault(
 
     const key = await deriveAesKey(password, salt);
     const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: toArrayBuffer(iv) },
+      { name: encryptedVault.cipher, iv: toArrayBuffer(iv) },
       key,
       toArrayBuffer(decodeBase64(encryptedVault.ciphertext))
     );
@@ -119,7 +134,12 @@ export function isEncryptedVaultBlob(value: unknown): value is EncryptedVaultBlo
   }
 
   return (
-    typeof value.version === 'number' &&
+    typeof value.formatVersion === 'number' &&
+    isRecord(value.kdf) &&
+    typeof value.kdf.name === 'string' &&
+    typeof value.kdf.iterations === 'number' &&
+    typeof value.kdf.hash === 'string' &&
+    typeof value.cipher === 'string' &&
     typeof value.salt === 'string' &&
     typeof value.iv === 'string' &&
     typeof value.ciphertext === 'string' &&
@@ -140,6 +160,24 @@ function assertPassword(password: string, action: string) {
 function assertEncryptedVaultBlob(value: unknown): asserts value is EncryptedVaultBlob {
   if (!isEncryptedVaultBlob(value)) {
     throw new VaultIntegrityError('Encrypted vault blob is invalid');
+  }
+}
+
+function assertSupportedEncryptionMetadata(encryptedVault: EncryptedVaultBlob) {
+  if (encryptedVault.formatVersion !== CURRENT_ENVELOPE_VERSION) {
+    throw new VaultIntegrityError('Encrypted vault format version is not supported');
+  }
+
+  if (
+    encryptedVault.kdf.name !== CURRENT_KDF_CONFIG.name ||
+    encryptedVault.kdf.iterations !== CURRENT_KDF_CONFIG.iterations ||
+    encryptedVault.kdf.hash !== CURRENT_KDF_CONFIG.hash
+  ) {
+    throw new VaultIntegrityError('Encrypted vault KDF metadata is not supported');
+  }
+
+  if (encryptedVault.cipher !== CURRENT_CIPHER) {
+    throw new VaultIntegrityError('Encrypted vault cipher metadata is not supported');
   }
 }
 

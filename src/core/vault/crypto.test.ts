@@ -7,12 +7,21 @@ import {
   type EncryptedVaultBlob
 } from './crypto';
 import { VaultAuthenticationError, VaultIntegrityError } from './errors';
-import { deriveAesKey, derivePasswordVerifier } from './password';
+import {
+  CURRENT_CIPHER,
+  CURRENT_ENVELOPE_VERSION,
+  CURRENT_KDF_CONFIG,
+  deriveAesKey,
+  derivePasswordVerifier
+} from './password';
 
 it('round-trips encrypted vault payload', async () => {
   const encrypted = await encryptVault({ version: 1, accounts: [] }, 'pass123456');
   const decrypted = await decryptVault(encrypted, 'pass123456');
 
+  expect(encrypted.formatVersion).toBe(CURRENT_ENVELOPE_VERSION);
+  expect(encrypted.kdf).toEqual(CURRENT_KDF_CONFIG);
+  expect(encrypted.cipher).toBe(CURRENT_CIPHER);
   expect(decrypted.version).toBe(1);
   expect(decrypted.accounts).toEqual([]);
 });
@@ -62,11 +71,45 @@ it('rejects encrypted blobs with invalid base64 content', async () => {
   await expect(
     decryptVault(
       {
-        version: 1,
+        formatVersion: CURRENT_ENVELOPE_VERSION,
+        kdf: CURRENT_KDF_CONFIG,
+        cipher: CURRENT_CIPHER,
         salt: '*',
         iv: '*',
         ciphertext: '*',
         passwordVerifier: '*'
+      },
+      'pass123456'
+    )
+  ).rejects.toBeInstanceOf(VaultIntegrityError);
+});
+
+it('rejects unsupported envelope versions', async () => {
+  const encrypted = await encryptVault({ version: 1, accounts: [] }, 'pass123456');
+
+  await expect(
+    decryptVault({ ...encrypted, formatVersion: 999 }, 'pass123456')
+  ).rejects.toBeInstanceOf(VaultIntegrityError);
+});
+
+it('rejects unsupported kdf or cipher metadata', async () => {
+  const encrypted = await encryptVault({ version: 1, accounts: [] }, 'pass123456');
+
+  await expect(
+    decryptVault(
+      {
+        ...encrypted,
+        kdf: { ...encrypted.kdf, name: 'scrypt' }
+      },
+      'pass123456'
+    )
+  ).rejects.toBeInstanceOf(VaultIntegrityError);
+
+  await expect(
+    decryptVault(
+      {
+        ...encrypted,
+        cipher: 'AES-CBC'
       },
       'pass123456'
     )
@@ -88,7 +131,9 @@ async function createEncryptedBlobForTest(
   );
 
   return {
-    version: 1,
+    formatVersion: CURRENT_ENVELOPE_VERSION,
+    kdf: CURRENT_KDF_CONFIG,
+    cipher: CURRENT_CIPHER,
     salt: encodeBase64(salt),
     iv: encodeBase64(iv),
     ciphertext: encodeBase64(new Uint8Array(ciphertext)),
