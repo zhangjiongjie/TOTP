@@ -1,4 +1,5 @@
 import type { WebDavProfile } from '../core/sync/webdav-client';
+import type { PendingSyncConflict } from '../core/sync/conflict';
 import type { StorageAreaLike } from '../core/vault/vault-store';
 
 const SYNC_METADATA_STORAGE_KEY = 'syncMetadata';
@@ -6,6 +7,7 @@ const SYNC_METADATA_STORAGE_KEY = 'syncMetadata';
 export interface SyncMetadata {
   profile: WebDavProfile | null;
   baseRevision: string | null;
+  baseFingerprint: string | null;
   localRevision: string | null;
   localFingerprint: string | null;
   localUpdatedAt: string | null;
@@ -17,6 +19,7 @@ export interface SyncMetadata {
   lastPushedAt: string | null;
   lastStatus: string | null;
   lastError: string | null;
+  pendingConflict: PendingSyncConflict | null;
 }
 
 export type SyncMetadataSnapshot = Readonly<SyncMetadata>;
@@ -30,6 +33,7 @@ export interface SyncMetadataStore {
 const defaultSyncMetadata: SyncMetadata = {
   profile: null,
   baseRevision: null,
+  baseFingerprint: null,
   localRevision: null,
   localFingerprint: null,
   localUpdatedAt: null,
@@ -40,7 +44,8 @@ const defaultSyncMetadata: SyncMetadata = {
   lastPulledAt: null,
   lastPushedAt: null,
   lastStatus: null,
-  lastError: null
+  lastError: null,
+  pendingConflict: null
 };
 
 export function createMemorySyncMetadataStore(
@@ -107,6 +112,7 @@ function createMetadata(value: unknown): SyncMetadata {
   return {
     profile: record.profile ?? null,
     baseRevision: normalizeString(record.baseRevision),
+    baseFingerprint: normalizeString(record.baseFingerprint),
     localRevision: normalizeString(record.localRevision),
     localFingerprint: normalizeString(record.localFingerprint),
     localUpdatedAt: normalizeString(record.localUpdatedAt),
@@ -117,7 +123,8 @@ function createMetadata(value: unknown): SyncMetadata {
     lastPulledAt: normalizeString(record.lastPulledAt),
     lastPushedAt: normalizeString(record.lastPushedAt),
     lastStatus: normalizeString(record.lastStatus),
-    lastError: normalizeString(record.lastError)
+    lastError: normalizeString(record.lastError),
+    pendingConflict: isPendingSyncConflict(record.pendingConflict) ? record.pendingConflict : null
   };
 }
 
@@ -130,4 +137,17 @@ function createSnapshot(metadata: SyncMetadata): SyncMetadataSnapshot {
 
 function normalizeString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
+}
+
+function isPendingSyncConflict(value: unknown): value is PendingSyncConflict {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  return (
+    value.kind === 'vault-conflict' &&
+    typeof value.detectedAt === 'string' &&
+    'local' in value &&
+    'remote' in value
+  );
 }

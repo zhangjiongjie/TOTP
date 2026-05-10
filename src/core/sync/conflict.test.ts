@@ -35,9 +35,28 @@ describe('detectVaultConflict', () => {
     expect(decision.remote.revision).toBe('rev-1');
   });
 
+  it('returns no-conflict when revisions differ but local and remote content fingerprints match', () => {
+    const decision = detectVaultConflict({
+      baseRevision: 'rev-1',
+      baseFingerprint: 'fingerprint-1',
+      local: createSnapshot({
+        revision: 'rev-local',
+        fingerprint: 'fingerprint-shared'
+      }),
+      remote: createSnapshot({
+        source: 'remote',
+        revision: 'rev-remote',
+        fingerprint: 'fingerprint-shared'
+      })
+    });
+
+    expect(decision.kind).toBe('no-conflict');
+  });
+
   it('returns apply-local when only local changed from the base revision', () => {
     const decision = detectVaultConflict({
       baseRevision: 'rev-1',
+      baseFingerprint: 'fingerprint-1',
       local: createSnapshot({
         revision: 'rev-2',
         fingerprint: 'fingerprint-2',
@@ -54,6 +73,7 @@ describe('detectVaultConflict', () => {
   it('returns apply-remote when only remote changed from the base revision', () => {
     const decision = detectVaultConflict({
       baseRevision: 'rev-1',
+      baseFingerprint: 'fingerprint-1',
       local: createSnapshot(),
       remote: createSnapshot({
         source: 'remote',
@@ -71,6 +91,7 @@ describe('detectVaultConflict', () => {
   it('returns conflict when both local and remote changed from the base revision', () => {
     const decision = detectVaultConflict({
       baseRevision: 'rev-1',
+      baseFingerprint: 'fingerprint-1',
       local: createSnapshot({
         revision: 'rev-local',
         fingerprint: 'fingerprint-local',

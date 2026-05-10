@@ -1,3 +1,5 @@
+import type { EncryptedVaultBlob } from '../vault/crypto';
+
 export type SyncEntitySource = 'local' | 'remote' | 'local-cache';
 export type SyncEntityStatus = 'ready' | 'missing';
 
@@ -15,8 +17,23 @@ export interface SyncChoice {
   updatedAt: string;
 }
 
+export interface PendingConflictSnapshot extends SyncInspectionSnapshot {
+  encryptedVault: EncryptedVaultBlob;
+  etag: string | null;
+}
+
+export interface PendingSyncConflict {
+  kind: 'vault-conflict';
+  detectedAt: string;
+  baseRevision: string | null;
+  baseFingerprint: string | null;
+  local: PendingConflictSnapshot;
+  remote: PendingConflictSnapshot;
+}
+
 interface SyncDecisionBase {
   baseRevision: string | null;
+  baseFingerprint: string | null;
   local: SyncInspectionSnapshot | null;
   remote: SyncInspectionSnapshot | null;
 }
@@ -40,12 +57,14 @@ export type SyncDecision = NoConflictDecision | ApplyRevisionDecision | Conflict
 
 export interface DetectVaultConflictInput {
   baseRevision: string | null;
+  baseFingerprint?: string | null;
   local: SyncInspectionSnapshot | null;
   remote: SyncInspectionSnapshot | null;
 }
 
 export function detectVaultConflict({
   baseRevision,
+  baseFingerprint = null,
   local,
   remote
 }: DetectVaultConflictInput): SyncDecision {
@@ -53,6 +72,7 @@ export function detectVaultConflict({
     return {
       kind: 'no-conflict',
       baseRevision,
+      baseFingerprint,
       local,
       remote
     };
@@ -62,6 +82,7 @@ export function detectVaultConflict({
     return {
       kind: 'apply-local',
       baseRevision,
+      baseFingerprint,
       local,
       remote,
       winner: local,
@@ -73,6 +94,7 @@ export function detectVaultConflict({
     return {
       kind: 'apply-remote',
       baseRevision,
+      baseFingerprint,
       local,
       remote,
       winner: remote,
@@ -84,6 +106,7 @@ export function detectVaultConflict({
     return {
       kind: 'no-conflict',
       baseRevision,
+      baseFingerprint,
       local,
       remote
     };
@@ -93,22 +116,24 @@ export function detectVaultConflict({
     return {
       kind: 'no-conflict',
       baseRevision,
+      baseFingerprint,
       local,
       remote
     };
   }
 
-  if (!baseRevision) {
-    return createConflictDecision(baseRevision, local, remote);
+  if (!baseFingerprint) {
+    return createConflictDecision(baseRevision, baseFingerprint, local, remote);
   }
 
-  const localChanged = local.revision !== baseRevision;
-  const remoteChanged = remote.revision !== baseRevision;
+  const localChanged = local.fingerprint !== baseFingerprint;
+  const remoteChanged = remote.fingerprint !== baseFingerprint;
 
   if (localChanged && !remoteChanged) {
     return {
       kind: 'apply-local',
       baseRevision,
+      baseFingerprint,
       local,
       remote,
       winner: local,
@@ -120,6 +145,7 @@ export function detectVaultConflict({
     return {
       kind: 'apply-remote',
       baseRevision,
+      baseFingerprint,
       local,
       remote,
       winner: remote,
@@ -131,22 +157,25 @@ export function detectVaultConflict({
     return {
       kind: 'no-conflict',
       baseRevision,
+      baseFingerprint,
       local,
       remote
     };
   }
 
-  return createConflictDecision(baseRevision, local, remote);
+  return createConflictDecision(baseRevision, baseFingerprint, local, remote);
 }
 
 function createConflictDecision(
   baseRevision: string | null,
+  baseFingerprint: string | null,
   local: SyncInspectionSnapshot,
   remote: SyncInspectionSnapshot
 ): ConflictDecision {
   return {
     kind: 'conflict',
     baseRevision,
+    baseFingerprint,
     local,
     remote,
     choices: [

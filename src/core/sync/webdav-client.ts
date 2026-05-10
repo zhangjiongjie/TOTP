@@ -1,4 +1,4 @@
-import type { EncryptedVaultBlob } from '../vault/crypto';
+import { isEncryptedVaultBlob, type EncryptedVaultBlob } from '../vault/crypto';
 
 export interface WebDavProfile {
   id: string;
@@ -31,6 +31,30 @@ export interface WebDavUploadInput {
   previousEtag?: string | null;
 }
 
+export type WebDavOperationKind = 'download' | 'upload' | 'validation';
+
+export class WebDavClientError extends Error {
+  readonly kind: WebDavOperationKind;
+  readonly statusCode: number | null;
+  readonly retryable: boolean;
+
+  constructor(
+    kind: WebDavOperationKind,
+    message: string,
+    options: { cause?: unknown; statusCode?: number | null; retryable?: boolean } = {}
+  ) {
+    super(message, { cause: options.cause });
+    this.name = 'WebDavClientError';
+    this.kind = kind;
+    this.statusCode = options.statusCode ?? null;
+    this.retryable =
+      options.retryable ??
+      (kind === 'validation'
+        ? false
+        : this.statusCode == null || this.statusCode === 412 || this.statusCode >= 500);
+  }
+}
+
 export interface WebDavClient {
   download(profile: WebDavProfile): Promise<WebDavRemoteSnapshot | null>;
   upload(profile: WebDavProfile, payload: WebDavUploadInput): Promise<WebDavRemoteSnapshot>;
@@ -41,17 +65,25 @@ export function createFetchWebDavClient(
 ): WebDavClient {
   return {
     async download(profile) {
-      const response = await fetchImpl(buildWebDavUrl(profile), {
-        method: 'GET',
-        headers: buildHeaders(profile)
-      });
+      let response: Response;
+
+      try {
+        response = await fetchImpl(buildWebDavUrl(profile), {
+          method: 'GET',
+          headers: buildHeaders(profile)
+        });
+      } catch (error) {
+        throw new WebDavClientError('download', 'WebDAV download failed', { cause: error });
+      }
 
       if (response.status === 404) {
         return null;
       }
 
       if (!response.ok) {
-        throw new Error(`WebDAV download failed with status ${response.status}`);
+        throw new WebDavClientError('download', `WebDAV download failed with status ${response.status}`, {
+          statusCode: response.status
+        });
       }
 
       const body = (await response.json()) as unknown;
@@ -65,23 +97,31 @@ export function createFetchWebDavClient(
       };
     },
     async upload(profile, payload) {
-      const response = await fetchImpl(buildWebDavUrl(profile), {
-        method: 'PUT',
-        headers: {
-          ...buildHeaders(profile),
-          'Content-Type': 'application/json',
-          ...(payload.previousEtag ? { 'If-Match': payload.previousEtag } : {})
-        },
-        body: JSON.stringify({
-          schemaVersion: 1,
-          revision: payload.revision,
-          updatedAt: payload.updatedAt,
-          encryptedVault: payload.encryptedVault
-        } satisfies WebDavRemoteEnvelope)
-      });
+      let response: Response;
+
+      try {
+        response = await fetchImpl(buildWebDavUrl(profile), {
+          method: 'PUT',
+          headers: {
+            ...buildHeaders(profile),
+            'Content-Type': 'application/json',
+            ...(payload.previousEtag ? { 'If-Match': payload.previousEtag } : {})
+          },
+          body: JSON.stringify({
+            schemaVersion: 1,
+            revision: payload.revision,
+            updatedAt: payload.updatedAt,
+            encryptedVault: payload.encryptedVault
+          } satisfies WebDavRemoteEnvelope)
+        });
+      } catch (error) {
+        throw new WebDavClientError('upload', 'WebDAV upload failed', { cause: error });
+      }
 
       if (!response.ok) {
-        throw new Error(`WebDAV upload failed with status ${response.status}`);
+        throw new WebDavClientError('upload', `WebDAV upload failed with status ${response.status}`, {
+          statusCode: response.status
+        });
       }
 
       return {
@@ -122,7 +162,7 @@ function buildHeaders(profile: WebDavProfile): Record<string, string> {
 
 function parseRemoteEnvelope(value: unknown): WebDavRemoteEnvelope {
   if (!isRemoteEnvelope(value)) {
-    throw new Error('WebDAV payload is invalid');
+    throw new WebDavClientError('validation', 'WebDAV payload is invalid');
   }
 
   return value;
@@ -137,7 +177,6 @@ function isRemoteEnvelope(value: unknown): value is WebDavRemoteEnvelope {
     value.schemaVersion === 1 &&
     typeof value.revision === 'string' &&
     typeof value.updatedAt === 'string' &&
-    typeof value.encryptedVault === 'object' &&
-    value.encryptedVault !== null
+    isEncryptedVaultBlob(value.encryptedVault)
   );
 }

@@ -1,5 +1,11 @@
 import { getSessionState } from '../state/session-store';
-import { createSyncEngine, type CreateSyncEngineOptions, type SyncRunResult } from '../core/sync/sync-engine';
+import {
+  createSyncEngine,
+  type CreateSyncEngineOptions,
+  type PendingSyncConflict,
+  type SyncOnOpenResult,
+  type SyncRunResult
+} from '../core/sync/sync-engine';
 
 export interface SyncScheduler {
   start(): void;
@@ -8,8 +14,9 @@ export interface SyncScheduler {
 }
 
 export interface SyncService {
-  syncOnOpen(): Promise<SyncRunResult>;
+  syncOnOpen(): Promise<SyncOnOpenResult>;
   manualSync(): Promise<SyncRunResult>;
+  resolveConflict(payload: PendingSyncConflict, choice: 'local' | 'remote'): Promise<SyncRunResult>;
   scheduleSync(intervalMs: number): SyncScheduler;
 }
 
@@ -19,12 +26,18 @@ export function createSyncService(options: CreateSyncEngineOptions): SyncService
   return {
     async syncOnOpen() {
       if (!getSessionState().isUnlocked) {
-        return {
+        const initial: SyncRunResult = {
           status: 'noop',
           source: 'none',
           localRevision: null,
           remoteRevision: null,
-          localVault: null
+          localVault: null,
+          pendingConflict: null
+        };
+
+        return {
+          initial,
+          background: Promise.resolve(initial)
         };
       }
 
@@ -32,6 +45,9 @@ export function createSyncService(options: CreateSyncEngineOptions): SyncService
     },
     async manualSync() {
       return engine.syncNow();
+    },
+    async resolveConflict(payload, choice) {
+      return engine.resolveConflict(payload, choice);
     },
     scheduleSync(intervalMs) {
       let timerId: number | null = null;
@@ -43,7 +59,7 @@ export function createSyncService(options: CreateSyncEngineOptions): SyncService
           }
 
           timerId = globalThis.setInterval(() => {
-            void engine.syncNow();
+            void engine.syncNow().catch(() => undefined);
           }, intervalMs);
         },
         stop() {

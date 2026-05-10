@@ -1,32 +1,55 @@
 import {
   detectVaultConflict,
+  type PendingConflictSnapshot,
+  type PendingSyncConflict,
   type SyncDecision,
   type SyncInspectionSnapshot
 } from './conflict';
-import type {
-  WebDavClient,
-  WebDavProfile,
-  WebDavRemoteSnapshot
+import {
+  WebDavClientError,
+  type WebDavClient,
+  type WebDavProfile,
+  type WebDavRemoteSnapshot
 } from './webdav-client';
 import { loadEncryptedVault, saveEncryptedVault, type VaultStorageAdapter } from '../vault/vault-store';
 import type { EncryptedVaultBlob } from '../vault/crypto';
-import type { SyncMetadataStore } from '../../state/sync-store';
+import type { SyncMetadataSnapshot, SyncMetadataStore } from '../../state/sync-store';
 
-export type { WebDavProfile, WebDavRemoteSnapshot } from './webdav-client';
+export { WebDavClientError, type PendingSyncConflict, type WebDavProfile, type WebDavRemoteSnapshot };
 
-export interface SyncEngine {
-  syncOnOpen(): Promise<SyncRunResult>;
-  syncNow(): Promise<SyncRunResult>;
+export type SyncSource = 'none' | 'local' | 'remote' | 'local-cache';
+export type SyncResultStatus =
+  | 'disabled'
+  | 'noop'
+  | 'local-cache'
+  | 'pulled'
+  | 'pushed'
+  | 'conflict'
+  | 'download-error'
+  | 'upload-error'
+  | 'validation-error';
+
+export interface SyncResultError {
+  kind: 'download' | 'upload' | 'validation';
+  message: string;
+  retryable: boolean;
+  statusCode: number | null;
 }
 
 export interface SyncRunResult {
-  status: 'disabled' | 'noop' | 'local-cache' | 'pulled' | 'pushed' | 'conflict';
-  source: 'none' | 'local' | 'remote' | 'local-cache';
+  status: SyncResultStatus;
+  source: SyncSource;
   localRevision: string | null;
   remoteRevision: string | null;
   localVault: EncryptedVaultBlob | null;
   decision?: SyncDecision;
-  error?: string;
+  pendingConflict?: PendingSyncConflict | null;
+  error?: SyncResultError;
+}
+
+export interface SyncOnOpenResult {
+  initial: SyncRunResult;
+  background: Promise<SyncRunResult>;
 }
 
 export interface CreateSyncEngineOptions {
@@ -35,6 +58,26 @@ export interface CreateSyncEngineOptions {
   vaultStorage: VaultStorageAdapter;
   syncStore: SyncMetadataStore;
   now?: () => string;
+}
+
+export interface SyncEngine {
+  syncOnOpen(): Promise<SyncOnOpenResult>;
+  syncNow(): Promise<SyncRunResult>;
+  resolveConflict(payload: PendingSyncConflict, choice: 'local' | 'remote'): Promise<SyncRunResult>;
+}
+
+interface SyncContext {
+  metadata: SyncMetadataSnapshot;
+  localVault: EncryptedVaultBlob | null;
+  localSnapshot: SyncInspectionSnapshot | null;
+}
+
+interface SyncCandidateInput {
+  encryptedVault: EncryptedVaultBlob;
+  revision: string;
+  updatedAt: string;
+  source: 'local' | 'remote';
+  status?: 'ready';
 }
 
 export function createSyncEngine({
@@ -47,275 +90,349 @@ export function createSyncEngine({
   return {
     async syncOnOpen() {
       if (!profile?.enabled) {
-        return createDisabledResult();
+        const disabled = createDisabledResult();
+
+        return {
+          initial: disabled,
+          background: Promise.resolve(disabled)
+        };
       }
 
-      const localVault = await loadEncryptedVault(vaultStorage);
-      const metadata = await syncStore.load();
-      const local = localVault
-        ? await createLocalSnapshot(
-            localVault,
-            metadata.localRevision,
-            metadata.localFingerprint,
-            metadata.localUpdatedAt,
-            now
-          )
-        : null;
+      const context = await loadContext(vaultStorage, syncStore, now);
+      const initial = createOpenInitialResult(context.localVault, context.localSnapshot, context.metadata);
+      const background = performSync(profile, 'open', context, client, vaultStorage, syncStore, now);
 
-      try {
-        const remoteSnapshot = await client.download(profile);
-
-        if (!remoteSnapshot) {
-          return finalizeNoop(syncStore, now, localVault, local, metadata.remoteRevision);
-        }
-
-        const remote = createRemoteSnapshot(remoteSnapshot);
-
-        if (!local) {
-          return pullRemoteVault(remoteSnapshot, profile, vaultStorage, syncStore, now);
-        }
-
-        const decision = detectVaultConflict({
-          baseRevision: metadata.baseRevision,
-          local,
-          remote
-        });
-
-        if (decision.kind === 'apply-remote') {
-          return pullRemoteVault(remoteSnapshot, profile, vaultStorage, syncStore, now);
-        }
-
-        if (decision.kind === 'conflict') {
-          await syncStore.save({
-            lastStatus: 'conflict',
-            lastError: null
-          });
-
-          return {
-            status: 'conflict',
-            source: 'none',
-            localRevision: local.revision,
-            remoteRevision: remote.revision,
-            localVault,
-            decision
-          };
-        }
-
-        if (remote.revision === local.revision) {
-          return finalizeNoop(syncStore, now, localVault, local, remote.revision);
-        }
-
-        return finalizeNoop(syncStore, now, localVault, local, remote.revision);
-      } catch (error) {
-        if (localVault) {
-          await syncStore.save({
-            lastStatus: 'local-cache',
-            lastError: error instanceof Error ? error.message : 'Unknown sync error'
-          });
-
-          return {
-            status: 'local-cache',
-            source: 'local-cache',
-            localRevision: local?.revision ?? null,
-            remoteRevision: metadata.remoteRevision,
-            localVault,
-            error: error instanceof Error ? error.message : 'Unknown sync error'
-          };
-        }
-
-        throw error;
-      }
+      return {
+        initial,
+        background
+      };
     },
     async syncNow() {
       if (!profile?.enabled) {
         return createDisabledResult();
       }
 
-      const metadata = await syncStore.load();
-      const localVault = await loadEncryptedVault(vaultStorage);
-      const local = localVault
-        ? await createLocalSnapshot(
-            localVault,
-            metadata.localRevision,
-            metadata.localFingerprint,
-            metadata.localUpdatedAt,
-            now
-          )
-        : null;
+      const context = await loadContext(vaultStorage, syncStore, now);
 
-      let remoteSnapshot: WebDavRemoteSnapshot | null;
-
-      try {
-        remoteSnapshot = await client.download(profile);
-      } catch (error) {
-        if (localVault) {
-          await syncStore.save({
-            lastStatus: 'local-cache',
-            lastError: error instanceof Error ? error.message : 'Unknown sync error'
-          });
-
-          return {
-            status: 'local-cache',
-            source: 'local-cache',
-            localRevision: local?.revision ?? null,
-            remoteRevision: metadata.remoteRevision,
-            localVault,
-            error: error instanceof Error ? error.message : 'Unknown sync error'
-          };
-        }
-
-        throw error;
+      return performSync(profile, 'manual', context, client, vaultStorage, syncStore, now);
+    },
+    async resolveConflict(payload, choice) {
+      if (!profile?.enabled) {
+        return createDisabledResult();
       }
 
-      if (!local && !remoteSnapshot) {
-        return finalizeNoop(syncStore, now, null, null, null);
-      }
-
-      if (!local && remoteSnapshot) {
-        return pullRemoteVault(remoteSnapshot, profile, vaultStorage, syncStore, now);
-      }
-
-      if (local && !remoteSnapshot) {
-        return pushLocalVault(localVault!, local, profile, client, syncStore, metadata.remoteEtag, now);
-      }
-
-      const remote = createRemoteSnapshot(remoteSnapshot!);
-      const decision = detectVaultConflict({
-        baseRevision: metadata.baseRevision,
-        local,
-        remote
-      });
-
-      if (decision.kind === 'apply-local') {
-        return pushLocalVault(localVault!, local!, profile, client, syncStore, metadata.remoteEtag, now);
-      }
-
-      if (decision.kind === 'apply-remote') {
-        return pullRemoteVault(remoteSnapshot!, profile, vaultStorage, syncStore, now);
-      }
-
-      if (decision.kind === 'conflict') {
-        await syncStore.save({
-          lastStatus: 'conflict',
-          lastError: null,
-          remoteRevision: remote.revision,
-          remoteUpdatedAt: remote.updatedAt,
-          remoteEtag: remoteSnapshot!.etag
-        });
-
-        return {
-          status: 'conflict',
-          source: 'none',
-          localRevision: local!.revision,
-          remoteRevision: remote.revision,
-          localVault,
-          decision
+      if (choice === 'remote') {
+        const remoteSnapshot: WebDavRemoteSnapshot = {
+          revision: payload.remote.revision,
+          updatedAt: payload.remote.updatedAt,
+          encryptedVault: payload.remote.encryptedVault,
+          etag: payload.remote.etag
         };
+
+        return applyRemoteSnapshot(remoteSnapshot, profile, vaultStorage, syncStore, now);
       }
 
-      return finalizeNoop(syncStore, now, localVault, local, remote.revision);
+      return uploadLocalSnapshot(
+        {
+          encryptedVault: payload.local.encryptedVault,
+          snapshot: payload.local
+        },
+        profile,
+        client,
+        syncStore,
+        payload.remote.etag,
+        now
+      );
     }
   };
 }
 
-async function pullRemoteVault(
+async function performSync(
+  profile: WebDavProfile,
+  mode: 'open' | 'manual',
+  context: SyncContext,
+  client: WebDavClient,
+  vaultStorage: VaultStorageAdapter,
+  syncStore: SyncMetadataStore,
+  now: () => string
+): Promise<SyncRunResult> {
+  let remoteSnapshot: WebDavRemoteSnapshot | null;
+
+  try {
+    remoteSnapshot = await client.download(profile);
+  } catch (error) {
+    return handleSyncError('download', error, context, syncStore);
+  }
+
+  if (!context.localSnapshot && !remoteSnapshot) {
+    return finalizeNoop(syncStore, now, {
+      localVault: null,
+      local: null,
+      remote: null
+    });
+  }
+
+  if (!context.localSnapshot && remoteSnapshot) {
+    return applyRemoteSnapshot(remoteSnapshot, profile, vaultStorage, syncStore, now);
+  }
+
+  if (context.localSnapshot && !remoteSnapshot) {
+    return uploadLocalSnapshot(
+      {
+        encryptedVault: context.localVault!,
+        snapshot: context.localSnapshot
+      },
+      profile,
+      client,
+      syncStore,
+      null,
+      now
+    );
+  }
+
+  const remote = await createCandidateSnapshot({
+    encryptedVault: remoteSnapshot!.encryptedVault,
+    revision: remoteSnapshot!.revision,
+    updatedAt: remoteSnapshot!.updatedAt,
+    source: 'remote'
+  });
+  const local = context.localSnapshot!;
+  const decision = detectVaultConflict({
+    baseRevision: context.metadata.baseRevision,
+    baseFingerprint: context.metadata.baseFingerprint,
+    local,
+    remote
+  });
+
+  if (decision.kind === 'apply-local') {
+    return uploadLocalSnapshot(
+      {
+        encryptedVault: context.localVault!,
+        snapshot: local
+      },
+      profile,
+      client,
+      syncStore,
+      remoteSnapshot!.etag,
+      now
+    );
+  }
+
+  if (decision.kind === 'apply-remote') {
+    return applyRemoteSnapshot(remoteSnapshot!, profile, vaultStorage, syncStore, now);
+  }
+
+  if (decision.kind === 'conflict') {
+    const pendingConflict = createPendingConflict(
+      context.metadata,
+      {
+        ...local,
+        encryptedVault: context.localVault!,
+        etag: null
+      },
+      {
+        ...remote,
+        encryptedVault: remoteSnapshot!.encryptedVault,
+        etag: remoteSnapshot!.etag
+      },
+      now()
+    );
+
+    await syncStore.save({
+      profile,
+      remoteRevision: remote.revision,
+      remoteUpdatedAt: remote.updatedAt,
+      remoteEtag: remoteSnapshot!.etag,
+      lastStatus: 'conflict',
+      lastError: null,
+      pendingConflict
+    });
+
+    return {
+      status: 'conflict',
+      source: mode === 'open' && context.localVault ? 'local-cache' : 'none',
+      localRevision: local.revision,
+      remoteRevision: remote.revision,
+      localVault: context.localVault,
+      decision,
+      pendingConflict
+    };
+  }
+
+  return finalizeNoop(syncStore, now, {
+    localVault: context.localVault,
+    local,
+    remote,
+    profile,
+    remoteEtag: remoteSnapshot!.etag
+  });
+}
+
+async function loadContext(
+  vaultStorage: VaultStorageAdapter,
+  syncStore: SyncMetadataStore,
+  now: () => string
+): Promise<SyncContext> {
+  const metadata = await syncStore.load();
+  const localVault = await loadEncryptedVault(vaultStorage);
+  const localSnapshot = localVault
+    ? await createLocalSnapshot(localVault, metadata.localRevision, metadata.localFingerprint, now)
+    : null;
+
+  return {
+    metadata,
+    localVault,
+    localSnapshot
+  };
+}
+
+async function applyRemoteSnapshot(
   remoteSnapshot: WebDavRemoteSnapshot,
   profile: WebDavProfile,
   vaultStorage: VaultStorageAdapter,
   syncStore: SyncMetadataStore,
   now: () => string
 ): Promise<SyncRunResult> {
-  await saveEncryptedVault(remoteSnapshot.encryptedVault, vaultStorage);
-  const syncedAt = now();
+  const remote = await createCandidateSnapshot({
+    encryptedVault: remoteSnapshot.encryptedVault,
+    revision: remoteSnapshot.revision,
+    updatedAt: remoteSnapshot.updatedAt,
+    source: 'remote'
+  });
 
+  await saveEncryptedVault(remoteSnapshot.encryptedVault, vaultStorage);
+
+  const syncedAt = now();
   await syncStore.save({
     profile,
-    baseRevision: remoteSnapshot.revision,
-    localRevision: remoteSnapshot.revision,
-    localFingerprint: remoteSnapshot.revision,
-    localUpdatedAt: remoteSnapshot.updatedAt,
-    remoteRevision: remoteSnapshot.revision,
-    remoteUpdatedAt: remoteSnapshot.updatedAt,
+    baseRevision: remote.revision,
+    baseFingerprint: remote.fingerprint,
+    localRevision: remote.revision,
+    localFingerprint: remote.fingerprint,
+    localUpdatedAt: remote.updatedAt,
+    remoteRevision: remote.revision,
+    remoteUpdatedAt: remote.updatedAt,
     remoteEtag: remoteSnapshot.etag,
     lastSyncedAt: syncedAt,
     lastPulledAt: syncedAt,
     lastStatus: 'pulled',
-    lastError: null
+    lastError: null,
+    pendingConflict: null
   });
 
   return {
     status: 'pulled',
     source: 'remote',
-    localRevision: remoteSnapshot.revision,
-    remoteRevision: remoteSnapshot.revision,
-    localVault: remoteSnapshot.encryptedVault
+    localRevision: remote.revision,
+    remoteRevision: remote.revision,
+    localVault: remoteSnapshot.encryptedVault,
+    pendingConflict: null
   };
 }
 
-async function pushLocalVault(
-  localVault: EncryptedVaultBlob,
-  local: SyncInspectionSnapshot,
+async function uploadLocalSnapshot(
+  local: { encryptedVault: EncryptedVaultBlob; snapshot: SyncInspectionSnapshot },
   profile: WebDavProfile,
   client: WebDavClient,
   syncStore: SyncMetadataStore,
   previousEtag: string | null,
   now: () => string
 ): Promise<SyncRunResult> {
-  const uploaded = await client.upload(profile, {
-    revision: local.revision,
-    updatedAt: local.updatedAt,
-    encryptedVault: localVault,
-    previousEtag
+  let uploaded: WebDavRemoteSnapshot;
+
+  try {
+    uploaded = await client.upload(profile, {
+      revision: local.snapshot.revision,
+      updatedAt: local.snapshot.updatedAt,
+      encryptedVault: local.encryptedVault,
+      previousEtag
+    });
+  } catch (error) {
+    return handleSyncError(
+      'upload',
+      error,
+      {
+        localVault: local.encryptedVault,
+        localSnapshot: local.snapshot,
+        metadata: await syncStore.load()
+      },
+      syncStore
+    );
+  }
+
+  const remote = await createCandidateSnapshot({
+    encryptedVault: uploaded.encryptedVault,
+    revision: uploaded.revision,
+    updatedAt: uploaded.updatedAt,
+    source: 'remote'
   });
   const syncedAt = now();
 
   await syncStore.save({
     profile,
-    baseRevision: uploaded.revision,
-    localRevision: local.revision,
-    localFingerprint: local.fingerprint,
-    localUpdatedAt: local.updatedAt,
-    remoteRevision: uploaded.revision,
+    baseRevision: remote.revision,
+    baseFingerprint: local.snapshot.fingerprint,
+    localRevision: remote.revision,
+    localFingerprint: local.snapshot.fingerprint,
+    localUpdatedAt: uploaded.updatedAt,
+    remoteRevision: remote.revision,
     remoteUpdatedAt: uploaded.updatedAt,
     remoteEtag: uploaded.etag,
     lastSyncedAt: syncedAt,
     lastPushedAt: syncedAt,
     lastStatus: 'pushed',
-    lastError: null
+    lastError: null,
+    pendingConflict: null
   });
 
   return {
     status: 'pushed',
     source: 'local',
-    localRevision: local.revision,
-    remoteRevision: uploaded.revision,
-    localVault
+    localRevision: remote.revision,
+    remoteRevision: remote.revision,
+    localVault: local.encryptedVault,
+    pendingConflict: null
   };
 }
 
 async function finalizeNoop(
   syncStore: SyncMetadataStore,
   now: () => string,
-  localVault: EncryptedVaultBlob | null,
-  local: SyncInspectionSnapshot | null,
-  remoteRevision: string | null
+  input: {
+    localVault: EncryptedVaultBlob | null;
+    local: SyncInspectionSnapshot | null;
+    remote: SyncInspectionSnapshot | null;
+    profile?: WebDavProfile;
+    remoteEtag?: string | null;
+  }
 ): Promise<SyncRunResult> {
+  const localRevision = input.remote?.revision ?? input.local?.revision ?? null;
+  const localFingerprint = input.remote?.fingerprint ?? input.local?.fingerprint ?? null;
+  const updatedAt = input.remote?.updatedAt ?? input.local?.updatedAt ?? null;
+
   await syncStore.save({
+    ...(input.profile ? { profile: input.profile } : {}),
+    baseRevision: input.remote?.revision ?? input.local?.revision ?? null,
+    baseFingerprint: input.remote?.fingerprint ?? input.local?.fingerprint ?? null,
+    localRevision,
+    localFingerprint,
+    localUpdatedAt: updatedAt,
+    remoteRevision: input.remote?.revision ?? null,
+    remoteUpdatedAt: input.remote?.updatedAt ?? null,
+    remoteEtag: input.remoteEtag ?? null,
     lastSyncedAt: now(),
     lastStatus: 'noop',
     lastError: null,
-    localRevision: local?.revision ?? null,
-    localFingerprint: local?.fingerprint ?? null,
-    localUpdatedAt: local?.updatedAt ?? null,
-    remoteRevision
+    pendingConflict: null
   });
 
   return {
     status: 'noop',
     source: 'none',
-    localRevision: local?.revision ?? null,
-    remoteRevision,
-    localVault
+    localRevision,
+    remoteRevision: input.remote?.revision ?? null,
+    localVault: input.localVault,
+    pendingConflict: null
   };
 }
 
@@ -325,17 +442,34 @@ function createDisabledResult(): SyncRunResult {
     source: 'none',
     localRevision: null,
     remoteRevision: null,
-    localVault: null
+    localVault: null,
+    pendingConflict: null
   };
 }
 
-function createRemoteSnapshot(remoteSnapshot: WebDavRemoteSnapshot): SyncInspectionSnapshot {
+function createOpenInitialResult(
+  localVault: EncryptedVaultBlob | null,
+  localSnapshot: SyncInspectionSnapshot | null,
+  metadata: SyncMetadataSnapshot
+): SyncRunResult {
+  if (!localVault) {
+    return {
+      status: 'noop',
+      source: 'none',
+      localRevision: localSnapshot?.revision ?? metadata.localRevision,
+      remoteRevision: metadata.remoteRevision,
+      localVault: null,
+      pendingConflict: metadata.pendingConflict
+    };
+  }
+
   return {
-    revision: remoteSnapshot.revision,
-    updatedAt: remoteSnapshot.updatedAt,
-    fingerprint: remoteSnapshot.revision,
-    source: 'remote',
-    status: 'ready'
+    status: 'local-cache',
+    source: 'local-cache',
+    localRevision: localSnapshot?.revision ?? metadata.localRevision,
+    remoteRevision: metadata.remoteRevision,
+    localVault,
+    pendingConflict: metadata.pendingConflict
   };
 }
 
@@ -343,30 +477,109 @@ async function createLocalSnapshot(
   encryptedVault: EncryptedVaultBlob,
   previousRevision: string | null,
   previousFingerprint: string | null,
-  previousUpdatedAt: string | null,
   now: () => string
 ): Promise<SyncInspectionSnapshot> {
-  const fingerprint = await createVaultRevision(encryptedVault);
-  const isKnownSnapshot =
-    (previousFingerprint && previousFingerprint === fingerprint) ||
-    (!previousFingerprint && previousRevision !== null);
-  const revision = isKnownSnapshot && previousRevision ? previousRevision : fingerprint;
-  const updatedAt = isKnownSnapshot && previousUpdatedAt ? previousUpdatedAt : now();
+  const fingerprint = await createFingerprint(encryptedVault);
+  const revision =
+    previousFingerprint && previousFingerprint === fingerprint && previousRevision
+      ? previousRevision
+      : `local:${fingerprint}`;
 
   return {
     revision,
-    updatedAt,
+    updatedAt: now(),
     fingerprint,
     source: 'local',
     status: 'ready'
   };
 }
 
-async function createVaultRevision(encryptedVault: EncryptedVaultBlob): Promise<string> {
+async function createCandidateSnapshot({
+  encryptedVault,
+  revision,
+  updatedAt,
+  source,
+  status = 'ready'
+}: SyncCandidateInput): Promise<SyncInspectionSnapshot> {
+  return {
+    revision,
+    updatedAt,
+    fingerprint: await createFingerprint(encryptedVault),
+    source,
+    status
+  };
+}
+
+function createPendingConflict(
+  metadata: SyncMetadataSnapshot,
+  local: PendingConflictSnapshot,
+  remote: PendingConflictSnapshot,
+  detectedAt: string
+): PendingSyncConflict {
+  return {
+    kind: 'vault-conflict',
+    detectedAt,
+    baseRevision: metadata.baseRevision,
+    baseFingerprint: metadata.baseFingerprint,
+    local,
+    remote
+  };
+}
+
+async function createFingerprint(encryptedVault: EncryptedVaultBlob): Promise<string> {
   const encoded = new TextEncoder().encode(JSON.stringify(encryptedVault));
   const digest = await crypto.subtle.digest('SHA-256', encoded);
 
   return [...new Uint8Array(digest)]
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
+}
+
+async function handleSyncError(
+  operation: 'download' | 'upload',
+  error: unknown,
+  context: SyncContext,
+  syncStore: SyncMetadataStore
+): Promise<SyncRunResult> {
+  const normalized = normalizeSyncError(operation, error);
+  const status = `${normalized.kind}-error` as Extract<
+    SyncResultStatus,
+    'download-error' | 'upload-error' | 'validation-error'
+  >;
+
+  await syncStore.save({
+    lastStatus: status,
+    lastError: normalized.message
+  });
+
+  return {
+    status,
+    source: context.localVault ? 'local-cache' : 'none',
+    localRevision: context.localSnapshot?.revision ?? context.metadata.localRevision,
+    remoteRevision: context.metadata.remoteRevision,
+    localVault: context.localVault,
+    pendingConflict: context.metadata.pendingConflict,
+    error: normalized
+  };
+}
+
+function normalizeSyncError(
+  operation: 'download' | 'upload',
+  error: unknown
+): SyncResultError {
+  if (error instanceof WebDavClientError) {
+    return {
+      kind: error.kind,
+      message: error.message,
+      retryable: error.retryable,
+      statusCode: error.statusCode
+    };
+  }
+
+  return {
+    kind: operation,
+    message: error instanceof Error ? error.message : 'Unknown sync error',
+    retryable: true,
+    statusCode: null
+  };
 }
