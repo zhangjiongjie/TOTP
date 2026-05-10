@@ -86,15 +86,22 @@ export function AddAccountPage({
     >
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-          <ModeButton label="Manual" active={mode === 'manual'} onClick={() => setMode('manual')} />
+          <ModeButton
+            label="Manual"
+            active={mode === 'manual'}
+            disabled={isSubmitting}
+            onClick={() => setMode('manual')}
+          />
           <ModeButton
             label="otpauth://"
             active={mode === 'otpauth'}
+            disabled={isSubmitting}
             onClick={() => setMode('otpauth')}
           />
           <ModeButton
             label="QR image"
             active={mode === 'qr'}
+            disabled={isSubmitting}
             onClick={() => {
               setMode('qr');
               setQrDialogOpen(true);
@@ -189,6 +196,10 @@ export function AddAccountPage({
         open={qrDialogOpen}
         onClose={() => setQrDialogOpen(false)}
         onImported={async (draft) => {
+          if (isSubmitting) {
+            return;
+          }
+
           setIsSubmitting(true);
           try {
             const account = await accountService.addAccount(draft);
@@ -206,23 +217,27 @@ export function AddAccountPage({
 function ModeButton({
   label,
   active,
+  disabled = false,
   onClick
 }: {
   label: string;
   active: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       style={{
         padding: '12px 10px',
         borderRadius: '16px',
         background: active ? 'rgba(56, 104, 151, 0.14)' : 'rgba(238, 244, 249, 0.92)',
         border: `1px solid ${active ? 'rgba(56, 104, 151, 0.35)' : 'var(--color-line)'}`,
         color: active ? 'var(--color-brand-strong)' : 'var(--color-ink-soft)',
-        cursor: 'pointer'
+        cursor: disabled ? 'wait' : 'pointer',
+        opacity: disabled ? 0.72 : 1
       }}
     >
       {label}

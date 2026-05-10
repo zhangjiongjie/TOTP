@@ -81,7 +81,7 @@ export function AccountDetailPage({
   }
 
   async function handleSave() {
-    if (isSaving) {
+    if (isSaving || isDeleting) {
       return;
     }
 
@@ -121,19 +121,19 @@ export function AccountDetailPage({
           onChange={updateField}
           onSubmit={handleSave}
           helperText="The code preview on the list will refresh from this data."
-          isSubmitting={isSaving}
+          isSubmitting={isSaving || isDeleting}
         />
         <button
           type="button"
-          disabled={isDeleting}
+          disabled={isSaving || isDeleting}
           onClick={() => setConfirmOpen(true)}
           style={{
             padding: '12px 16px',
             borderRadius: '999px',
             background: 'rgba(187, 83, 105, 0.12)',
             color: '#a14157',
-            cursor: isDeleting ? 'wait' : 'pointer',
-            opacity: isDeleting ? 0.72 : 1
+            cursor: isSaving || isDeleting ? 'wait' : 'pointer',
+            opacity: isSaving || isDeleting ? 0.72 : 1
           }}
         >
           Delete account
@@ -144,9 +144,9 @@ export function AccountDetailPage({
         open={confirmOpen}
         accountLabel={`${account.issuer} · ${account.accountName}`}
         onCancel={() => setConfirmOpen(false)}
-        isSubmitting={isDeleting}
+        isSubmitting={isSaving || isDeleting}
         onConfirm={async () => {
-          if (isDeleting) {
+          if (isSaving || isDeleting) {
             return;
           }
 

@@ -48,4 +48,47 @@ describe('AccountDetailPage', () => {
 
     updateSpy.mockRestore();
   });
+
+  it('disables account deletion while a save request is in flight', async () => {
+    const updateSpy = vi
+      .spyOn(accountService, 'updateAccount')
+      .mockImplementation(() => new Promise(() => {}));
+
+    render(
+      <AccountDetailPage
+        accountId="demo-1"
+        onBack={() => {}}
+        onDeleted={() => {}}
+      />
+    );
+
+    expect(await screen.findByDisplayValue('alice@company.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(screen.getByRole('button', { name: 'Delete account' })).toBeDisabled();
+
+    updateSpy.mockRestore();
+  });
+
+  it('disables save while a delete request is in flight', async () => {
+    const deleteSpy = vi
+      .spyOn(accountService, 'deleteAccount')
+      .mockImplementation(() => new Promise(() => {}));
+
+    render(
+      <AccountDetailPage
+        accountId="demo-1"
+        onBack={() => {}}
+        onDeleted={() => {}}
+      />
+    );
+
+    expect(await screen.findByDisplayValue('alice@company.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(screen.getByRole('button', { name: 'Working...' })).toBeDisabled();
+
+    deleteSpy.mockRestore();
+  });
 });
