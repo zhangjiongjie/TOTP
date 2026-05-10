@@ -4,7 +4,9 @@ export interface SessionState {
   unlockedAt: string | null;
 }
 
-type SessionListener = (state: SessionState) => void;
+export type SessionSnapshot = Readonly<SessionState>;
+
+type SessionListener = (state: SessionSnapshot) => void;
 
 const lockedState: SessionState = {
   isUnlocked: false,
@@ -15,8 +17,8 @@ const lockedState: SessionState = {
 let sessionState: SessionState = lockedState;
 const listeners = new Set<SessionListener>();
 
-export function getSessionState(): SessionState {
-  return sessionState;
+export function getSessionState(): SessionSnapshot {
+  return createSnapshot(sessionState);
 }
 
 export function unlockSession(keyMaterial: CryptoKey, unlockedAt = new Date().toISOString()) {
@@ -36,7 +38,7 @@ export function lockSession() {
 
 export function subscribeSession(listener: SessionListener): () => void {
   listeners.add(listener);
-  listener(sessionState);
+  listener(createSnapshot(sessionState));
 
   return () => {
     listeners.delete(listener);
@@ -45,6 +47,14 @@ export function subscribeSession(listener: SessionListener): () => void {
 
 function emit() {
   for (const listener of listeners) {
-    listener(sessionState);
+    listener(createSnapshot(sessionState));
   }
+}
+
+function createSnapshot(state: SessionState): SessionSnapshot {
+  return Object.freeze({
+    isUnlocked: state.isUnlocked,
+    keyMaterial: state.keyMaterial,
+    unlockedAt: state.unlockedAt
+  });
 }
