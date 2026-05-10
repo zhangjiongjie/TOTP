@@ -17,29 +17,30 @@ export function AccountDetailPage({
   onBack,
   onDeleted
 }: AccountDetailPageProps) {
-  const [account, setAccount] = useState(() => accountService.getAccount(accountId));
-  const [values, setValues] = useState<AccountFormValues>(() =>
-    account
-      ? accountService.toFormValues(account)
-      : {
-          issuer: '',
-          accountName: '',
-          secret: '',
-          digits: '6',
-          period: '30',
-          algorithm: 'SHA1'
-        }
-  );
+  const [account, setAccount] = useState<Awaited<ReturnType<typeof accountService.getAccount>>>(null);
+  const [values, setValues] = useState<AccountFormValues>(() => getEmptyFormValues());
   const [message, setMessage] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    setAccount(accountService.getAccount(accountId));
-
-    return accountService.subscribe(() => {
-      const nextAccount = accountService.getAccount(accountId);
+    async function refreshAccount() {
+      setIsLoading(true);
+      const nextAccount = await accountService.getAccount(accountId);
       setAccount(nextAccount);
+      setIsLoading(false);
+    }
+
+    void refreshAccount();
+    const unsubscribe = accountService.subscribe(() => {
+      void refreshAccount();
     });
+
+    return () => {
+      unsubscribe();
+    };
   }, [accountId]);
 
   useEffect(() => {
@@ -47,6 +48,16 @@ export function AccountDetailPage({
       setValues(accountService.toFormValues(account));
     }
   }, [account]);
+
+  if (isLoading) {
+    return (
+      <PopupShell topBar={<TopBar eyebrow="Account" title="Loading account" actions={null} />}>
+        <div style={{ width: '100%' }}>
+          <p style={{ color: 'var(--color-ink-soft)' }}>Loading local account details...</p>
+        </div>
+      </PopupShell>
+    );
+  }
 
   if (!account) {
     return (
@@ -69,12 +80,21 @@ export function AccountDetailPage({
     setValues((current) => ({ ...current, [field]: value }));
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (isSaving) {
+      return;
+    }
+
+    setMessage('');
+    setIsSaving(true);
+
     try {
-      accountService.updateAccount(accountId, importService.fromManualForm(values));
+      await accountService.updateAccount(accountId, importService.fromManualForm(values));
       setMessage('Account updated.');
     } catch (caughtError) {
       setMessage(caughtError instanceof Error ? caughtError.message : 'Unable to update account.');
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -101,16 +121,19 @@ export function AccountDetailPage({
           onChange={updateField}
           onSubmit={handleSave}
           helperText="The code preview on the list will refresh from this data."
+          isSubmitting={isSaving}
         />
         <button
           type="button"
+          disabled={isDeleting}
           onClick={() => setConfirmOpen(true)}
           style={{
             padding: '12px 16px',
             borderRadius: '999px',
             background: 'rgba(187, 83, 105, 0.12)',
             color: '#a14157',
-            cursor: 'pointer'
+            cursor: isDeleting ? 'wait' : 'pointer',
+            opacity: isDeleting ? 0.72 : 1
           }}
         >
           Delete account
@@ -121,14 +144,40 @@ export function AccountDetailPage({
         open={confirmOpen}
         accountLabel={`${account.issuer} · ${account.accountName}`}
         onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          accountService.deleteAccount(accountId);
-          setConfirmOpen(false);
-          onDeleted();
+        isSubmitting={isDeleting}
+        onConfirm={async () => {
+          if (isDeleting) {
+            return;
+          }
+
+          setIsDeleting(true);
+          try {
+            await accountService.deleteAccount(accountId);
+            setConfirmOpen(false);
+            onDeleted();
+          } catch (caughtError) {
+            setConfirmOpen(false);
+            setMessage(
+              caughtError instanceof Error ? caughtError.message : 'Unable to delete account.'
+            );
+          } finally {
+            setIsDeleting(false);
+          }
         }}
       />
     </PopupShell>
   );
+}
+
+function getEmptyFormValues(): AccountFormValues {
+  return {
+    issuer: '',
+    accountName: '',
+    secret: '',
+    digits: '6',
+    period: '30',
+    algorithm: 'SHA1'
+  };
 }
 
 const actionStyle = {

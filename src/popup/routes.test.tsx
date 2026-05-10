@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PopupRoutes } from './routes';
 
 describe('PopupRoutes', () => {
-  it('navigates to accounts by updating the hash after unlock submit', () => {
+  it('navigates to accounts by updating the hash after unlock submit', async () => {
     window.location.hash = '#setup';
 
     render(<PopupRoutes />);
@@ -14,8 +14,6 @@ describe('PopupRoutes', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
 
     expect(window.location.hash).toBe('#accounts');
-    expect(
-      screen.getByRole('heading', { name: 'TOTP Authenticator' })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'TOTP Authenticator' })).toBeInTheDocument();
   });
 });

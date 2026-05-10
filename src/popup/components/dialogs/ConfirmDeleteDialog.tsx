@@ -3,13 +3,15 @@ interface ConfirmDeleteDialogProps {
   open: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  isSubmitting?: boolean;
 }
 
 export function ConfirmDeleteDialog({
   accountLabel,
   open,
   onCancel,
-  onConfirm
+  onConfirm,
+  isSubmitting = false
 }: ConfirmDeleteDialogProps) {
   if (!open) {
     return null;
@@ -73,8 +75,13 @@ export function ConfirmDeleteDialog({
             marginTop: '22px'
           }}
         >
-          <DialogButton label="Cancel" onClick={onCancel} />
-          <DialogButton label="Delete" onClick={onConfirm} tone="danger" />
+          <DialogButton label="Cancel" onClick={onCancel} disabled={isSubmitting} />
+          <DialogButton
+            label={isSubmitting ? 'Deleting...' : 'Delete'}
+            onClick={onConfirm}
+            tone="danger"
+            disabled={isSubmitting}
+          />
         </div>
       </section>
     </div>
@@ -84,16 +91,19 @@ export function ConfirmDeleteDialog({
 function DialogButton({
   label,
   onClick,
-  tone = 'default'
+  tone = 'default',
+  disabled = false
 }: {
   label: string;
   onClick: () => void;
   tone?: 'default' | 'danger';
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       style={{
         minWidth: '96px',
         padding: '11px 16px',
@@ -103,7 +113,8 @@ function DialogButton({
             ? 'linear-gradient(180deg, #bb5369 0%, #a14157 100%)'
             : 'rgba(238, 244, 249, 0.96)',
         color: tone === 'danger' ? '#fff' : 'var(--color-brand-strong)',
-        cursor: 'pointer'
+        cursor: disabled ? 'wait' : 'pointer',
+        opacity: disabled ? 0.72 : 1
       }}
     >
       {label}

@@ -12,6 +12,7 @@ export interface DemoAccount {
   code: string;
   period: number;
   secondsRemaining: number;
+  groupLabel?: string;
 }
 
 export interface AccountCardProps {
@@ -114,6 +115,18 @@ export function AccountCard({
           >
             {account.accountName}
           </p>
+          {account.groupLabel ? (
+            <p
+              style={{
+                margin: '6px 0 0',
+                color: 'var(--color-brand-strong)',
+                fontSize: '12px',
+                fontWeight: 600
+              }}
+            >
+              {`Group: ${account.groupLabel}`}
+            </p>
+          ) : null}
         </div>
       </div>
       <CountdownRing

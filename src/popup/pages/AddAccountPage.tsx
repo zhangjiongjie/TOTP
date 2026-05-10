@@ -26,27 +26,46 @@ export function AddAccountPage({
   const [otpauthInput, setOtpauthInput] = useState('');
   const [message, setMessage] = useState('');
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function updateField(field: keyof AccountFormValues, value: string) {
     setFormValues((current) => ({ ...current, [field]: value }));
   }
 
-  function handleManualSubmit() {
+  async function handleManualSubmit() {
+    if (isSubmitting) {
+      return;
+    }
+
+    setMessage('');
+    setIsSubmitting(true);
+
     try {
       const draft = importService.fromManualForm(formValues);
-      const account = accountService.addAccount(draft);
+      const account = await accountService.addAccount(draft);
       onAccountCreated(account.id);
     } catch (caughtError) {
       setMessage(caughtError instanceof Error ? caughtError.message : 'Unable to add account.');
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  function handleOtpAuthImport() {
+  async function handleOtpAuthImport() {
+    if (isSubmitting) {
+      return;
+    }
+
+    setMessage('');
+    setIsSubmitting(true);
+
     try {
-      const account = accountService.addAccount(importService.fromOtpAuthUri(otpauthInput));
+      const account = await accountService.addAccount(importService.fromOtpAuthUri(otpauthInput));
       onAccountCreated(account.id);
     } catch (caughtError) {
       setMessage(caughtError instanceof Error ? caughtError.message : 'Unable to import link.');
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -73,7 +92,14 @@ export function AddAccountPage({
             active={mode === 'otpauth'}
             onClick={() => setMode('otpauth')}
           />
-          <ModeButton label="QR image" active={mode === 'qr'} onClick={() => setQrDialogOpen(true)} />
+          <ModeButton
+            label="QR image"
+            active={mode === 'qr'}
+            onClick={() => {
+              setMode('qr');
+              setQrDialogOpen(true);
+            }}
+          />
         </div>
         {mode === 'manual' ? (
           <AccountForm
@@ -83,8 +109,9 @@ export function AddAccountPage({
             onChange={updateField}
             onSubmit={handleManualSubmit}
             helperText="Fill the issuer, account name, secret, digits, period, and algorithm."
+            isSubmitting={isSubmitting}
           />
-        ) : (
+        ) : mode === 'otpauth' ? (
           <section
             style={{
               padding: '18px',
@@ -99,6 +126,7 @@ export function AddAccountPage({
             </p>
             <textarea
               aria-label="otpauth link"
+              disabled={isSubmitting}
               value={otpauthInput}
               onChange={(event) => setOtpauthInput(event.target.value)}
               rows={6}
@@ -113,8 +141,43 @@ export function AddAccountPage({
                 resize: 'vertical'
               }}
             />
-            <button type="button" onClick={handleOtpAuthImport} style={primaryButtonStyle}>
-              Import link
+            <button
+              type="button"
+              onClick={handleOtpAuthImport}
+              disabled={isSubmitting}
+              style={{
+                ...primaryButtonStyle,
+                cursor: isSubmitting ? 'wait' : 'pointer',
+                opacity: isSubmitting ? 0.72 : 1
+              }}
+            >
+              {isSubmitting ? 'Importing...' : 'Import link'}
+            </button>
+          </section>
+        ) : (
+          <section
+            style={{
+              padding: '18px',
+              borderRadius: '22px',
+              background: 'rgba(250, 252, 255, 0.92)',
+              border: '1px solid var(--color-line)'
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: '20px' }}>Import QR image</h2>
+            <p style={{ margin: '8px 0 0', color: 'var(--color-ink-soft)', lineHeight: 1.5 }}>
+              Choose an image containing a QR code, or reopen the picker if you closed it.
+            </p>
+            <button
+              type="button"
+              onClick={() => setQrDialogOpen(true)}
+              disabled={isSubmitting}
+              style={{
+                ...primaryButtonStyle,
+                cursor: isSubmitting ? 'wait' : 'pointer',
+                opacity: isSubmitting ? 0.72 : 1
+              }}
+            >
+              Choose QR image
             </button>
           </section>
         )}
@@ -125,10 +188,15 @@ export function AddAccountPage({
       <QrImportDialog
         open={qrDialogOpen}
         onClose={() => setQrDialogOpen(false)}
-        onImported={(draft) => {
-          const account = accountService.addAccount(draft);
-          setQrDialogOpen(false);
-          onAccountCreated(account.id);
+        onImported={async (draft) => {
+          setIsSubmitting(true);
+          try {
+            const account = await accountService.addAccount(draft);
+            setQrDialogOpen(false);
+            onAccountCreated(account.id);
+          } finally {
+            setIsSubmitting(false);
+          }
         }}
       />
     </PopupShell>

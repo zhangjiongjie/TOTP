@@ -8,6 +8,7 @@ interface AccountFormProps {
   onChange: (field: keyof AccountFormValues, value: string) => void;
   onSubmit: () => void;
   helperText?: string;
+  isSubmitting?: boolean;
 }
 
 export function AccountForm({
@@ -16,7 +17,8 @@ export function AccountForm({
   values,
   onChange,
   onSubmit,
-  helperText
+  helperText,
+  isSubmitting = false
 }: AccountFormProps) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,18 +47,21 @@ export function AccountForm({
         value={values.issuer}
         onChange={(value) => onChange('issuer', value)}
         placeholder="GitHub"
+        disabled={isSubmitting}
       />
       <Field
         label="Account name"
         value={values.accountName}
         onChange={(value) => onChange('accountName', value)}
         placeholder="alice@company.com"
+        disabled={isSubmitting}
       />
       <Field
         label="Secret"
         value={values.secret}
         onChange={(value) => onChange('secret', value)}
         placeholder="JBSWY3DPEHPK3PXP"
+        disabled={isSubmitting}
       />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Field
@@ -64,12 +69,14 @@ export function AccountForm({
           value={values.digits}
           onChange={(value) => onChange('digits', value)}
           placeholder="6"
+          disabled={isSubmitting}
         />
         <Field
           label="Period"
           value={values.period}
           onChange={(value) => onChange('period', value)}
           placeholder="30"
+          disabled={isSubmitting}
         />
       </div>
       <label style={{ display: 'grid', gap: '8px' }}>
@@ -78,6 +85,7 @@ export function AccountForm({
         </span>
         <select
           aria-label="Algorithm"
+          disabled={isSubmitting}
           value={values.algorithm}
           onChange={(event) => onChange('algorithm', event.target.value)}
           style={fieldStyle}
@@ -89,6 +97,7 @@ export function AccountForm({
       </label>
       <button
         type="submit"
+        disabled={isSubmitting}
         style={{
           marginTop: '4px',
           padding: '13px 18px',
@@ -99,7 +108,7 @@ export function AccountForm({
           cursor: 'pointer'
         }}
       >
-        {submitLabel}
+        {isSubmitting ? 'Working...' : submitLabel}
       </button>
     </form>
   );
@@ -109,12 +118,14 @@ function Field({
   label,
   value,
   onChange,
-  placeholder
+  placeholder,
+  disabled = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  disabled?: boolean;
 }) {
   return (
     <label style={{ display: 'grid', gap: '8px' }}>
@@ -123,6 +134,7 @@ function Field({
       </span>
       <input
         aria-label={label}
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

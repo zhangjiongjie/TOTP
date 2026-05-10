@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AccountCard, type DemoAccount } from '../components/account/AccountCard';
 import { ConfirmDeleteDialog } from '../components/dialogs/ConfirmDeleteDialog';
+import { MoveGroupDialog } from '../components/dialogs/MoveGroupDialog';
 import { FloatingAddButton } from '../components/layout/FloatingAddButton';
 import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
@@ -71,13 +72,23 @@ function TopActionButton({ label }: { label: 'Sync' | 'Settings' }) {
 
 export function AccountListPage() {
   const [now, setNow] = useState(() => Date.now());
-  const [accounts, setAccounts] = useState(() => accountService.listAccounts());
+  const [accounts, setAccounts] = useState<Awaited<ReturnType<typeof accountService.listAccounts>>>(
+    []
+  );
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingMoveGroupId, setPendingMoveGroupId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isMovingGroup, setIsMovingGroup] = useState(false);
 
   useEffect(() => {
+    async function refreshAccounts() {
+      setAccounts(await accountService.listAccounts());
+    }
+
+    void refreshAccounts();
     const unsubscribe = accountService.subscribe(() => {
-      setAccounts(accountService.listAccounts());
+      void refreshAccounts();
     });
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
 
@@ -90,7 +101,12 @@ export function AccountListPage() {
   const runtimeAccounts: DemoAccount[] = accounts.map((account) =>
     accountService.createRuntime(account, now)
   );
-  const pendingDelete = pendingDeleteId ? accountService.getAccount(pendingDeleteId) : null;
+  const pendingDelete = pendingDeleteId
+    ? accounts.find((account) => account.id === pendingDeleteId) ?? null
+    : null;
+  const pendingMoveGroup = pendingMoveGroupId
+    ? accounts.find((account) => account.id === pendingMoveGroupId) ?? null
+    : null;
 
   return (
     <PopupShell
@@ -136,8 +152,8 @@ export function AccountListPage() {
               onEdit={(accountId) => {
                 window.location.hash = `#detail/${accountId}`;
               }}
-              onMoveGroup={() => {
-                setStatusMessage('Move Group is a placeholder in the demo service for now.');
+              onMoveGroup={(accountId) => {
+                setPendingMoveGroupId(accountId);
               }}
               onDelete={(accountId) => {
                 setPendingDeleteId(accountId);
@@ -155,12 +171,56 @@ export function AccountListPage() {
           accountLabel={
             pendingDelete ? `${pendingDelete.issuer} · ${pendingDelete.accountName}` : ''
           }
+          isSubmitting={isDeleting}
           onCancel={() => setPendingDeleteId(null)}
-          onConfirm={() => {
-            if (pendingDeleteId) {
-              accountService.deleteAccount(pendingDeleteId);
+          onConfirm={async () => {
+            if (!pendingDeleteId || isDeleting) {
+              return;
             }
-            setPendingDeleteId(null);
+
+            setIsDeleting(true);
+            try {
+              await accountService.deleteAccount(pendingDeleteId);
+              setStatusMessage('Account removed.');
+            } catch (caughtError) {
+              setStatusMessage(
+                caughtError instanceof Error ? caughtError.message : 'Unable to delete account.'
+              );
+            } finally {
+              setPendingDeleteId(null);
+              setIsDeleting(false);
+            }
+          }}
+        />
+        <MoveGroupDialog
+          open={Boolean(pendingMoveGroup)}
+          accountLabel={
+            pendingMoveGroup
+              ? `${pendingMoveGroup.issuer} · ${pendingMoveGroup.accountName}`
+              : ''
+          }
+          groups={accountService.getGroups()}
+          isSubmitting={isMovingGroup}
+          onClose={() => setPendingMoveGroupId(null)}
+          onSelectGroup={async (groupId) => {
+            if (!pendingMoveGroupId || isMovingGroup) {
+              return;
+            }
+
+            setIsMovingGroup(true);
+            try {
+              const updated = await accountService.moveGroup(pendingMoveGroupId, groupId);
+              setStatusMessage(`Moved to ${accountService.getGroupLabel(updated.groupId)}.`);
+            } catch (caughtError) {
+              setStatusMessage(
+                caughtError instanceof Error
+                  ? caughtError.message
+                  : 'Unable to move account to that group.'
+              );
+            } finally {
+              setPendingMoveGroupId(null);
+              setIsMovingGroup(false);
+            }
           }}
         />
       </>

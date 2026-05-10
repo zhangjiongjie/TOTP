@@ -43,18 +43,16 @@ function normalizeDraft(input: {
   period: number;
   algorithm: TotpAlgorithm;
 }): AccountDraft {
+  const normalizedAccountName = input.accountName.trim();
+  const normalizedIssuer = input.issuer.trim() || normalizedAccountName || 'Imported account';
   const draft: AccountDraft = {
-    issuer: input.issuer.trim(),
-    accountName: input.accountName.trim(),
+    issuer: normalizedIssuer,
+    accountName: normalizedAccountName,
     secret: input.secret.trim().replace(/\s+/g, '').toUpperCase(),
     digits: Number(input.digits),
     period: Number(input.period),
     algorithm: input.algorithm
   };
-
-  if (!draft.issuer) {
-    throw new ImportServiceError('Issuer is required.');
-  }
 
   if (!draft.accountName) {
     throw new ImportServiceError('Account name is required.');

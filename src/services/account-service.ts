@@ -19,6 +19,11 @@ export interface AccountFormValues {
   algorithm: TotpAlgorithm;
 }
 
+export interface AccountGroup {
+  id: string;
+  label: string;
+}
+
 export interface AccountRuntime {
   id: string;
   issuer: string;
@@ -26,10 +31,17 @@ export interface AccountRuntime {
   code: string;
   period: number;
   secondsRemaining: number;
+  groupId: string | null;
+  groupLabel: string;
 }
 
 const DEFAULT_GROUP_ID = 'default';
-const DEFAULT_SECONDS_REMAINING = 24;
+
+const accountGroups: AccountGroup[] = [
+  { id: 'default', label: 'Default' },
+  { id: 'personal', label: 'Personal' },
+  { id: 'work', label: 'Work' }
+];
 
 const demoSeedAccounts: AccountDraft[] = [
   {
@@ -74,10 +86,7 @@ const demoSeedAccounts: AccountDraft[] = [
   }
 ];
 
-let accounts = demoSeedAccounts.map((draft, index) =>
-  buildAccountRecord(draft, `demo-${index + 1}`)
-);
-
+let accounts = createSeedAccounts();
 const listeners = new Set<() => void>();
 
 export const accountService = {
@@ -86,26 +95,26 @@ export const accountService = {
     return () => listeners.delete(listener);
   },
 
-  listAccounts() {
+  async listAccounts() {
     return accounts.map(cloneAccount);
   },
 
-  getAccount(accountId: string) {
+  async getAccount(accountId: string) {
     const account = accounts.find((item) => item.id === accountId);
     return account ? cloneAccount(account) : null;
   },
 
-  addAccount(draft: AccountDraft) {
+  async addAccount(draft: AccountDraft) {
     const account = buildAccountRecord(draft);
     accounts = [account, ...accounts];
     emit();
     return cloneAccount(account);
   },
 
-  updateAccount(accountId: string, draft: AccountDraft) {
+  async updateAccount(accountId: string, draft: AccountDraft) {
     const existing = accounts.find((item) => item.id === accountId);
     if (!existing) {
-      return null;
+      throw new Error('Account not found.');
     }
 
     const updated: AccountRecord = {
@@ -128,10 +137,10 @@ export const accountService = {
     return cloneAccount(updated);
   },
 
-  deleteAccount(accountId: string) {
+  async deleteAccount(accountId: string) {
     const nextAccounts = accounts.filter((item) => item.id !== accountId);
     if (nextAccounts.length === accounts.length) {
-      return false;
+      throw new Error('Account not found.');
     }
 
     accounts = nextAccounts;
@@ -139,10 +148,41 @@ export const accountService = {
     return true;
   },
 
+  async moveGroup(accountId: string, groupId: string) {
+    const existing = accounts.find((item) => item.id === accountId);
+    if (!existing) {
+      throw new Error('Account not found.');
+    }
+
+    const targetGroup = accountGroups.find((group) => group.id === groupId);
+    if (!targetGroup) {
+      throw new Error('Target group not found.');
+    }
+
+    const updated: AccountRecord = {
+      ...existing,
+      groupId,
+      updatedAt: new Date().toISOString()
+    };
+
+    accounts = accounts.map((item) => (item.id === accountId ? updated : item));
+    emit();
+    return cloneAccount(updated);
+  },
+
+  getGroups() {
+    return accountGroups.map((group) => ({ ...group }));
+  },
+
+  getGroupLabel(groupId: string | null) {
+    return accountGroups.find((group) => group.id === groupId)?.label ?? 'Ungrouped';
+  },
+
   createRuntime(account: AccountRecord, now = Date.now()): AccountRuntime {
     const period = account.period || 30;
     const elapsedSeconds = Math.floor(now / 1000);
-    const secondsRemaining = period - (elapsedSeconds % period || period);
+    const cyclePosition = elapsedSeconds % period;
+    const secondsRemaining = cyclePosition === 0 ? period : period - cyclePosition;
     const code = createDemoCode(account, Math.floor(now / (period * 1000)));
 
     return {
@@ -151,7 +191,9 @@ export const accountService = {
       accountName: account.accountName,
       code,
       period,
-      secondsRemaining: secondsRemaining <= 0 ? period : secondsRemaining
+      secondsRemaining,
+      groupId: account.groupId,
+      groupLabel: this.getGroupLabel(account.groupId)
     };
   },
 
@@ -164,8 +206,17 @@ export const accountService = {
       period: String(account.period),
       algorithm: account.algorithm
     };
+  },
+
+  __resetForTests() {
+    accounts = createSeedAccounts();
+    emit();
   }
 };
+
+function createSeedAccounts() {
+  return demoSeedAccounts.map((draft, index) => buildAccountRecord(draft, `demo-${index + 1}`));
+}
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -223,12 +274,4 @@ export function getDefaultAccountFormValues(): AccountFormValues {
     period: '30',
     algorithm: 'SHA1'
   };
-}
-
-export function isAccountDraftValid(draft: AccountDraft) {
-  return draft.issuer.length > 0 && draft.accountName.length > 0 && draft.secret.length > 0;
-}
-
-export function getDefaultSecondsRemaining() {
-  return DEFAULT_SECONDS_REMAINING;
 }

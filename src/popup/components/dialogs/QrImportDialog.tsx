@@ -5,7 +5,7 @@ import type { AccountDraft } from '../../../services/account-service';
 interface QrImportDialogProps {
   open: boolean;
   onClose: () => void;
-  onImported: (draft: AccountDraft) => void;
+  onImported: (draft: AccountDraft) => Promise<void> | void;
 }
 
 export function QrImportDialog({
@@ -31,7 +31,7 @@ export function QrImportDialog({
 
     try {
       const draft = await importService.fromQrFile(file);
-      onImported(draft);
+      await onImported(draft);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -91,7 +91,7 @@ export function QrImportDialog({
           <span style={{ display: 'block', marginBottom: '10px', fontWeight: 600 }}>
             Choose image
           </span>
-          <input type="file" accept="image/*" onChange={handleFileChange} />
+          <input type="file" accept="image/*" onChange={handleFileChange} disabled={isImporting} />
         </label>
         {error ? (
           <p style={{ margin: '12px 0 0', color: '#9d4156', lineHeight: 1.5 }}>{error}</p>
@@ -100,13 +100,15 @@ export function QrImportDialog({
           <button
             type="button"
             onClick={onClose}
+            disabled={isImporting}
             style={{
               minWidth: '96px',
               padding: '11px 16px',
               borderRadius: '999px',
               background: 'rgba(238, 244, 249, 0.96)',
               color: 'var(--color-brand-strong)',
-              cursor: 'pointer'
+              cursor: isImporting ? 'wait' : 'pointer',
+              opacity: isImporting ? 0.72 : 1
             }}
           >
             {isImporting ? 'Working...' : 'Close'}
