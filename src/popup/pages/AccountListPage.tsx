@@ -1,50 +1,10 @@
+import { useEffect, useState } from 'react';
 import { AccountCard, type DemoAccount } from '../components/account/AccountCard';
+import { ConfirmDeleteDialog } from '../components/dialogs/ConfirmDeleteDialog';
 import { FloatingAddButton } from '../components/layout/FloatingAddButton';
 import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
-
-const demoAccounts: DemoAccount[] = [
-  {
-    id: 'github-alice',
-    issuer: 'GitHub',
-    accountName: 'alice@company.com',
-    code: '123 456',
-    period: 30,
-    secondsRemaining: 18
-  },
-  {
-    id: 'google-mail',
-    issuer: 'Google',
-    accountName: 'product.team@gmail.com',
-    code: '528 019',
-    period: 30,
-    secondsRemaining: 11
-  },
-  {
-    id: 'microsoft-dev',
-    issuer: 'Microsoft',
-    accountName: 'contoso.dev@outlook.com',
-    code: '881 204',
-    period: 30,
-    secondsRemaining: 24
-  },
-  {
-    id: 'openai-workspace',
-    issuer: 'OpenAI',
-    accountName: 'workspace-owner',
-    code: '402 933',
-    period: 30,
-    secondsRemaining: 7
-  },
-  {
-    id: 'slack-team',
-    issuer: 'Slack',
-    accountName: 'design-ops',
-    code: '750 811',
-    period: 30,
-    secondsRemaining: 29
-  }
-];
+import { accountService } from '../../services/account-service';
 
 function TopActionButton({ label }: { label: 'Sync' | 'Settings' }) {
   const icon =
@@ -110,13 +70,35 @@ function TopActionButton({ label }: { label: 'Sync' | 'Settings' }) {
 }
 
 export function AccountListPage() {
+  const [now, setNow] = useState(() => Date.now());
+  const [accounts, setAccounts] = useState(() => accountService.listAccounts());
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = accountService.subscribe(() => {
+      setAccounts(accountService.listAccounts());
+    });
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const runtimeAccounts: DemoAccount[] = accounts.map((account) =>
+    accountService.createRuntime(account, now)
+  );
+  const pendingDelete = pendingDeleteId ? accountService.getAccount(pendingDeleteId) : null;
+
   return (
     <PopupShell
       topBar={
         <TopBar
           eyebrow="Authenticator"
           title="TOTP Authenticator"
-          subtitle={`${demoAccounts.length} 个账号已就绪，点击验证码即可快速复制。`}
+          subtitle={`${runtimeAccounts.length} 个账号已就绪，点击验证码即可快速复制。`}
           actions={
             <>
               <TopActionButton label="Sync" />
@@ -125,22 +107,63 @@ export function AccountListPage() {
           }
         />
       }
-      floatingAction={<FloatingAddButton />}
+      floatingAction={
+        <FloatingAddButton
+          onClick={() => {
+            window.location.hash = '#add';
+          }}
+        />
+      }
     >
-      <div
-        style={{
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '14px',
-          paddingBottom: '88px',
-          overflowY: 'auto'
-        }}
-      >
-        {demoAccounts.map((account) => (
-          <AccountCard key={account.id} account={account} />
-        ))}
-      </div>
+      <>
+        <div
+          style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            paddingBottom: '88px',
+            overflowY: 'auto'
+          }}
+        >
+          {runtimeAccounts.map((account) => (
+            <AccountCard
+              key={account.id}
+              account={account}
+              onOpenDetails={(accountId) => {
+                window.location.hash = `#detail/${accountId}`;
+              }}
+              onEdit={(accountId) => {
+                window.location.hash = `#detail/${accountId}`;
+              }}
+              onMoveGroup={() => {
+                setStatusMessage('Move Group is a placeholder in the demo service for now.');
+              }}
+              onDelete={(accountId) => {
+                setPendingDeleteId(accountId);
+              }}
+            />
+          ))}
+          {statusMessage ? (
+            <p style={{ margin: 0, color: 'var(--color-ink-soft)', lineHeight: 1.5 }}>
+              {statusMessage}
+            </p>
+          ) : null}
+        </div>
+        <ConfirmDeleteDialog
+          open={Boolean(pendingDelete)}
+          accountLabel={
+            pendingDelete ? `${pendingDelete.issuer} · ${pendingDelete.accountName}` : ''
+          }
+          onCancel={() => setPendingDeleteId(null)}
+          onConfirm={() => {
+            if (pendingDeleteId) {
+              accountService.deleteAccount(pendingDeleteId);
+            }
+            setPendingDeleteId(null);
+          }}
+        />
+      </>
     </PopupShell>
   );
 }

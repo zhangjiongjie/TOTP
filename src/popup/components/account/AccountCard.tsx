@@ -3,6 +3,7 @@ import { resolveIconKey } from '../../../core/icons/icon-matchers';
 import { iconRegistry } from '../../../core/icons/icon-registry';
 import { CountdownRing } from './CountdownRing';
 import { CopyButton } from './CopyButton';
+import { AccountMenu } from './AccountMenu';
 
 export interface DemoAccount {
   id: string;
@@ -16,14 +17,24 @@ export interface DemoAccount {
 export interface AccountCardProps {
   account: DemoAccount;
   onOpenDetails?: (accountId: string) => void;
+  onEdit?: (accountId: string) => void;
+  onMoveGroup?: (accountId: string) => void;
+  onDelete?: (accountId: string) => void;
 }
 
-export function AccountCard({ account, onOpenDetails }: AccountCardProps) {
+export function AccountCard({
+  account,
+  onOpenDetails,
+  onEdit,
+  onMoveGroup,
+  onDelete
+}: AccountCardProps) {
   const [copied, setCopied] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('点击验证码即可复制');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>(
     'idle'
   );
+  const [menuOpen, setMenuOpen] = useState(false);
   const iconKey = resolveIconKey({
     issuer: account.issuer,
     accountName: account.accountName
@@ -115,6 +126,7 @@ export function AccountCard({ account, onOpenDetails }: AccountCardProps) {
   return (
     <article
       style={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
@@ -125,35 +137,77 @@ export function AccountCard({ account, onOpenDetails }: AccountCardProps) {
         boxShadow: 'var(--shadow-card)'
       }}
     >
-      {onOpenDetails ? (
-        <button
-          type="button"
-          onClick={() => onOpenDetails(account.id)}
-          aria-label={`${account.issuer} ${account.accountName}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            padding: 0,
-            textAlign: 'left',
-            cursor: 'pointer'
-          }}
-        >
-          {headerContent}
-        </button>
-      ) : (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px'
-          }}
-        >
-          {headerContent}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        {onOpenDetails ? (
+          <button
+            type="button"
+            onClick={() => onOpenDetails(account.id)}
+            aria-label={`${account.issuer} ${account.accountName}`}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: 0,
+              textAlign: 'left',
+              cursor: 'pointer'
+            }}
+          >
+            {headerContent}
+          </button>
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}
+          >
+            {headerContent}
+          </div>
+        )}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            type="button"
+            aria-label="More actions"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((current) => !current)}
+            style={{
+              width: '34px',
+              height: '34px',
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: '12px',
+              background: 'rgba(238, 244, 249, 0.92)',
+              border: '1px solid var(--color-line)',
+              color: 'var(--color-ink-soft)',
+              cursor: 'pointer'
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: '20px', lineHeight: 1 }}>
+              ···
+            </span>
+          </button>
+          <AccountMenu
+            open={menuOpen}
+            onEdit={() => {
+              setMenuOpen(false);
+              onEdit?.(account.id);
+            }}
+            onMoveGroup={() => {
+              setMenuOpen(false);
+              onMoveGroup?.(account.id);
+            }}
+            onDelete={() => {
+              setMenuOpen(false);
+              onDelete?.(account.id);
+            }}
+          />
         </div>
-      )}
+      </div>
 
       <div>
         <CopyButton code={account.code} copied={copied} onCopy={handleCopy} />

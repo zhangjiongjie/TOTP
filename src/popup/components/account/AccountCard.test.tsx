@@ -51,4 +51,14 @@ describe('AccountCard', () => {
       screen.queryByRole('button', { name: /GitHub alice@company.com/i })
     ).not.toBeInTheDocument();
   });
+
+  it('reveals edit move and delete actions from the more menu', () => {
+    render(<AccountCard {...baseProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move Group' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
 });
