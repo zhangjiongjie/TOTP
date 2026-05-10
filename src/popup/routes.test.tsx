@@ -16,4 +16,17 @@ describe('PopupRoutes', () => {
     expect(window.location.hash).toBe('#accounts');
     expect(await screen.findByRole('heading', { name: 'TOTP Authenticator' })).toBeInTheDocument();
   });
+
+  it('renders the settings page from the settings hash and can navigate back', async () => {
+    window.location.hash = '#settings';
+
+    render(<PopupRoutes />);
+
+    expect(await screen.findByRole('heading', { name: 'Backup and sync' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(window.location.hash).toBe('#accounts');
+    expect(await screen.findByRole('heading', { name: 'TOTP Authenticator' })).toBeInTheDocument();
+  });
 });

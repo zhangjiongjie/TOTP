@@ -111,6 +111,12 @@ export const accountService = {
     return cloneAccount(account);
   },
 
+  async replaceAllAccounts(nextAccounts: AccountRecord[]) {
+    accounts = nextAccounts.map(cloneAccount);
+    emit();
+    return accounts.map(cloneAccount);
+  },
+
   async updateAccount(accountId: string, draft: AccountDraft) {
     const existing = accounts.find((item) => item.id === accountId);
     if (!existing) {

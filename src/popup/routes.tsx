@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { AddAccountPage } from './pages/AddAccountPage';
 import { AccountDetailPage } from './pages/AccountDetailPage';
 import { AccountListPage } from './pages/AccountListPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { UnlockPage } from './pages/UnlockPage';
 import type { UnlockMode } from './components/forms/UnlockForm';
 
 type PopupRoute =
   | { name: 'accounts' }
   | { name: 'add' }
+  | { name: 'settings' }
   | { name: 'detail'; accountId: string }
   | { name: UnlockMode };
 
@@ -16,6 +18,10 @@ function readRoute(): PopupRoute {
 
   if (hash === 'add') {
     return { name: 'add' };
+  }
+
+  if (hash === 'settings') {
+    return { name: 'settings' };
   }
 
   if (hash.startsWith('detail/')) {
@@ -76,6 +82,10 @@ export function PopupRoutes() {
         onDeleted={() => navigate({ name: 'accounts' })}
       />
     );
+  }
+
+  if (route.name === 'settings') {
+    return <SettingsPage />;
   }
 
   return <AccountListPage />;

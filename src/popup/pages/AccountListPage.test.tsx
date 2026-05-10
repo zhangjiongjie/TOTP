@@ -33,6 +33,18 @@ describe('AccountListPage', () => {
     expect(window.location.hash).toBe('#add');
   });
 
+  it('navigates to the settings page from the top action button', async () => {
+    window.location.hash = '#accounts';
+
+    render(<AccountListPage />);
+
+    await screen.findAllByRole('button', { name: 'More actions' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+    expect(window.location.hash).toBe('#settings');
+  });
+
   it('shows a delete confirmation dialog when deleting an account', async () => {
     render(<AccountListPage />);
 

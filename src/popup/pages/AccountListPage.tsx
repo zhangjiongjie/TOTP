@@ -7,7 +7,13 @@ import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
 import { accountService } from '../../services/account-service';
 
-function TopActionButton({ label }: { label: 'Sync' | 'Settings' }) {
+function TopActionButton({
+  label,
+  onClick
+}: {
+  label: 'Sync' | 'Settings';
+  onClick?: () => void;
+}) {
   const icon =
     label === 'Sync' ? (
       <svg
@@ -51,6 +57,7 @@ function TopActionButton({ label }: { label: 'Sync' | 'Settings' }) {
     <button
       type="button"
       aria-label={label}
+      onClick={onClick}
       style={{
         width: '36px',
         height: '36px',
@@ -118,7 +125,12 @@ export function AccountListPage() {
           actions={
             <>
               <TopActionButton label="Sync" />
-              <TopActionButton label="Settings" />
+              <TopActionButton
+                label="Settings"
+                onClick={() => {
+                  window.location.hash = '#settings';
+                }}
+              />
             </>
           }
         />
