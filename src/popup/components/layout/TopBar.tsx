@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 
 interface TopBarProps {
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   actions?: ReactNode;
 }
 
-export function TopBar({ title, subtitle, actions }: TopBarProps) {
+export function TopBar({ eyebrow, title, subtitle, actions }: TopBarProps) {
   return (
     <header
       style={{
@@ -17,20 +18,22 @@ export function TopBar({ title, subtitle, actions }: TopBarProps) {
       }}
     >
       <div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '12px',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: 'var(--color-ink-soft)'
-          }}
-        >
-          Microsoft style vault
-        </p>
+        {eyebrow ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: '12px',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--color-ink-soft)'
+            }}
+          >
+            {eyebrow}
+          </p>
+        ) : null}
         <h1
           style={{
-            margin: '6px 0 0',
+            margin: eyebrow ? '6px 0 0' : 0,
             fontSize: '30px',
             fontWeight: 600,
             lineHeight: 1.15,

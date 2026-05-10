@@ -15,7 +15,7 @@ export function UnlockPage({ mode, onSubmit }: UnlockPageProps) {
 
   return (
     <PopupShell
-      topBar={<TopBar title="TOTP 保管库" subtitle={subtitle} />}
+      topBar={<TopBar eyebrow="Security" title="TOTP 保管库" subtitle={subtitle} />}
     >
       <div
         style={{

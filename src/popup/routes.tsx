@@ -21,11 +21,17 @@ export function PopupRoutes() {
   useEffect(() => {
     const handleHashChange = () => setRoute(readRoute());
     window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  function navigate(nextRoute: PopupRoute) {
+    window.location.hash = nextRoute === 'accounts' ? '#accounts' : `#${nextRoute}`;
+    setRoute(readRoute());
+  }
+
   if (route === 'setup' || route === 'unlock') {
-    return <UnlockPage mode={route} onSubmit={() => setRoute('accounts')} />;
+    return <UnlockPage mode={route} onSubmit={() => navigate('accounts')} />;
   }
 
   return <AccountListPage />;
