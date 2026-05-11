@@ -43,8 +43,11 @@ export class WebDavClientError extends Error {
     message: string,
     options: { cause?: unknown; statusCode?: number | null; retryable?: boolean } = {}
   ) {
-    super(message, { cause: options.cause });
+    super(message);
     this.name = 'WebDavClientError';
+    if (options.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
     this.kind = kind;
     this.statusCode = options.statusCode ?? null;
     this.retryable =
@@ -185,10 +188,12 @@ function isRemoteEnvelope(value: unknown): value is WebDavRemoteEnvelope {
     return false;
   }
 
+  const record = value as Record<string, unknown>;
+
   return (
-    value.schemaVersion === 1 &&
-    typeof value.revision === 'string' &&
-    typeof value.updatedAt === 'string' &&
-    isEncryptedVaultBlob(value.encryptedVault)
+    record.schemaVersion === 1 &&
+    typeof record.revision === 'string' &&
+    typeof record.updatedAt === 'string' &&
+    isEncryptedVaultBlob(record.encryptedVault)
   );
 }

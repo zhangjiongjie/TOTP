@@ -309,6 +309,8 @@ export function getDefaultAccountFormValues(): AccountFormValues {
   };
 }
 
-function normalizeGroupId(groupId: string | null | undefined) {
-  return accountGroups.some((group) => group.id === groupId) ? groupId : DEFAULT_GROUP_ID;
+function normalizeGroupId(groupId: string | null | undefined): string {
+  return typeof groupId === 'string' && accountGroups.some((group) => group.id === groupId)
+    ? groupId
+    : DEFAULT_GROUP_ID;
 }

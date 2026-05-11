@@ -12,7 +12,7 @@ const ALGORITHM_MAP: Record<TotpAlgorithm, string> = {
 export async function generateTotpCode(config: TotpConfig): Promise<string> {
   validateTotpConfig(config);
 
-  const secret = decodeBase32(config.secret);
+  const secret = Uint8Array.from(decodeBase32(config.secret));
   const counter = getTotpCounter(config.period, config.timestamp ?? Date.now());
   const key = await crypto.subtle.importKey(
     'raw',

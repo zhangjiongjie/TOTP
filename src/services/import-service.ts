@@ -5,8 +5,11 @@ import type { AccountDraft, AccountFormValues } from './account-service';
 
 export class ImportServiceError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
+    super(message);
     this.name = 'ImportServiceError';
+    if (options?.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
   }
 }
 

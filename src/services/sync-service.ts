@@ -63,7 +63,7 @@ export function createSyncService(options: CreateSyncEngineOptions): SyncService
       return engine.resolveConflict(payload, choice);
     },
     scheduleSync(intervalMs) {
-      let timerId: number | null = null;
+      let timerId: ReturnType<typeof globalThis.setInterval> | null = null;
 
       return {
         start() {
@@ -322,9 +322,8 @@ function mergeSingleAccount(
   }
 
   merged.tags = [...mergedTags];
-  merged.updatedAt = [baseAccount.updatedAt, localAccount.updatedAt, remoteAccount.updatedAt]
-    .sort()
-    .at(-1) ?? baseAccount.updatedAt;
+  const sortedUpdatedAts = [baseAccount.updatedAt, localAccount.updatedAt, remoteAccount.updatedAt].sort();
+  merged.updatedAt = sortedUpdatedAts[sortedUpdatedAts.length - 1] ?? baseAccount.updatedAt;
 
   return merged;
 }

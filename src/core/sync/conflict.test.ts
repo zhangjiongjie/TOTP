@@ -30,6 +30,12 @@ describe('detectVaultConflict', () => {
     });
 
     expect(decision.kind).toBe('no-conflict');
+    if (decision.kind !== 'no-conflict') {
+      throw new Error(`Expected no-conflict decision, received ${decision.kind}.`);
+    }
+    if (decision.local === null || decision.remote === null) {
+      throw new Error('Expected local and remote snapshots to be present.');
+    }
     expect(decision.baseRevision).toBe('rev-1');
     expect(decision.local.revision).toBe('rev-1');
     expect(decision.remote.revision).toBe('rev-1');
@@ -66,6 +72,12 @@ describe('detectVaultConflict', () => {
     });
 
     expect(decision.kind).toBe('apply-local');
+    if (decision.kind !== 'apply-local') {
+      throw new Error(`Expected apply-local decision, received ${decision.kind}.`);
+    }
+    if (decision.loser === null) {
+      throw new Error('Expected losing snapshot to be present for apply-local.');
+    }
     expect(decision.winner.source).toBe('local');
     expect(decision.loser.source).toBe('remote');
   });
@@ -84,6 +96,12 @@ describe('detectVaultConflict', () => {
     });
 
     expect(decision.kind).toBe('apply-remote');
+    if (decision.kind !== 'apply-remote') {
+      throw new Error(`Expected apply-remote decision, received ${decision.kind}.`);
+    }
+    if (decision.loser === null) {
+      throw new Error('Expected losing snapshot to be present for apply-remote.');
+    }
     expect(decision.winner.source).toBe('remote');
     expect(decision.loser.source).toBe('local');
   });
@@ -106,6 +124,9 @@ describe('detectVaultConflict', () => {
     });
 
     expect(decision.kind).toBe('conflict');
+    if (decision.kind !== 'conflict') {
+      throw new Error(`Expected conflict decision, received ${decision.kind}.`);
+    }
     expect(decision.choices).toEqual([
       {
         source: 'local',

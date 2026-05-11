@@ -1,12 +1,13 @@
 import { exportVaultBundle, importVaultBundle } from '../core/vault/export';
 import { decryptVault } from '../core/vault/crypto';
+import type { SyncRunResult } from '../core/sync/sync-engine';
 import {
   clearEncryptedVault,
   createChromeVaultStorageAdapter,
   createMemoryVaultStorageAdapter
 } from '../core/vault/vault-store';
 import { accountService } from './account-service';
-import { createSyncService, type SyncRunResult } from './sync-service';
+import { createSyncService } from './sync-service';
 import { refreshAutomaticSync } from '../state/app-store';
 import type { PendingSyncConflict } from '../core/sync/conflict';
 import {

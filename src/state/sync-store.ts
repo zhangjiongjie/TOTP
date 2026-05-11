@@ -149,10 +149,12 @@ function isPendingSyncConflict(value: unknown): value is PendingSyncConflict {
     return false;
   }
 
+  const record = value as Record<string, unknown>;
+
   return (
-    value.kind === 'vault-conflict' &&
-    typeof value.detectedAt === 'string' &&
-    'local' in value &&
-    'remote' in value
+    record.kind === 'vault-conflict' &&
+    typeof record.detectedAt === 'string' &&
+    'local' in record &&
+    'remote' in record
   );
 }

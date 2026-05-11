@@ -72,7 +72,7 @@ let hashListenerAttached = false;
 let initializePromise: Promise<void> | null = null;
 let persistVaultPromise: Promise<void> = Promise.resolve();
 let autoSyncQueue: Promise<SyncRunResult | null> = Promise.resolve(null);
-let autoSyncTimerId: number | null = null;
+let autoSyncTimerId: ReturnType<typeof globalThis.setInterval> | null = null;
 let autoSyncGeneration = 0;
 let pendingAutoSyncRuns = 0;
 let isApplyingRemoteSyncUpdate = false;
@@ -413,7 +413,7 @@ function syncHash(route: PopupRoute) {
   }
 }
 
-function createAppState() {
+function createAppState(): AppSnapshot {
   const route = readRoute();
   const session = getSessionState();
 

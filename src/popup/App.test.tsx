@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { decryptVault, encryptVault } from '../core/vault/crypto';
+import {
+  decryptVault,
+  encryptVault,
+  type EncryptedVaultBlob
+} from '../core/vault/crypto';
 import {
   __corruptStoredVaultForTests,
   __readSyncMetadataForTests,
@@ -16,6 +20,13 @@ import {
 import { accountService } from '../services/account-service';
 import { runRuntimeManualSync } from '../services/runtime-sync-service';
 import { App } from './App';
+
+type TestRemoteSnapshot = {
+  revision: string;
+  updatedAt: string;
+  etag: string;
+  encryptedVault: EncryptedVaultBlob;
+};
 
 describe('App', () => {
   beforeEach(async () => {
@@ -397,17 +408,10 @@ describe('App', () => {
   it('reuses the pending automatic push when manual sync is triggered during upload', async () => {
     const password = 'very-secure-password';
     const emptyVault = await encryptVault({ version: 1, accounts: [] }, password);
-    let resolveUpload:
-      | ((value: {
-          revision: string;
-          updatedAt: string;
-          etag: string;
-          encryptedVault: EncryptedVaultBlob;
-        }) => void)
-      | null = null;
+    let resolveUpload!: (value: TestRemoteSnapshot) => void;
     const upload = vi.fn().mockImplementation(
       async (_profile, payload) =>
-        new Promise((resolve) => {
+        new Promise<TestRemoteSnapshot>((resolve) => {
           resolveUpload = resolve;
           void payload;
         })
@@ -453,12 +457,12 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(upload).toHaveBeenCalledTimes(1);
-      expect(resolveUpload).not.toBeNull();
+      expect(resolveUpload).toBeTypeOf('function');
     });
     expect(screen.getByRole('button', { name: 'Sync' })).toBeDisabled();
     expect(screen.getByText('正在同步本地变更，请稍候...')).toBeInTheDocument();
 
-    resolveUpload?.({
+    resolveUpload({
       revision: 'rev-upload-race',
       updatedAt: '2026-05-11T10:07:00.000Z',
       etag: '"etag-upload-race"',
@@ -479,14 +483,7 @@ describe('App', () => {
   it('does not wipe a newly added account when manual sync races with the first background pull', async () => {
     const password = 'very-secure-password';
     const emptyVault = await encryptVault({ version: 1, accounts: [] }, password);
-    let resolveInitialDownload:
-      | ((value: {
-          revision: string;
-          updatedAt: string;
-          etag: string;
-          encryptedVault: typeof emptyVault;
-        }) => void)
-      | null = null;
+    let resolveInitialDownload!: (value: TestRemoteSnapshot) => void;
     let firstDownloadPending = true;
     const upload = vi.fn().mockImplementation(async (_profile, payload) => ({
       revision: 'rev-manual-race',
@@ -526,7 +523,7 @@ describe('App', () => {
     await initializeApp();
     await submitUnlock(password);
     await waitFor(() => {
-      expect(resolveInitialDownload).not.toBeNull();
+      expect(resolveInitialDownload).toBeTypeOf('function');
     });
 
     await act(async () => {
@@ -539,7 +536,7 @@ describe('App', () => {
         algorithm: 'SHA1'
       });
 
-      resolveInitialDownload?.({
+      resolveInitialDownload({
         revision: 'rev-remote-empty',
         updatedAt: '2026-05-11T10:00:00.000Z',
         etag: '"etag-remote-empty"',
@@ -565,12 +562,7 @@ describe('App', () => {
   it('does not let a stale background pull wipe newer local accounts', async () => {
     const password = 'very-secure-password';
     const emptyVault = await encryptVault({ version: 1, accounts: [] }, password);
-    let resolveDownload: ((value: {
-      revision: string;
-      updatedAt: string;
-      etag: string;
-      encryptedVault: typeof emptyVault;
-    }) => void) | null = null;
+    let resolveDownload!: (value: TestRemoteSnapshot) => void;
     const upload = vi.fn().mockImplementation(async (_profile, payload) => ({
       revision: 'rev-after-stale-pull',
       updatedAt: '2026-05-11T10:06:00.000Z',
@@ -614,7 +606,11 @@ describe('App', () => {
       });
     });
 
-    resolveDownload?.({
+    await waitFor(() => {
+      expect(resolveDownload).toBeTypeOf('function');
+    });
+
+    resolveDownload({
       revision: 'rev-remote-empty',
       updatedAt: '2026-05-11T10:00:00.000Z',
       etag: '"etag-remote-empty"',
@@ -652,12 +648,7 @@ describe('App', () => {
       }
     ]);
     await __seedStoredVaultForTests(password);
-    let resolveDownload: ((value: {
-      revision: string;
-      updatedAt: string;
-      etag: string;
-      encryptedVault: EncryptedVaultBlob;
-    }) => void) | null = null;
+    let resolveDownload!: (value: TestRemoteSnapshot) => void;
     const remoteVault = await encryptVault(
       {
         version: 1,
@@ -710,7 +701,11 @@ describe('App', () => {
       await accountService.deleteAccount('delete-race-1');
     });
 
-    resolveDownload?.({
+    await waitFor(() => {
+      expect(resolveDownload).toBeTypeOf('function');
+    });
+
+    resolveDownload({
       revision: 'rev-remote-stale-delete',
       updatedAt: '2026-05-11T10:01:00.000Z',
       etag: '"etag-remote-stale-delete"',

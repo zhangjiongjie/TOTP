@@ -1,7 +1,10 @@
 export class CoreError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
+    super(message);
     this.name = new.target.name;
+    if (options?.cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
   }
 }
 

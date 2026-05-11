@@ -40,7 +40,7 @@ describe('createSyncEngine', () => {
 
     await vaultStorage.area.set({ vault: LOCAL_VAULT });
 
-    let rejectDownload: ((reason?: unknown) => void) | null = null;
+    let rejectDownload!: (reason?: unknown) => void;
     const download = vi.fn().mockImplementation(
       () =>
         new Promise<never>((_, reject) => {
@@ -70,7 +70,7 @@ describe('createSyncEngine', () => {
     expect(openResult.initial.source).toBe('local-cache');
     expect(openResult.initial.localVault?.ciphertext).toBe('local-ciphertext');
 
-    rejectDownload?.(new WebDavClientError('download', 'offline'));
+    rejectDownload(new WebDavClientError('download', 'offline'));
 
     const background = await openResult.background;
 
