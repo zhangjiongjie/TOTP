@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Slack">
+  <rect x="9.4" y="2" width="4" height="9.1" rx="2" fill="#36C5F0"/>
+  <rect x="12.9" y="9.4" width="9.1" height="4" rx="2" fill="#2EB67D"/>
+  <rect x="10.6" y="12.9" width="4" height="9.1" rx="2" fill="#ECB22E"/>
+  <rect x="2" y="10.6" width="9.1" height="4" rx="2" fill="#E01E5A"/>
+  <rect x="2" y="9.4" width="4" height="9.1" rx="2" fill="#36C5F0"/>
+  <rect x="5.5" y="18" width="9.1" height="4" rx="2" fill="#2EB67D"/>
+  <rect x="18" y="5.5" width="4" height="9.1" rx="2" fill="#ECB22E"/>
+  <rect x="9.4" y="2" width="9.1" height="4" rx="2" fill="#E01E5A"/>
+</svg>

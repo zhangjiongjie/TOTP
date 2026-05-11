@@ -1,0 +1,279 @@
+import { useEffect, useState } from 'react';
+import type { WebDavProfile } from '../../../core/sync/webdav-client';
+import type { PendingSyncConflict } from '../../../core/sync/conflict';
+
+interface WebDavFormProps {
+  profile: WebDavProfile | null;
+  syncStatus: {
+    lastStatus: string | null;
+    lastSyncedAt: string | null;
+    lastError: string | null;
+    pendingConflict: PendingSyncConflict | null;
+  };
+  isSaving?: boolean;
+  message?: string;
+  onSubmit: (profile: WebDavProfile) => Promise<void> | void;
+  onOpenConflict?: () => void;
+}
+
+const defaultProfile: WebDavProfile = {
+  id: 'webdav-primary',
+  enabled: false,
+  baseUrl: '',
+  filePath: '/totp/vault.json',
+  username: '',
+  password: '',
+  syncIntervalMs: 300000
+};
+
+export function WebDavForm({
+  profile,
+  syncStatus,
+  isSaving = false,
+  message,
+  onSubmit,
+  onOpenConflict
+}: WebDavFormProps) {
+  const [formState, setFormState] = useState<WebDavProfile>(profile ?? defaultProfile);
+
+  useEffect(() => {
+    setFormState(profile ?? defaultProfile);
+  }, [profile]);
+
+  function updateField<Key extends keyof WebDavProfile>(field: Key, value: WebDavProfile[Key]) {
+    setFormState((current) => ({ ...current, [field]: value }));
+  }
+
+  return (
+    <section style={sectionStyle}>
+      <div style={sectionHeaderStyle}>
+        <div>
+          <h2 style={headingStyle}>WebDAV 同步</h2>
+          <p style={helperStyle}>
+            配置 WebDAV 端点后，可以在不同设备之间同步当前加密保管库。
+          </p>
+        </div>
+        <label style={toggleStyle}>
+          <input
+            type="checkbox"
+            checked={formState.enabled}
+            onChange={(event) => updateField('enabled', event.target.checked)}
+          />
+          启用同步
+        </label>
+      </div>
+      <div style={gridStyle}>
+        <Field label="WebDAV 服务地址">
+          <input
+            aria-label="WebDAV 服务地址"
+            value={formState.baseUrl}
+            onChange={(event) => updateField('baseUrl', event.target.value)}
+            placeholder="https://dav.example.com/remote.php/dav/files/user"
+            style={inputStyle}
+          />
+        </Field>
+        <Field label="远端文件路径">
+          <input
+            aria-label="远端文件路径"
+            value={formState.filePath}
+            onChange={(event) => updateField('filePath', event.target.value)}
+            placeholder="/totp/vault.json"
+            style={inputStyle}
+          />
+        </Field>
+        <Field label="用户名">
+          <input
+            aria-label="用户名"
+            value={formState.username ?? ''}
+            onChange={(event) => updateField('username', event.target.value)}
+            placeholder="alice"
+            style={inputStyle}
+          />
+        </Field>
+        <Field label="密码">
+          <input
+            aria-label="密码"
+            type="password"
+            value={formState.password ?? ''}
+            onChange={(event) => updateField('password', event.target.value)}
+            placeholder="应用专用密码"
+            style={inputStyle}
+          />
+        </Field>
+        <Field label="同步间隔（分钟）">
+          <input
+            aria-label="同步间隔（分钟）"
+            type="number"
+            min={1}
+            value={String(Math.max(1, Math.round((formState.syncIntervalMs ?? 300000) / 60000)))}
+            onChange={(event) =>
+              updateField(
+                'syncIntervalMs',
+                Math.max(1, Number(event.target.value || '5')) * 60_000
+              )
+            }
+            style={inputStyle}
+          />
+        </Field>
+      </div>
+      <div style={statusCardStyle}>
+        <p style={statusLineStyle}>最近同步：{syncStatus.lastSyncedAt ?? '尚未同步'}</p>
+        <p style={statusLineStyle}>最近状态：{formatSyncStatus(syncStatus.lastStatus)}</p>
+        {syncStatus.lastError ? (
+          <p style={{ ...statusLineStyle, color: '#9d4156' }}>最近错误：{syncStatus.lastError}</p>
+        ) : null}
+        {syncStatus.pendingConflict ? (
+          <button type="button" onClick={onOpenConflict} style={secondaryButtonStyle}>
+            查看同步冲突
+          </button>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={() => void onSubmit(formState)}
+        disabled={isSaving}
+        style={primaryButtonStyle}
+      >
+        {isSaving ? '保存中...' : '保存 WebDAV 设置'}
+      </button>
+      {message ? <p style={messageStyle}>{message}</p> : null}
+    </section>
+  );
+}
+
+function formatSyncStatus(status: string | null) {
+  switch (status) {
+    case 'disabled':
+      return '未启用';
+    case 'noop':
+      return '已是最新';
+    case 'local-cache':
+      return '已使用本地缓存';
+    case 'pulled':
+      return '已拉取远端';
+    case 'pushed':
+      return '已推送本地';
+    case 'conflict':
+      return '存在冲突';
+    case 'download-error':
+      return '下载失败';
+    case 'upload-error':
+      return '上传失败';
+    case 'validation-error':
+      return '数据校验失败';
+    default:
+      return '空闲';
+  }
+}
+
+function Field({
+  label,
+  children
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: 'grid', gap: '8px' }}>
+      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink-soft)' }}>
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+const sectionStyle = {
+  display: 'grid',
+  gap: '16px',
+  padding: '18px',
+  borderRadius: '22px',
+  background: 'rgba(250, 252, 255, 0.92)',
+  border: '1px solid var(--color-line)'
+} satisfies React.CSSProperties;
+
+const sectionHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: '12px'
+} satisfies React.CSSProperties;
+
+const headingStyle = {
+  margin: 0,
+  fontSize: '20px',
+  color: 'var(--color-ink-strong)'
+} satisfies React.CSSProperties;
+
+const helperStyle = {
+  margin: '8px 0 0',
+  lineHeight: 1.5,
+  color: 'var(--color-ink-soft)'
+} satisfies React.CSSProperties;
+
+const toggleStyle = {
+  display: 'inline-flex',
+  gap: '8px',
+  alignItems: 'center',
+  fontWeight: 600,
+  color: 'var(--color-brand-strong)'
+} satisfies React.CSSProperties;
+
+const gridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: '12px'
+} satisfies React.CSSProperties;
+
+const inputStyle = {
+  width: '100%',
+  minHeight: '42px',
+  padding: '10px 12px',
+  borderRadius: '14px',
+  border: '1px solid var(--color-line)',
+  background: 'rgba(248, 251, 254, 0.94)',
+  color: 'var(--color-ink-strong)'
+} satisfies React.CSSProperties;
+
+const statusCardStyle = {
+  display: 'grid',
+  gap: '8px',
+  padding: '14px',
+  borderRadius: '16px',
+  background: 'rgba(238, 244, 249, 0.72)'
+} satisfies React.CSSProperties;
+
+const statusLineStyle = {
+  margin: 0,
+  lineHeight: 1.5,
+  color: 'var(--color-ink-soft)'
+} satisfies React.CSSProperties;
+
+const primaryButtonStyle = {
+  justifySelf: 'start',
+  minWidth: '180px',
+  padding: '13px 18px',
+  borderRadius: '999px',
+  background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+  color: '#f8fbff',
+  fontWeight: 600,
+  cursor: 'pointer'
+} satisfies React.CSSProperties;
+
+const secondaryButtonStyle = {
+  justifySelf: 'start',
+  minWidth: '180px',
+  minHeight: '38px',
+  padding: '0 14px',
+  borderRadius: '12px',
+  background: 'rgba(255, 255, 255, 0.9)',
+  border: '1px solid var(--color-line)',
+  color: 'var(--color-brand-strong)',
+  cursor: 'pointer'
+} satisfies React.CSSProperties;
+
+const messageStyle = {
+  margin: 0,
+  lineHeight: 1.5,
+  color: 'var(--color-ink-soft)'
+} satisfies React.CSSProperties;

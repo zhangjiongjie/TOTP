@@ -1,0 +1,23 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "PingFang SC", sans-serif;
+  --popup-width: 392px;
+  --popup-height: 580px;
+  --color-ink-strong: #142033;
+  --color-ink: #243852;
+  --color-ink-soft: #60748b;
+  --color-surface: rgba(247, 250, 252, 0.96);
+  --color-surface-strong: #ffffff;
+  --color-surface-muted: #edf3f8;
+  --color-line: rgba(109, 133, 161, 0.22);
+  --color-line-strong: rgba(58, 88, 124, 0.18);
+  --color-brand: #2f5f8f;
+  --color-brand-soft: #dbe7f3;
+  --color-brand-strong: #1c466e;
+  --color-success: #2f6e62;
+  --shadow-shell: 0 20px 44px rgba(18, 34, 54, 0.16);
+  --shadow-card: 0 10px 24px rgba(28, 48, 76, 0.08);
+  --radius-shell: 28px;
+  --radius-card: 22px;
+  --radius-pill: 999px;
+}
