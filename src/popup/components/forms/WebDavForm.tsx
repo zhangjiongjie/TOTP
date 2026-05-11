@@ -48,10 +48,9 @@ export function WebDavForm({
     <section style={sectionStyle}>
       <div style={sectionHeaderStyle}>
         <div>
-          <h2 style={headingStyle}>WebDAV Sync</h2>
+          <h2 style={headingStyle}>WebDAV 同步</h2>
           <p style={helperStyle}>
-            Configure a WebDAV endpoint for encrypted vault syncing. The current popup uses the
-            sync metadata store already wired in this branch.
+            配置 WebDAV 端点后，可以在不同设备之间同步当前加密保管库。
           </p>
         </div>
         <label style={toggleStyle}>
@@ -60,50 +59,50 @@ export function WebDavForm({
             checked={formState.enabled}
             onChange={(event) => updateField('enabled', event.target.checked)}
           />
-          Enable sync
+          启用同步
         </label>
       </div>
       <div style={gridStyle}>
-        <Field label="WebDAV server URL">
+        <Field label="WebDAV 服务地址">
           <input
-            aria-label="WebDAV server URL"
+            aria-label="WebDAV 服务地址"
             value={formState.baseUrl}
             onChange={(event) => updateField('baseUrl', event.target.value)}
             placeholder="https://dav.example.com/remote.php/dav/files/user"
             style={inputStyle}
           />
         </Field>
-        <Field label="Remote file path">
+        <Field label="远端文件路径">
           <input
-            aria-label="Remote file path"
+            aria-label="远端文件路径"
             value={formState.filePath}
             onChange={(event) => updateField('filePath', event.target.value)}
             placeholder="/totp/vault.json"
             style={inputStyle}
           />
         </Field>
-        <Field label="Username">
+        <Field label="用户名">
           <input
-            aria-label="Username"
+            aria-label="用户名"
             value={formState.username ?? ''}
             onChange={(event) => updateField('username', event.target.value)}
             placeholder="alice"
             style={inputStyle}
           />
         </Field>
-        <Field label="Password">
+        <Field label="密码">
           <input
-            aria-label="Password"
+            aria-label="密码"
             type="password"
             value={formState.password ?? ''}
             onChange={(event) => updateField('password', event.target.value)}
-            placeholder="App password"
+            placeholder="应用专用密码"
             style={inputStyle}
           />
         </Field>
-        <Field label="Sync interval (minutes)">
+        <Field label="同步间隔（分钟）">
           <input
-            aria-label="Sync interval (minutes)"
+            aria-label="同步间隔（分钟）"
             type="number"
             min={1}
             value={String(Math.max(1, Math.round((formState.syncIntervalMs ?? 300000) / 60000)))}
@@ -118,14 +117,14 @@ export function WebDavForm({
         </Field>
       </div>
       <div style={statusCardStyle}>
-        <p style={statusLineStyle}>Last sync: {syncStatus.lastSyncedAt ?? 'Never'}</p>
-        <p style={statusLineStyle}>Last status: {syncStatus.lastStatus ?? 'idle'}</p>
+        <p style={statusLineStyle}>最近同步：{syncStatus.lastSyncedAt ?? '尚未同步'}</p>
+        <p style={statusLineStyle}>最近状态：{formatSyncStatus(syncStatus.lastStatus)}</p>
         {syncStatus.lastError ? (
-          <p style={{ ...statusLineStyle, color: '#9d4156' }}>Last error: {syncStatus.lastError}</p>
+          <p style={{ ...statusLineStyle, color: '#9d4156' }}>最近错误：{syncStatus.lastError}</p>
         ) : null}
         {syncStatus.pendingConflict ? (
           <button type="button" onClick={onOpenConflict} style={secondaryButtonStyle}>
-            Review sync conflict
+            查看同步冲突
           </button>
         ) : null}
       </div>
@@ -135,11 +134,36 @@ export function WebDavForm({
         disabled={isSaving}
         style={primaryButtonStyle}
       >
-        {isSaving ? 'Saving...' : 'Save WebDAV settings'}
+        {isSaving ? '保存中...' : '保存 WebDAV 设置'}
       </button>
       {message ? <p style={messageStyle}>{message}</p> : null}
     </section>
   );
+}
+
+function formatSyncStatus(status: string | null) {
+  switch (status) {
+    case 'disabled':
+      return '未启用';
+    case 'noop':
+      return '已是最新';
+    case 'local-cache':
+      return '已使用本地缓存';
+    case 'pulled':
+      return '已拉取远端';
+    case 'pushed':
+      return '已推送本地';
+    case 'conflict':
+      return '存在冲突';
+    case 'download-error':
+      return '下载失败';
+    case 'upload-error':
+      return '上传失败';
+    case 'validation-error':
+      return '数据校验失败';
+    default:
+      return '空闲';
+  }
 }
 
 function Field({

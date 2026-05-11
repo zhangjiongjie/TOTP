@@ -70,7 +70,11 @@ export function createFetchWebDavClient(
       try {
         response = await fetchImpl(buildWebDavUrl(profile), {
           method: 'GET',
-          headers: buildHeaders(profile)
+          cache: 'no-store',
+          headers: buildHeaders(profile, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache'
+          })
         });
       } catch (error) {
         throw new WebDavClientError('download', 'WebDAV download failed', { cause: error });
@@ -102,8 +106,12 @@ export function createFetchWebDavClient(
       try {
         response = await fetchImpl(buildWebDavUrl(profile), {
           method: 'PUT',
+          cache: 'no-store',
           headers: {
-            ...buildHeaders(profile),
+            ...buildHeaders(profile, {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              Pragma: 'no-cache'
+            }),
             'Content-Type': 'application/json',
             ...(payload.previousEtag ? { 'If-Match': payload.previousEtag } : {})
           },
@@ -143,9 +151,12 @@ function buildWebDavUrl(profile: WebDavProfile): string {
   return `${normalizedBaseUrl}${normalizedPath}`;
 }
 
-function buildHeaders(profile: WebDavProfile): Record<string, string> {
+function buildHeaders(
+  profile: WebDavProfile,
+  extraHeaders: Record<string, string> = {}
+): Record<string, string> {
   if (!profile.username || !profile.password) {
-    return {};
+    return extraHeaders;
   }
 
   const rawCredentials = new TextEncoder().encode(`${profile.username}:${profile.password}`);
@@ -156,6 +167,7 @@ function buildHeaders(profile: WebDavProfile): Record<string, string> {
   }
 
   return {
+    ...extraHeaders,
     Authorization: `Basic ${btoa(binary)}`
   };
 }

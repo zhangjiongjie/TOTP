@@ -11,6 +11,7 @@
     "test:plan-smoke": "node -e \"const fs=require('fs');['package.json','vite.config.ts','src/main.tsx'].forEach((f)=>{if(!fs.existsSync(f)) throw new Error(f+' missing')})\""
   },
   "dependencies": {
+    "jsqr": "^1.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

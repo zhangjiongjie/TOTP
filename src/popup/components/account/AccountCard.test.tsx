@@ -52,13 +52,14 @@ describe('AccountCard', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('reveals edit move and delete actions from the more menu', () => {
-    render(<AccountCard {...baseProps} />);
+  it('renders an explicit edit button and forwards the account id', () => {
+    const onEdit = vi.fn();
 
-    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    render(<AccountCard {...baseProps} onEdit={onEdit} />);
 
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Move Group' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit account' }));
+
+    expect(onEdit).toHaveBeenCalledWith('github-alice');
+    expect(onEdit).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,6 @@
 import { parseOtpAuthUri } from '../core/totp/otpauth';
 import type { TotpAlgorithm } from '../core/types';
-import { decodeQrFromImageFile } from '../core/import/qr-decode';
+import { decodeQrFromDataUrl, decodeQrFromImageFile } from '../core/import/qr-decode';
 import type { AccountDraft, AccountFormValues } from './account-service';
 
 export class ImportServiceError extends Error {
@@ -18,7 +18,8 @@ export const importService = {
       secret: values.secret,
       digits: Number(values.digits),
       period: Number(values.period),
-      algorithm: values.algorithm
+      algorithm: values.algorithm,
+      groupId: values.groupId
     });
 
     return draft;
@@ -32,6 +33,12 @@ export const importService = {
   async fromQrFile(file: File): Promise<AccountDraft> {
     const otpauthUri = await decodeQrFromImageFile(file);
     return this.fromOtpAuthUri(otpauthUri);
+  },
+
+  async fromCurrentTabQr(): Promise<AccountDraft> {
+    const imageDataUrl = await captureVisibleTabImage();
+    const otpauthUri = await decodeQrFromDataUrl(imageDataUrl);
+    return this.fromOtpAuthUri(otpauthUri);
   }
 };
 
@@ -42,6 +49,7 @@ function normalizeDraft(input: {
   digits: number;
   period: number;
   algorithm: TotpAlgorithm;
+  groupId?: string | null;
 }): AccountDraft {
   const normalizedAccountName = input.accountName.trim();
   const normalizedIssuer = input.issuer.trim() || normalizedAccountName || 'Imported account';
@@ -51,7 +59,8 @@ function normalizeDraft(input: {
     secret: input.secret.trim().replace(/\s+/g, '').toUpperCase(),
     digits: Number(input.digits),
     period: Number(input.period),
-    algorithm: input.algorithm
+    algorithm: input.algorithm,
+    groupId: input.groupId ?? 'default'
   };
 
   if (!draft.accountName) {
@@ -71,4 +80,51 @@ function normalizeDraft(input: {
   }
 
   return draft;
+}
+
+async function captureVisibleTabImage(): Promise<string> {
+  const tabsApi = (
+    globalThis as typeof globalThis & {
+      chrome?: {
+        tabs?: {
+          captureVisibleTab(
+            windowId?: number,
+            options?: { format?: 'jpeg' | 'png'; quality?: number },
+            callback?: (dataUrl?: string) => void
+          ): void;
+        };
+        runtime?: { lastError?: { message?: string } };
+      };
+    }
+  ).chrome?.tabs;
+
+  if (!tabsApi?.captureVisibleTab) {
+    throw new ImportServiceError('当前浏览器暂不支持扫描当前网页，请改用图片上传。');
+  }
+
+  return new Promise((resolve, reject) => {
+    tabsApi.captureVisibleTab(undefined, { format: 'png' }, (dataUrl) => {
+      const lastError = (
+        globalThis as typeof globalThis & {
+          chrome?: { runtime?: { lastError?: { message?: string } } };
+        }
+      ).chrome?.runtime?.lastError;
+
+      if (lastError) {
+        reject(
+          new ImportServiceError(
+            lastError.message ?? '无法读取当前网页内容，请改用图片上传。'
+          )
+        );
+        return;
+      }
+
+      if (!dataUrl) {
+        reject(new ImportServiceError('当前网页中未读取到可扫描的图像，请改用图片上传。'));
+        return;
+      }
+
+      resolve(dataUrl);
+    });
+  });
 }

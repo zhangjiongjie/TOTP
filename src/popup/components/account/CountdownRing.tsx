@@ -7,7 +7,7 @@ export function CountdownRing({
   secondsRemaining,
   period
 }: CountdownRingProps) {
-  const size = 52;
+  const size = 50;
   const strokeWidth = 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -22,7 +22,8 @@ export function CountdownRing({
         width: `${size}px`,
         height: `${size}px`,
         display: 'grid',
-        placeItems: 'center'
+        placeItems: 'center',
+        alignSelf: 'center'
       }}
     >
       <svg
@@ -55,7 +56,8 @@ export function CountdownRing({
       <strong
         style={{
           position: 'absolute',
-          fontSize: '14px',
+          fontSize: '13px',
+          lineHeight: 1,
           color: 'var(--color-ink-strong)'
         }}
       >

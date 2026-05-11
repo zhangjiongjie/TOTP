@@ -3,7 +3,6 @@ import { resolveIconKey } from '../../../core/icons/icon-matchers';
 import { iconRegistry } from '../../../core/icons/icon-registry';
 import { CountdownRing } from './CountdownRing';
 import { CopyButton } from './CopyButton';
-import { AccountMenu } from './AccountMenu';
 
 export interface DemoAccount {
   id: string;
@@ -17,25 +16,18 @@ export interface DemoAccount {
 
 export interface AccountCardProps {
   account: DemoAccount;
-  onOpenDetails?: (accountId: string) => void;
   onEdit?: (accountId: string) => void;
-  onMoveGroup?: (accountId: string) => void;
-  onDelete?: (accountId: string) => void;
 }
 
 export function AccountCard({
   account,
-  onOpenDetails,
-  onEdit,
-  onMoveGroup,
-  onDelete
+  onEdit
 }: AccountCardProps) {
   const [copied, setCopied] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('点击验证码即可复制');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>(
     'idle'
   );
-  const [menuOpen, setMenuOpen] = useState(false);
   const iconKey = resolveIconKey({
     issuer: account.issuer,
     accountName: account.accountName
@@ -73,34 +65,95 @@ export function AccountCard({
   }
 
   const headerContent = (
-    <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+    <div
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px'
+      }}
+    >
+      <div
+        style={{
+          flex: '1 1 auto',
+          minWidth: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px'
+        }}
+      >
         <div
           aria-hidden="true"
           style={{
             width: '48px',
+            minWidth: '48px',
             height: '48px',
+            aspectRatio: '1 / 1',
             display: 'grid',
             placeItems: 'center',
-            borderRadius: '16px',
+            borderRadius: '14px',
             background: 'var(--color-surface-muted)',
             border: '1px solid var(--color-line)'
           }}
         >
           {iconMarkup ? (
             <span
-              style={{ width: '24px', height: '24px', display: 'block' }}
-              dangerouslySetInnerHTML={{ __html: iconMarkup }}
-            />
+              className="brand-icon-plate"
+              style={{
+                width: '32px',
+                minWidth: '32px',
+                height: '32px',
+                aspectRatio: '1 / 1',
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                background: 'rgba(255, 255, 255, 0.98)',
+                boxShadow: 'inset 0 0 0 1px rgba(109, 133, 161, 0.12)'
+              }}
+            >
+              <span
+                className="brand-icon-glyph"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  aspectRatio: '1 / 1',
+                  display: 'grid',
+                  placeItems: 'center'
+                }}
+                dangerouslySetInnerHTML={{ __html: iconMarkup }}
+              />
+            </span>
           ) : (
-            <strong>{account.issuer.slice(0, 1)}</strong>
+            <span
+              className="brand-icon-plate"
+              style={{
+                width: '32px',
+                minWidth: '32px',
+                height: '32px',
+                aspectRatio: '1 / 1',
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                background: 'rgba(255, 255, 255, 0.98)',
+                boxShadow: 'inset 0 0 0 1px rgba(109, 133, 161, 0.12)',
+                color: 'var(--color-brand-strong)',
+                fontSize: '15px',
+                fontWeight: 700
+              }}
+            >
+              {account.issuer.slice(0, 1)}
+            </span>
           )}
         </div>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h2
             style={{
               margin: 0,
               fontSize: '18px',
+              lineHeight: 1.15,
               color: 'var(--color-ink-strong)'
             }}
           >
@@ -110,7 +163,8 @@ export function AccountCard({
             style={{
               margin: '4px 0 0',
               color: 'var(--color-ink-soft)',
-              fontSize: '14px'
+              fontSize: '14px',
+              overflowWrap: 'anywhere'
             }}
           >
             {account.accountName}
@@ -121,7 +175,8 @@ export function AccountCard({
                 margin: '6px 0 0',
                 color: 'var(--color-brand-strong)',
                 fontSize: '12px',
-                fontWeight: 600
+                fontWeight: 600,
+                overflowWrap: 'anywhere'
               }}
             >
               {`Group: ${account.groupLabel}`}
@@ -129,11 +184,13 @@ export function AccountCard({
           ) : null}
         </div>
       </div>
-      <CountdownRing
-        secondsRemaining={account.secondsRemaining}
-        period={account.period}
-      />
-    </>
+      <div style={{ flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+        <CountdownRing
+          secondsRemaining={account.secondsRemaining}
+          period={account.period}
+        />
+      </div>
+    </div>
   );
 
   return (
@@ -150,44 +207,22 @@ export function AccountCard({
         boxShadow: 'var(--shadow-card)'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-        {onOpenDetails ? (
-          <button
-            type="button"
-            onClick={() => onOpenDetails(account.id)}
-            aria-label={`${account.issuer} ${account.accountName}`}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px',
-              padding: 0,
-              textAlign: 'left',
-              cursor: 'pointer'
-            }}
-          >
-            {headerContent}
-          </button>
-        ) : (
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px'
-            }}
-          >
-            {headerContent}
-          </div>
-        )}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'stretch'
+          }}
+        >
+          {headerContent}
+        </div>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             type="button"
-            aria-label="More actions"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((current) => !current)}
+            aria-label="Edit account"
+            title="编辑账号"
+            onClick={() => onEdit?.(account.id)}
             style={{
               width: '34px',
               height: '34px',
@@ -200,25 +235,29 @@ export function AccountCard({
               cursor: 'pointer'
             }}
           >
-            <span aria-hidden="true" style={{ fontSize: '20px', lineHeight: 1 }}>
-              ···
-            </span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M4.5 13.7v1.8h1.8l7.26-7.26-1.8-1.8L4.5 13.7Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10.98 5.88 12.78 4.08a1.27 1.27 0 0 1 1.8 0l1.34 1.34a1.27 1.27 0 0 1 0 1.8l-1.8 1.8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
-          <AccountMenu
-            open={menuOpen}
-            onEdit={() => {
-              setMenuOpen(false);
-              onEdit?.(account.id);
-            }}
-            onMoveGroup={() => {
-              setMenuOpen(false);
-              onMoveGroup?.(account.id);
-            }}
-            onDelete={() => {
-              setMenuOpen(false);
-              onDelete?.(account.id);
-            }}
-          />
         </div>
       </div>
 

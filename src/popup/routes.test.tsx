@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { accountService } from '../services/account-service';
 import { PopupRoutes, readRoute, routesEqual } from './routes';
 import { AccountListPage } from './pages/AccountListPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -39,9 +40,9 @@ describe('PopupRoutes', () => {
       />
     );
 
-    expect(await screen.findByRole('heading', { name: 'Backup and sync' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '备份与同步' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.click(screen.getByRole('button', { name: '返回' }));
 
     expect(routesEqual(navigations[0] as ReturnType<typeof readRoute>, { name: 'accounts' })).toBe(
       true
@@ -52,6 +53,15 @@ describe('PopupRoutes', () => {
 describe('Navigation Injection', () => {
   it('does not mutate window hash when AccountListPage receives injected navigation handlers', async () => {
     window.location.hash = '#accounts';
+    accountService.__resetForTests?.();
+    await accountService.addAccount({
+      issuer: 'GitHub',
+      accountName: 'alice@company.com',
+      secret: 'JBSWY3DPEHPK3PXP',
+      digits: 6,
+      period: 30,
+      algorithm: 'SHA1'
+    });
 
     render(
       <AccountListPage
@@ -61,11 +71,11 @@ describe('Navigation Injection', () => {
       />
     );
 
-    await screen.findAllByRole('button', { name: 'More actions' });
+    await screen.findByRole('button', { name: 'Edit account' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
-    fireEvent.click(screen.getByRole('button', { name: /GitHub alice@company.com/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit account' }));
 
     expect(window.location.hash).toBe('#accounts');
   });
@@ -75,7 +85,7 @@ describe('Navigation Injection', () => {
 
     render(<SettingsPage onBack={() => undefined} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Back' }));
+    fireEvent.click(await screen.findByRole('button', { name: '返回' }));
 
     expect(window.location.hash).toBe('#settings');
   });

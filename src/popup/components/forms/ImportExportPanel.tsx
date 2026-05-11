@@ -20,33 +20,32 @@ export function ImportExportPanel({
   return (
     <section style={sectionStyle}>
       <div>
-        <h2 style={headingStyle}>Import / Export</h2>
+        <h2 style={headingStyle}>导入 / 导出</h2>
         <p style={helperStyle}>
-          Create a portable JSON backup or restore accounts from a previous export. Encrypted mode
-          reuses the vault bundle helpers already present in the core layer.
+          导出便携 JSON 备份，或从已有备份中恢复账号。加密模式会使用主密码保护备份文件。
         </p>
       </div>
       <div style={gridStyle}>
         <label style={{ display: 'grid', gap: '8px' }}>
-          <span style={labelStyle}>Backup format</span>
+          <span style={labelStyle}>备份格式</span>
           <select
-            aria-label="Backup format"
+            aria-label="备份格式"
             value={mode}
             onChange={(event) => setMode(event.target.value as BackupMode)}
             style={inputStyle}
           >
-            <option value="plain">Plain JSON</option>
-            <option value="encrypted">Encrypted JSON</option>
+            <option value="plain">明文 JSON</option>
+            <option value="encrypted">加密 JSON</option>
           </select>
         </label>
         <label style={{ display: 'grid', gap: '8px' }}>
-          <span style={labelStyle}>Backup password</span>
+          <span style={labelStyle}>备份密码</span>
           <input
-            aria-label="Backup password"
+            aria-label="备份密码"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder={mode === 'encrypted' ? 'Required for encrypted backups' : 'Optional'}
+            placeholder={mode === 'encrypted' ? '加密备份时必填' : '可选'}
             style={inputStyle}
           />
         </label>
@@ -58,12 +57,12 @@ export function ImportExportPanel({
           disabled={isBusy}
           style={primaryButtonStyle}
         >
-          Export backup
+          导出备份
         </button>
         <label style={fileLabelStyle}>
-          <span>{isBusy ? 'Importing...' : 'Import backup file'}</span>
+          <span>{isBusy ? '导入中...' : '导入备份文件'}</span>
           <input
-            aria-label="Import backup file"
+            aria-label="导入备份文件"
             type="file"
             accept="application/json"
             disabled={isBusy}

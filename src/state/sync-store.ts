@@ -1,3 +1,4 @@
+import { isEncryptedVaultBlob, type EncryptedVaultBlob } from '../core/vault/crypto';
 import type { WebDavProfile } from '../core/sync/webdav-client';
 import type { PendingSyncConflict } from '../core/sync/conflict';
 import type { StorageAreaLike } from '../core/vault/vault-store';
@@ -8,6 +9,7 @@ export interface SyncMetadata {
   profile: WebDavProfile | null;
   baseRevision: string | null;
   baseFingerprint: string | null;
+  baseVault: EncryptedVaultBlob | null;
   localRevision: string | null;
   localFingerprint: string | null;
   localUpdatedAt: string | null;
@@ -34,6 +36,7 @@ const defaultSyncMetadata: SyncMetadata = {
   profile: null,
   baseRevision: null,
   baseFingerprint: null,
+  baseVault: null,
   localRevision: null,
   localFingerprint: null,
   localUpdatedAt: null,
@@ -113,6 +116,7 @@ function createMetadata(value: unknown): SyncMetadata {
     profile: record.profile ?? null,
     baseRevision: normalizeString(record.baseRevision),
     baseFingerprint: normalizeString(record.baseFingerprint),
+    baseVault: isEncryptedVaultBlob(record.baseVault) ? record.baseVault : null,
     localRevision: normalizeString(record.localRevision),
     localFingerprint: normalizeString(record.localFingerprint),
     localUpdatedAt: normalizeString(record.localUpdatedAt),
@@ -131,7 +135,8 @@ function createMetadata(value: unknown): SyncMetadata {
 function createSnapshot(metadata: SyncMetadata): SyncMetadataSnapshot {
   return Object.freeze({
     ...metadata,
-    profile: metadata.profile ? { ...metadata.profile } : null
+    profile: metadata.profile ? { ...metadata.profile } : null,
+    baseVault: metadata.baseVault ? { ...metadata.baseVault, kdf: { ...metadata.baseVault.kdf } } : null
   });
 }
 

@@ -6,12 +6,13 @@ import { AccountListPage } from './AccountListPage';
 describe('AccountListPage', () => {
   beforeEach(() => {
     accountService.__resetForTests?.();
+    accountService.__seedDemoForTests?.();
   });
 
   it('renders heading, top actions, and floating add button', async () => {
     render(<AccountListPage />);
 
-    await screen.findAllByRole('button', { name: 'More actions' });
+    await screen.findAllByRole('button', { name: 'Edit account' });
 
     expect(
       screen.getByRole('heading', { name: 'TOTP Authenticator' })
@@ -26,7 +27,7 @@ describe('AccountListPage', () => {
 
     render(<AccountListPage />);
 
-    await screen.findAllByRole('button', { name: 'More actions' });
+    await screen.findAllByRole('button', { name: 'Edit account' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
 
@@ -38,43 +39,21 @@ describe('AccountListPage', () => {
 
     render(<AccountListPage />);
 
-    await screen.findAllByRole('button', { name: 'More actions' });
+    await screen.findAllByRole('button', { name: 'Edit account' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
 
     expect(window.location.hash).toBe('#settings');
   });
 
-  it('shows a delete confirmation dialog when deleting an account', async () => {
+  it('opens the edit flow from the dedicated edit button', async () => {
+    window.location.hash = '#accounts';
     render(<AccountListPage />);
 
-    await screen.findAllByRole('button', { name: 'More actions' });
-    fireEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-
-    expect(
-      screen.getByRole('heading', { name: 'Delete account?' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('This action removes the account from the local demo vault.')
-    ).toBeInTheDocument();
-  });
-
-  it('moves an account into another group from the more menu flow', async () => {
-    render(<AccountListPage />);
-
-    await screen.findAllByRole('button', { name: 'More actions' });
-    fireEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Move Group' }));
-
-    expect(
-      screen.getByRole('heading', { name: 'Move account to group' })
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Personal' }));
+    fireEvent.click(await screen.findAllByRole('button', { name: 'Edit account' }).then((items) => items[0]));
 
     await waitFor(() => {
-      expect(screen.getByText('Group: Personal')).toBeInTheDocument();
+      expect(window.location.hash).toBe('#detail/demo-1');
     });
   });
 });

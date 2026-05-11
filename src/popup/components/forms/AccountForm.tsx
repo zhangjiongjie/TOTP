@@ -2,27 +2,31 @@ import type { FormEvent } from 'react';
 import type { AccountFormValues } from '../../../services/account-service';
 
 interface AccountFormProps {
-  title: string;
-  submitLabel: string;
+  title?: string;
+  submitLabel?: string;
   values: AccountFormValues;
   onChange: (field: keyof AccountFormValues, value: string) => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   helperText?: string;
   isSubmitting?: boolean;
+  showSubmitButton?: boolean;
+  groups?: Array<{ id: string; label: string }>;
 }
 
 export function AccountForm({
   title,
-  submitLabel,
   values,
   onChange,
   onSubmit,
   helperText,
-  isSubmitting = false
+  isSubmitting = false,
+  submitLabel = '保存',
+  showSubmitButton = true,
+  groups = []
 }: AccountFormProps) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit();
+    onSubmit?.();
   }
 
   return (
@@ -34,14 +38,20 @@ export function AccountForm({
         gap: '14px'
       }}
     >
-      <div>
-        <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--color-ink-strong)' }}>{title}</h2>
-        {helperText ? (
-          <p style={{ margin: '8px 0 0', color: 'var(--color-ink-soft)', lineHeight: 1.5 }}>
-            {helperText}
-          </p>
-        ) : null}
-      </div>
+      {title || helperText ? (
+        <div>
+          {title ? (
+            <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--color-ink-strong)' }}>
+              {title}
+            </h2>
+          ) : null}
+          {helperText ? (
+            <p style={{ margin: title ? '8px 0 0' : 0, color: 'var(--color-ink-soft)', lineHeight: 1.5 }}>
+              {helperText}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <Field
         label="Issuer"
         value={values.issuer}
@@ -95,21 +105,41 @@ export function AccountForm({
           <option value="SHA512">SHA512</option>
         </select>
       </label>
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        style={{
-          marginTop: '4px',
-          padding: '13px 18px',
-          borderRadius: '999px',
-          background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
-          color: '#f8fbff',
-          fontWeight: 600,
-          cursor: 'pointer'
-        }}
-      >
-        {isSubmitting ? 'Working...' : submitLabel}
-      </button>
+      <label style={{ display: 'grid', gap: '8px' }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink-soft)' }}>
+          Group
+        </span>
+        <select
+          aria-label="Group"
+          disabled={isSubmitting}
+          value={values.groupId}
+          onChange={(event) => onChange('groupId', event.target.value)}
+          style={fieldStyle}
+        >
+          {groups.map((group) => (
+            <option key={group.id} value={group.id}>
+              {group.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {showSubmitButton ? (
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          style={{
+            marginTop: '4px',
+            padding: '13px 18px',
+            borderRadius: '999px',
+            background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+            color: '#f8fbff',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          {isSubmitting ? 'Working...' : submitLabel}
+        </button>
+      ) : null}
     </form>
   );
 }

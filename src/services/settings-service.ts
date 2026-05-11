@@ -1,4 +1,5 @@
 import { exportVaultBundle, importVaultBundle } from '../core/vault/export';
+import { decryptVault } from '../core/vault/crypto';
 import {
   clearEncryptedVault,
   createChromeVaultStorageAdapter,
@@ -6,6 +7,7 @@ import {
 } from '../core/vault/vault-store';
 import { accountService } from './account-service';
 import { createSyncService, type SyncRunResult } from './sync-service';
+import { refreshAutomaticSync } from '../state/app-store';
 import type { PendingSyncConflict } from '../core/sync/conflict';
 import {
   createFetchWebDavClient,
@@ -16,6 +18,7 @@ import {
   createMemorySyncMetadataStore,
   type SyncMetadataSnapshot
 } from '../state/sync-store';
+import { getCurrentMasterPassword } from '../state/master-password-store';
 
 export type BackupMode = 'plain' | 'encrypted';
 
@@ -41,8 +44,6 @@ export interface ImportVaultResult {
 const syncStore = createSyncStore();
 const vaultStorage = createVaultStorage();
 const webDavClient = createFetchWebDavClient();
-const SYNC_BRIDGE_UNAVAILABLE_MESSAGE =
-  'Sync conflict resolution will be enabled after the popup uses the encrypted vault as its single source of truth.';
 
 export const settingsService = {
   async getSnapshot(): Promise<SettingsSnapshot> {
@@ -62,6 +63,7 @@ export const settingsService = {
   async saveWebDavProfile(profile: WebDavProfile): Promise<WebDavProfile> {
     const normalizedProfile = normalizeWebDavProfile(profile);
     await syncStore.save({ profile: normalizedProfile });
+    await refreshAutomaticSync();
     return normalizedProfile;
   },
 
@@ -100,16 +102,26 @@ export const settingsService = {
   },
 
   async runManualSync(): Promise<SyncRunResult> {
-    throw new Error(SYNC_BRIDGE_UNAVAILABLE_MESSAGE);
+    const profile = await requireEnabledProfile();
+    const service = createRuntimeSyncService(profile);
+    const result = await service.manualSync();
+
+    await applyRemoteAccountsIfNeeded(result);
+
+    return result;
   },
 
   async resolveConflict(
     conflict: PendingSyncConflict,
     choice: 'local' | 'remote'
   ): Promise<SyncRunResult> {
-    void conflict;
-    void choice;
-    throw new Error(SYNC_BRIDGE_UNAVAILABLE_MESSAGE);
+    const profile = await requireEnabledProfile();
+    const service = createRuntimeSyncService(profile);
+    const result = await service.resolveConflict(conflict, choice);
+
+    await applyRemoteAccountsIfNeeded(result);
+
+    return result;
   }
 };
 
@@ -157,6 +169,7 @@ async function resetSyncCache() {
     ...current,
     baseRevision: null,
     baseFingerprint: null,
+    baseVault: null,
     localRevision: null,
     localFingerprint: null,
     localUpdatedAt: null,
@@ -170,4 +183,25 @@ async function resetSyncCache() {
     lastError: null,
     pendingConflict: null
   });
+}
+
+async function requireEnabledProfile(): Promise<WebDavProfile> {
+  const metadata = await syncStore.load();
+
+  if (!metadata.profile?.enabled) {
+    throw new Error('请先启用并保存 WebDAV 同步配置。');
+  }
+
+  return metadata.profile;
+}
+
+async function applyRemoteAccountsIfNeeded(result: SyncRunResult) {
+  const masterPassword = getCurrentMasterPassword();
+
+  if ((!result.merged && result.status !== 'pulled') || !result.localVault || !masterPassword) {
+    return;
+  }
+
+  const decryptedVault = await decryptVault(result.localVault, masterPassword);
+  await accountService.replaceAllAccounts(decryptedVault.accounts);
 }

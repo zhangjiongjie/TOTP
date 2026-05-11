@@ -40,6 +40,9 @@ export function MoveGroupDialog({
         aria-labelledby="move-group-title"
         style={{
           width: 'min(360px, calc(100vw - 32px))',
+          maxHeight: 'min(78vh, 560px)',
+          display: 'grid',
+          gridTemplateRows: 'auto auto auto minmax(0, 1fr) auto',
           padding: '22px',
           borderRadius: '24px',
           background: 'rgba(255, 255, 255, 0.98)',
@@ -48,15 +51,25 @@ export function MoveGroupDialog({
         }}
       >
         <h2 id="move-group-title" style={{ margin: 0, fontSize: '24px' }}>
-          Move account to group
+          移动到分组
         </h2>
         <p style={{ margin: '12px 0 0', color: 'var(--color-ink-soft)', lineHeight: 1.6 }}>
-          Choose where this account should live in the local demo vault.
+          选择这个账号要归属到哪个分组。
         </p>
         <p style={{ margin: '10px 0 0', color: 'var(--color-ink-strong)', fontWeight: 600 }}>
           {accountLabel}
         </p>
-        <div style={{ display: 'grid', gap: '10px', marginTop: '18px' }}>
+        <div
+          style={{
+            display: 'grid',
+            gap: '10px',
+            marginTop: '18px',
+            maxHeight: 'min(280px, 42vh)',
+            paddingRight: '4px',
+            overflowY: 'auto',
+            alignContent: 'start'
+          }}
+        >
           {groups.map((group) => (
             <button
               key={group.id}
@@ -94,7 +107,7 @@ export function MoveGroupDialog({
               opacity: isSubmitting ? 0.72 : 1
             }}
           >
-            {isSubmitting ? 'Moving...' : 'Cancel'}
+            {isSubmitting ? '移动中...' : '取消'}
           </button>
         </div>
       </section>

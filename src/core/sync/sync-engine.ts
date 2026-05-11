@@ -42,6 +42,7 @@ export interface SyncRunResult {
   localRevision: string | null;
   remoteRevision: string | null;
   localVault: EncryptedVaultBlob | null;
+  merged?: boolean;
   decision?: SyncDecision;
   pendingConflict?: PendingSyncConflict | null;
   error?: SyncResultError;
@@ -57,6 +58,17 @@ export interface CreateSyncEngineOptions {
   client: WebDavClient;
   vaultStorage: VaultStorageAdapter;
   syncStore: SyncMetadataStore;
+  fingerprintVault?: (encryptedVault: EncryptedVaultBlob) => Promise<string>;
+  mergeConflict?: (input: {
+    metadata: SyncMetadataSnapshot;
+    local: PendingConflictSnapshot;
+    remote: PendingConflictSnapshot;
+  }) => Promise<EncryptedVaultBlob | null>;
+  preferRemoteOnFirstSync?: (input: {
+    local: SyncInspectionSnapshot;
+    remote: SyncInspectionSnapshot;
+    metadata: SyncMetadataSnapshot;
+  }) => Promise<boolean> | boolean;
   now?: () => string;
 }
 
@@ -78,6 +90,7 @@ interface SyncCandidateInput {
   updatedAt: string;
   source: 'local' | 'remote';
   status?: 'ready';
+  fingerprintVault: (encryptedVault: EncryptedVaultBlob) => Promise<string>;
 }
 
 export function createSyncEngine({
@@ -85,6 +98,9 @@ export function createSyncEngine({
   client,
   vaultStorage,
   syncStore,
+  fingerprintVault = createEncryptedVaultFingerprint,
+  mergeConflict,
+  preferRemoteOnFirstSync,
   now = () => new Date().toISOString()
 }: CreateSyncEngineOptions): SyncEngine {
   return {
@@ -98,9 +114,20 @@ export function createSyncEngine({
         };
       }
 
-      const context = await loadContext(vaultStorage, syncStore, now);
+      const context = await loadContext(vaultStorage, syncStore, fingerprintVault, now);
       const initial = createOpenInitialResult(context.localVault, context.localSnapshot, context.metadata);
-      const background = performSync(profile, 'open', context, client, vaultStorage, syncStore, now);
+      const background = performSync(
+        profile,
+        'open',
+        context,
+        client,
+        vaultStorage,
+        syncStore,
+        fingerprintVault,
+        mergeConflict,
+        preferRemoteOnFirstSync,
+        now
+      );
 
       return {
         initial,
@@ -112,16 +139,27 @@ export function createSyncEngine({
         return createDisabledResult();
       }
 
-      const context = await loadContext(vaultStorage, syncStore, now);
+      const context = await loadContext(vaultStorage, syncStore, fingerprintVault, now);
 
-      return performSync(profile, 'manual', context, client, vaultStorage, syncStore, now);
+      return performSync(
+        profile,
+        'manual',
+        context,
+        client,
+        vaultStorage,
+        syncStore,
+        fingerprintVault,
+        mergeConflict,
+        preferRemoteOnFirstSync,
+        now
+      );
     },
     async resolveConflict(payload, choice) {
       if (!profile?.enabled) {
         return createDisabledResult();
       }
 
-      const context = await loadContext(vaultStorage, syncStore, now);
+      const context = await loadContext(vaultStorage, syncStore, fingerprintVault, now);
 
       if (!isPendingConflictCurrent(context.metadata.pendingConflict, payload)) {
         return handleValidationFailure(
@@ -139,7 +177,14 @@ export function createSyncEngine({
           etag: payload.remote.etag
         };
 
-        return applyRemoteSnapshot(remoteSnapshot, profile, vaultStorage, syncStore, now);
+        return applyRemoteSnapshot(
+          remoteSnapshot,
+          profile,
+          vaultStorage,
+          syncStore,
+          fingerprintVault,
+          now
+        );
       }
 
       return uploadLocalSnapshot(
@@ -151,6 +196,7 @@ export function createSyncEngine({
         client,
         syncStore,
         payload.remote.etag,
+        fingerprintVault,
         now
       );
     }
@@ -164,6 +210,21 @@ async function performSync(
   client: WebDavClient,
   vaultStorage: VaultStorageAdapter,
   syncStore: SyncMetadataStore,
+  fingerprintVault: (encryptedVault: EncryptedVaultBlob) => Promise<string>,
+  mergeConflict:
+    | ((input: {
+        metadata: SyncMetadataSnapshot;
+        local: PendingConflictSnapshot;
+        remote: PendingConflictSnapshot;
+      }) => Promise<EncryptedVaultBlob | null>)
+    | undefined,
+  preferRemoteOnFirstSync:
+    | ((input: {
+        local: SyncInspectionSnapshot;
+        remote: SyncInspectionSnapshot;
+        metadata: SyncMetadataSnapshot;
+      }) => Promise<boolean> | boolean)
+    | undefined,
   now: () => string
 ): Promise<SyncRunResult> {
   let remoteSnapshot: WebDavRemoteSnapshot | null;
@@ -178,12 +239,20 @@ async function performSync(
     return finalizeNoop(syncStore, now, {
       localVault: null,
       local: null,
-      remote: null
+      remote: null,
+      baseVault: null
     });
   }
 
   if (!context.localSnapshot && remoteSnapshot) {
-    return applyRemoteSnapshot(remoteSnapshot, profile, vaultStorage, syncStore, now);
+    return applyRemoteSnapshot(
+      remoteSnapshot,
+      profile,
+      vaultStorage,
+      syncStore,
+      fingerprintVault,
+      now
+    );
   }
 
   if (context.localSnapshot && !remoteSnapshot) {
@@ -196,6 +265,7 @@ async function performSync(
       client,
       syncStore,
       null,
+      fingerprintVault,
       now
     );
   }
@@ -204,7 +274,8 @@ async function performSync(
     encryptedVault: remoteSnapshot!.encryptedVault,
     revision: remoteSnapshot!.revision,
     updatedAt: remoteSnapshot!.updatedAt,
-    source: 'remote'
+    source: 'remote',
+    fingerprintVault
   });
   const local = context.localSnapshot!;
   const decision = detectVaultConflict({
@@ -213,6 +284,25 @@ async function performSync(
     local,
     remote
   });
+
+  if (
+    !context.metadata.baseFingerprint &&
+    preferRemoteOnFirstSync &&
+    (await preferRemoteOnFirstSync({
+      local,
+      remote,
+      metadata: context.metadata
+    }))
+  ) {
+    return applyRemoteSnapshot(
+      remoteSnapshot!,
+      profile,
+      vaultStorage,
+      syncStore,
+      fingerprintVault,
+      now
+    );
+  }
 
   if (decision.kind === 'apply-local') {
     return uploadLocalSnapshot(
@@ -224,27 +314,74 @@ async function performSync(
       client,
       syncStore,
       remoteSnapshot!.etag,
+      fingerprintVault,
       now
     );
   }
 
   if (decision.kind === 'apply-remote') {
-    return applyRemoteSnapshot(remoteSnapshot!, profile, vaultStorage, syncStore, now);
+    return applyRemoteSnapshot(
+      remoteSnapshot!,
+      profile,
+      vaultStorage,
+      syncStore,
+      fingerprintVault,
+      now
+    );
   }
 
   if (decision.kind === 'conflict') {
+    const localConflict: PendingConflictSnapshot = {
+      ...local,
+      encryptedVault: context.localVault!,
+      etag: null
+    };
+    const remoteConflict: PendingConflictSnapshot = {
+      ...remote,
+      encryptedVault: remoteSnapshot!.encryptedVault,
+      etag: remoteSnapshot!.etag
+    };
+
+    if (mergeConflict) {
+      const mergedVault = await mergeConflict({
+        metadata: context.metadata,
+        local: localConflict,
+        remote: remoteConflict
+      });
+
+      if (mergedVault) {
+        await saveEncryptedVault(mergedVault, vaultStorage);
+        const mergedLocalSnapshot = await createLocalSnapshot(
+          mergedVault,
+          context.metadata.localRevision,
+          context.metadata.localFingerprint,
+          fingerprintVault,
+          now
+        );
+        const mergedResult = await uploadLocalSnapshot(
+          {
+            encryptedVault: mergedVault,
+            snapshot: mergedLocalSnapshot
+          },
+          profile,
+          client,
+          syncStore,
+          remoteSnapshot!.etag,
+          fingerprintVault,
+          now
+        );
+
+        return {
+          ...mergedResult,
+          merged: true
+        };
+      }
+    }
+
     const pendingConflict = createPendingConflict(
       context.metadata,
-      {
-        ...local,
-        encryptedVault: context.localVault!,
-        etag: null
-      },
-      {
-        ...remote,
-        encryptedVault: remoteSnapshot!.encryptedVault,
-        etag: remoteSnapshot!.etag
-      },
+      localConflict,
+      remoteConflict,
       now()
     );
 
@@ -273,6 +410,7 @@ async function performSync(
     localVault: context.localVault,
     local,
     remote,
+    remoteVault: remoteSnapshot!.encryptedVault,
     profile,
     remoteEtag: remoteSnapshot!.etag
   });
@@ -281,12 +419,19 @@ async function performSync(
 async function loadContext(
   vaultStorage: VaultStorageAdapter,
   syncStore: SyncMetadataStore,
+  fingerprintVault: (encryptedVault: EncryptedVaultBlob) => Promise<string>,
   now: () => string
 ): Promise<SyncContext> {
   const metadata = await syncStore.load();
   const localVault = await loadEncryptedVault(vaultStorage);
   const localSnapshot = localVault
-    ? await createLocalSnapshot(localVault, metadata.localRevision, metadata.localFingerprint, now)
+    ? await createLocalSnapshot(
+        localVault,
+        metadata.localRevision,
+        metadata.localFingerprint,
+        fingerprintVault,
+        now
+      )
     : null;
 
   return {
@@ -301,13 +446,15 @@ async function applyRemoteSnapshot(
   profile: WebDavProfile,
   vaultStorage: VaultStorageAdapter,
   syncStore: SyncMetadataStore,
+  fingerprintVault: (encryptedVault: EncryptedVaultBlob) => Promise<string>,
   now: () => string
 ): Promise<SyncRunResult> {
   const remote = await createCandidateSnapshot({
     encryptedVault: remoteSnapshot.encryptedVault,
     revision: remoteSnapshot.revision,
     updatedAt: remoteSnapshot.updatedAt,
-    source: 'remote'
+    source: 'remote',
+    fingerprintVault
   });
 
   await saveEncryptedVault(remoteSnapshot.encryptedVault, vaultStorage);
@@ -317,6 +464,7 @@ async function applyRemoteSnapshot(
     profile,
     baseRevision: remote.revision,
     baseFingerprint: remote.fingerprint,
+    baseVault: remoteSnapshot.encryptedVault,
     localRevision: remote.revision,
     localFingerprint: remote.fingerprint,
     localUpdatedAt: remote.updatedAt,
@@ -346,6 +494,7 @@ async function uploadLocalSnapshot(
   client: WebDavClient,
   syncStore: SyncMetadataStore,
   previousEtag: string | null,
+  fingerprintVault: (encryptedVault: EncryptedVaultBlob) => Promise<string>,
   now: () => string
 ): Promise<SyncRunResult> {
   let uploaded: WebDavRemoteSnapshot;
@@ -374,7 +523,8 @@ async function uploadLocalSnapshot(
     encryptedVault: uploaded.encryptedVault,
     revision: uploaded.revision,
     updatedAt: uploaded.updatedAt,
-    source: 'remote'
+    source: 'remote',
+    fingerprintVault
   });
   const syncedAt = now();
 
@@ -382,6 +532,7 @@ async function uploadLocalSnapshot(
     profile,
     baseRevision: remote.revision,
     baseFingerprint: local.snapshot.fingerprint,
+    baseVault: local.encryptedVault,
     localRevision: remote.revision,
     localFingerprint: local.snapshot.fingerprint,
     localUpdatedAt: uploaded.updatedAt,
@@ -412,6 +563,8 @@ async function finalizeNoop(
     localVault: EncryptedVaultBlob | null;
     local: SyncInspectionSnapshot | null;
     remote: SyncInspectionSnapshot | null;
+    remoteVault?: EncryptedVaultBlob | null;
+    baseVault?: EncryptedVaultBlob | null;
     profile?: WebDavProfile;
     remoteEtag?: string | null;
   }
@@ -424,6 +577,7 @@ async function finalizeNoop(
     ...(input.profile ? { profile: input.profile } : {}),
     baseRevision: input.remote?.revision ?? input.local?.revision ?? null,
     baseFingerprint: input.remote?.fingerprint ?? input.local?.fingerprint ?? null,
+    baseVault: input.baseVault ?? input.remoteVault ?? input.localVault,
     localRevision,
     localFingerprint,
     localUpdatedAt: updatedAt,
@@ -487,9 +641,10 @@ async function createLocalSnapshot(
   encryptedVault: EncryptedVaultBlob,
   previousRevision: string | null,
   previousFingerprint: string | null,
+  fingerprintVault: (encryptedVault: EncryptedVaultBlob) => Promise<string>,
   now: () => string
 ): Promise<SyncInspectionSnapshot> {
-  const fingerprint = await createFingerprint(encryptedVault);
+  const fingerprint = await fingerprintVault(encryptedVault);
   const revision =
     previousFingerprint && previousFingerprint === fingerprint && previousRevision
       ? previousRevision
@@ -509,12 +664,13 @@ async function createCandidateSnapshot({
   revision,
   updatedAt,
   source,
-  status = 'ready'
+  status = 'ready',
+  fingerprintVault
 }: SyncCandidateInput): Promise<SyncInspectionSnapshot> {
   return {
     revision,
     updatedAt,
-    fingerprint: await createFingerprint(encryptedVault),
+    fingerprint: await fingerprintVault(encryptedVault),
     source,
     status
   };
@@ -536,7 +692,9 @@ function createPendingConflict(
   };
 }
 
-async function createFingerprint(encryptedVault: EncryptedVaultBlob): Promise<string> {
+async function createEncryptedVaultFingerprint(
+  encryptedVault: EncryptedVaultBlob
+): Promise<string> {
   const encoded = new TextEncoder().encode(JSON.stringify(encryptedVault));
   const digest = await crypto.subtle.digest('SHA-256', encoded);
 

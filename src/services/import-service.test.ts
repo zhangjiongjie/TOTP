@@ -23,4 +23,40 @@ describe('importService', () => {
     expect(draft.accountName).toBe('alice@company.com');
     expect(draft.issuer).toBe('alice@company.com');
   });
+
+  it('captures the current tab and decodes it as a QR image', async () => {
+    vi.spyOn(qrDecodeModule, 'decodeQrFromDataUrl').mockResolvedValue(
+      'otpauth://totp/alice%40company.com?secret=JBSWY3DPEHPK3PXP'
+    );
+
+    (
+      globalThis as typeof globalThis & {
+        chrome?: {
+          tabs?: {
+            captureVisibleTab: (
+              windowId: number | undefined,
+              options: { format?: 'jpeg' | 'png'; quality?: number },
+              callback: (dataUrl?: string) => void
+            ) => void;
+          };
+          runtime?: { lastError?: { message?: string } };
+        };
+      }
+    ).chrome = {
+      tabs: {
+        captureVisibleTab: (_windowId, _options, callback) => {
+          callback('data:image/png;base64,qr-data');
+        }
+      },
+      runtime: {}
+    };
+
+    const draft = await importService.fromCurrentTabQr();
+
+    expect(draft.accountName).toBe('alice@company.com');
+    expect(draft.issuer).toBe('alice@company.com');
+    expect(qrDecodeModule.decodeQrFromDataUrl).toHaveBeenCalledWith(
+      'data:image/png;base64,qr-data'
+    );
+  });
 });

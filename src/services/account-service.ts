@@ -8,15 +8,18 @@ export interface AccountDraft {
   digits: number;
   period: number;
   algorithm: TotpAlgorithm;
+  groupId?: string | null;
 }
 
 export interface AccountFormValues {
+  otpauthUri: string;
   issuer: string;
   accountName: string;
   secret: string;
   digits: string;
   period: string;
   algorithm: TotpAlgorithm;
+  groupId: string;
 }
 
 export interface AccountGroup {
@@ -36,6 +39,7 @@ export interface AccountRuntime {
 }
 
 const DEFAULT_GROUP_ID = 'default';
+const SEED_UPDATED_AT = '2026-01-01T00:00:00.000Z';
 
 const accountGroups: AccountGroup[] = [
   { id: 'default', label: 'Default' },
@@ -86,7 +90,7 @@ const demoSeedAccounts: AccountDraft[] = [
   }
 ];
 
-let accounts = createSeedAccounts();
+let accounts: AccountRecord[] = [];
 const listeners = new Set<() => void>();
 
 export const accountService = {
@@ -131,6 +135,7 @@ export const accountService = {
       digits: draft.digits,
       period: draft.period,
       algorithm: draft.algorithm,
+      groupId: normalizeGroupId(draft.groupId),
       iconKey: resolveIconKey({
         issuer: draft.issuer,
         accountName: draft.accountName
@@ -205,33 +210,46 @@ export const accountService = {
 
   toFormValues(account: AccountRecord): AccountFormValues {
     return {
+      otpauthUri: '',
       issuer: account.issuer,
       accountName: account.accountName,
       secret: account.secret,
       digits: String(account.digits),
       period: String(account.period),
-      algorithm: account.algorithm
+      algorithm: account.algorithm,
+      groupId: account.groupId ?? DEFAULT_GROUP_ID
     };
   },
 
   __resetForTests() {
+    accounts = [];
+    emit();
+  },
+
+  __seedDemoForTests() {
     accounts = createSeedAccounts();
     emit();
   }
 };
 
 function createSeedAccounts() {
-  return demoSeedAccounts.map((draft, index) => buildAccountRecord(draft, `demo-${index + 1}`));
+  return demoSeedAccounts.map((draft, index) =>
+    buildAccountRecord(draft, `demo-${index + 1}`, SEED_UPDATED_AT)
+  );
 }
 
 function emit() {
   listeners.forEach((listener) => listener());
 }
 
-function buildAccountRecord(draft: AccountDraft, fixedId?: string): AccountRecord {
+function buildAccountRecord(
+  draft: AccountDraft,
+  fixedId?: string,
+  fixedUpdatedAt?: string
+): AccountRecord {
   const normalizedIssuer = draft.issuer.trim();
   const normalizedAccountName = draft.accountName.trim();
-  const now = new Date().toISOString();
+  const now = fixedUpdatedAt ?? new Date().toISOString();
 
   return {
     id: fixedId ?? `account-${crypto.randomUUID()}`,
@@ -242,13 +260,20 @@ function buildAccountRecord(draft: AccountDraft, fixedId?: string): AccountRecor
     period: draft.period,
     algorithm: draft.algorithm,
     tags: [],
-    groupId: DEFAULT_GROUP_ID,
+    groupId: normalizeGroupId(draft.groupId),
     pinned: false,
     iconKey: resolveIconKey({
       issuer: normalizedIssuer,
       accountName: normalizedAccountName
     }),
     updatedAt: now
+  };
+}
+
+export function getSeedVaultPayload() {
+  return {
+    version: 1 as const,
+    accounts: createSeedAccounts()
   };
 }
 
@@ -273,11 +298,17 @@ function createDemoCode(account: AccountRecord, timeSlice: number): string {
 
 export function getDefaultAccountFormValues(): AccountFormValues {
   return {
+    otpauthUri: '',
     issuer: '',
     accountName: '',
     secret: '',
     digits: '6',
     period: '30',
-    algorithm: 'SHA1'
+    algorithm: 'SHA1',
+    groupId: DEFAULT_GROUP_ID
   };
+}
+
+function normalizeGroupId(groupId: string | null | undefined) {
+  return accountGroups.some((group) => group.id === groupId) ? groupId : DEFAULT_GROUP_ID;
 }

@@ -14,15 +14,16 @@ export function PopupShell({
     <main
       style={{
         position: 'relative',
-        minWidth: 'var(--popup-width)',
-        minHeight: 'var(--popup-height)',
+        width: 'var(--popup-width)',
+        height: 'var(--popup-height)',
         padding: '20px',
-        color: 'var(--color-ink)'
+        color: 'var(--color-ink)',
+        overflow: 'hidden'
       }}
     >
       <section
         style={{
-          minHeight: 'calc(var(--popup-height) - 40px)',
+          height: 'calc(var(--popup-height) - 40px)',
           display: 'flex',
           flexDirection: 'column',
           gap: '18px',
@@ -31,7 +32,8 @@ export function PopupShell({
           background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 248, 251, 0.94))',
           boxShadow: 'var(--shadow-shell)',
           border: '1px solid rgba(255, 255, 255, 0.82)',
-          backdropFilter: 'blur(14px)'
+          backdropFilter: 'blur(14px)',
+          overflow: 'hidden'
         }}
       >
         {topBar}

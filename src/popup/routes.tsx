@@ -83,7 +83,7 @@ export function PopupRoutes({
     return (
       <AddAccountPage
         onBack={() => onNavigate({ name: 'accounts' })}
-        onAccountCreated={(accountId) => onNavigate({ name: 'detail', accountId })}
+        onAccountCreated={() => onNavigate({ name: 'accounts' })}
       />
     );
   }

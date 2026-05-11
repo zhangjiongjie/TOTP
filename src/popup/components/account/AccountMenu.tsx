@@ -1,5 +1,6 @@
 interface AccountMenuProps {
   open: boolean;
+  placement?: 'top' | 'bottom';
   onEdit: () => void;
   onMoveGroup: () => void;
   onDelete: () => void;
@@ -7,6 +8,7 @@ interface AccountMenuProps {
 
 export function AccountMenu({
   open,
+  placement = 'bottom',
   onEdit,
   onMoveGroup,
   onDelete
@@ -20,7 +22,7 @@ export function AccountMenu({
       aria-label="Account actions"
       style={{
         position: 'absolute',
-        top: '44px',
+        ...(placement === 'top' ? { bottom: '44px' } : { top: '44px' }),
         right: 0,
         width: '172px',
         padding: '8px',
@@ -28,7 +30,7 @@ export function AccountMenu({
         background: 'rgba(255, 255, 255, 0.98)',
         border: '1px solid var(--color-line)',
         boxShadow: '0 18px 34px rgba(41, 71, 100, 0.18)',
-        zIndex: 2
+        zIndex: 6
       }}
     >
       <MenuAction label="Edit" onClick={onEdit} />

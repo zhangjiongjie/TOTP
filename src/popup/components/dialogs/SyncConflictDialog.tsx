@@ -26,41 +26,44 @@ export function SyncConflictDialog({
   return (
     <div style={backdropStyle} role="presentation">
       <section aria-modal="true" role="dialog" style={dialogStyle}>
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <p style={eyebrowStyle}>Sync conflict</p>
-          <h2 style={headingStyle}>Choose which vault revision wins</h2>
+        <div style={contentStyle}>
+          <div style={{ display: 'grid', gap: '10px' }}>
+          <p style={eyebrowStyle}>同步冲突</p>
+          <h2 style={headingStyle}>选择保留哪个版本</h2>
           <p style={helperStyle}>
-            Both the local and remote vault changed since revision {conflict.baseRevision ?? 'N/A'}.
-            Pick one source to keep and the sync engine will clear the pending conflict.
+            从基线版本 {conflict.baseRevision ?? 'N/A'} 之后，本地和远端都发生了变化。
+            选择要保留的一方后，会用该版本完成覆盖并清理当前同步冲突。
           </p>
           {!resolutionAvailable ? (
             <p style={messageStyle}>
-              Conflict resolution is read-only in this popup demo until encrypted vault integration
-              is finished.
+              当前版本暂不支持在弹窗内直接处理冲突，请先检查同步配置。
             </p>
           ) : null}
+          </div>
+          <div style={choiceGridStyle}>
+            <ChoiceCard
+              title="保留本地版本"
+              description="使用本地版本覆盖远端"
+              revision={conflict.local.revision}
+              updatedAt={conflict.local.updatedAt}
+              source="本地"
+              disabled={isResolving || !resolutionAvailable}
+              onClick={() => void onResolve('local')}
+            />
+            <ChoiceCard
+              title="使用远端版本"
+              description="使用远端版本覆盖本地"
+              revision={conflict.remote.revision}
+              updatedAt={conflict.remote.updatedAt}
+              source="远端"
+              disabled={isResolving || !resolutionAvailable}
+              onClick={() => void onResolve('remote')}
+            />
+          </div>
+          {message ? <p style={messageStyle}>{message}</p> : null}
         </div>
-        <div style={choiceGridStyle}>
-          <ChoiceCard
-            title="Keep local copy"
-            revision={conflict.local.revision}
-            updatedAt={conflict.local.updatedAt}
-            source="Local"
-            disabled={isResolving || !resolutionAvailable}
-            onClick={() => void onResolve('local')}
-          />
-          <ChoiceCard
-            title="Use remote copy"
-            revision={conflict.remote.revision}
-            updatedAt={conflict.remote.updatedAt}
-            source="Remote"
-            disabled={isResolving || !resolutionAvailable}
-            onClick={() => void onResolve('remote')}
-          />
-        </div>
-        {message ? <p style={messageStyle}>{message}</p> : null}
         <button type="button" onClick={onClose} disabled={isResolving} style={closeButtonStyle}>
-          Close
+          关闭
         </button>
       </section>
     </div>
@@ -69,6 +72,7 @@ export function SyncConflictDialog({
 
 function ChoiceCard({
   title,
+  description,
   source,
   revision,
   updatedAt,
@@ -76,6 +80,7 @@ function ChoiceCard({
   onClick
 }: {
   title: string;
+  description: string;
   source: string;
   revision: string;
   updatedAt: string;
@@ -85,8 +90,12 @@ function ChoiceCard({
   return (
     <button type="button" onClick={onClick} disabled={disabled} style={choiceCardStyle}>
       <strong style={{ fontSize: '16px' }}>{title}</strong>
-      <span style={metaLineStyle}>{source} revision: {revision}</span>
-      <span style={metaLineStyle}>Updated: {updatedAt}</span>
+      <span style={descriptionStyle}>{description}</span>
+      <span style={metaLineStyle}>
+        <strong>{source}版本：</strong>
+        <span>{revision}</span>
+      </span>
+      <span style={metaLineStyle}>更新时间：{updatedAt}</span>
     </button>
   );
 }
@@ -101,13 +110,23 @@ const backdropStyle = {
 } satisfies React.CSSProperties;
 
 const dialogStyle = {
-  width: 'min(560px, 100%)',
+  width: 'min(420px, calc(100vw - 24px))',
   display: 'grid',
   gap: '18px',
   padding: '22px',
+  maxHeight: 'calc(100vh - 40px)',
   borderRadius: '24px',
   background: 'rgba(255, 255, 255, 0.98)',
-  boxShadow: '0 26px 60px rgba(15, 23, 42, 0.18)'
+  boxShadow: '0 26px 60px rgba(15, 23, 42, 0.18)',
+  overflow: 'hidden'
+} satisfies React.CSSProperties;
+
+const contentStyle = {
+  display: 'grid',
+  gap: '18px',
+  minHeight: 0,
+  overflowY: 'auto',
+  paddingRight: '4px'
 } satisfies React.CSSProperties;
 
 const eyebrowStyle = {
@@ -132,7 +151,7 @@ const helperStyle = {
 
 const choiceGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
   gap: '12px'
 } satisfies React.CSSProperties;
 
@@ -144,12 +163,23 @@ const choiceCardStyle = {
   background: 'rgba(244, 248, 251, 0.92)',
   border: '1px solid var(--color-line)',
   textAlign: 'left',
-  cursor: 'pointer'
+  cursor: 'pointer',
+  minWidth: 0
 } satisfies React.CSSProperties;
 
 const metaLineStyle = {
+  display: 'grid',
+  gap: '4px',
   lineHeight: 1.5,
-  color: 'var(--color-ink-soft)'
+  color: 'var(--color-ink-soft)',
+  wordBreak: 'break-all'
+} satisfies React.CSSProperties;
+
+const descriptionStyle = {
+  lineHeight: 1.5,
+  color: 'var(--color-brand-strong)',
+  fontSize: '13px',
+  fontWeight: 600
 } satisfies React.CSSProperties;
 
 const closeButtonStyle = {

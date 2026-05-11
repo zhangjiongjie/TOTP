@@ -1,6 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Slack">
-  <path fill="#E01E5A" d="M10.3 1.5A2.8 2.8 0 1 0 7.5 4.3v2.8a2.8 2.8 0 1 0 2.8 2.8V1.5Z"/>
-  <path fill="#36C5F0" d="M22.5 10.3A2.8 2.8 0 1 0 19.7 7.5h-2.8a2.8 2.8 0 1 0-2.8 2.8h8.4Z"/>
-  <path fill="#2EB67D" d="M13.7 22.5a2.8 2.8 0 1 0 2.8-2.8v-2.8a2.8 2.8 0 1 0-2.8-2.8v8.4Z"/>
-  <path fill="#ECB22E" d="M1.5 13.7a2.8 2.8 0 1 0 2.8 2.8h2.8a2.8 2.8 0 1 0 2.8-2.8H1.5Z"/>
+  <rect x="9.4" y="2" width="4" height="9.1" rx="2" fill="#36C5F0"/>
+  <rect x="12.9" y="9.4" width="9.1" height="4" rx="2" fill="#2EB67D"/>
+  <rect x="10.6" y="12.9" width="4" height="9.1" rx="2" fill="#ECB22E"/>
+  <rect x="2" y="10.6" width="9.1" height="4" rx="2" fill="#E01E5A"/>
+  <rect x="2" y="9.4" width="4" height="9.1" rx="2" fill="#36C5F0"/>
+  <rect x="5.5" y="18" width="9.1" height="4" rx="2" fill="#2EB67D"/>
+  <rect x="18" y="5.5" width="4" height="9.1" rx="2" fill="#ECB22E"/>
+  <rect x="9.4" y="2" width="9.1" height="4" rx="2" fill="#E01E5A"/>
 </svg>

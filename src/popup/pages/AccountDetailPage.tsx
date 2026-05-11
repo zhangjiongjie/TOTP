@@ -68,7 +68,7 @@ export function AccountDetailPage({
           <p style={{ color: 'var(--color-ink-soft)' }}>
             This account is no longer available.
           </p>
-          <button type="button" onClick={onBack} style={actionStyle}>
+          <button type="button" onClick={onBack} style={secondaryButtonStyle}>
             Back to accounts
           </button>
         </div>
@@ -90,7 +90,7 @@ export function AccountDetailPage({
 
     try {
       await accountService.updateAccount(accountId, importService.fromManualForm(values));
-      setMessage('Account updated.');
+      onBack();
     } catch (caughtError) {
       setMessage(caughtError instanceof Error ? caughtError.message : 'Unable to update account.');
     } finally {
@@ -103,42 +103,49 @@ export function AccountDetailPage({
       topBar={
         <TopBar
           eyebrow="Account"
-          title={`${account.issuer} details`}
-          subtitle="Edit the local demo record. The service API stays compatible with a later vault-backed implementation."
+          title="编辑账号"
+          subtitle="修改账号信息与分组，保存后会返回主列表。"
           actions={
-            <button type="button" aria-label="Back" onClick={onBack} style={actionStyle}>
-              Back
+            <button type="button" aria-label="返回" onClick={onBack} style={secondaryButtonStyle}>
+              返回
             </button>
           }
         />
       }
     >
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <AccountForm
-          title="Edit account"
-          submitLabel="Save changes"
-          values={values}
-          onChange={updateField}
-          onSubmit={handleSave}
-          helperText="The code preview on the list will refresh from this data."
-          isSubmitting={isSaving || isDeleting}
-        />
-        <button
-          type="button"
-          disabled={isSaving || isDeleting}
-          onClick={() => setConfirmOpen(true)}
-          style={{
-            padding: '12px 16px',
-            borderRadius: '999px',
-            background: 'rgba(187, 83, 105, 0.12)',
-            color: '#a14157',
-            cursor: isSaving || isDeleting ? 'wait' : 'pointer',
-            opacity: isSaving || isDeleting ? 0.72 : 1
-          }}
-        >
-          Delete account
-        </button>
-        {message ? <p style={{ margin: 0, color: 'var(--color-ink-soft)' }}>{message}</p> : null}
+      <div style={pageLayoutStyle}>
+        <div style={scrollAreaStyle}>
+          <section style={panelStyle}>
+            <AccountForm
+              title={`${account.issuer} · ${account.accountName}`}
+              helperText="Group 会在保存时一起提交，删除操作也统一放在底部。"
+              values={values}
+              onChange={updateField}
+              isSubmitting={isSaving || isDeleting}
+              showSubmitButton={false}
+              groups={accountService.getGroups()}
+            />
+          </section>
+          {message ? <p style={messageStyle}>{message}</p> : null}
+        </div>
+        <div style={footerStyle}>
+          <button
+            type="button"
+            disabled={isSaving || isDeleting}
+            onClick={() => setConfirmOpen(true)}
+            style={dangerButtonStyle}
+          >
+            {isDeleting ? '删除中...' : '删除'}
+          </button>
+          <button
+            type="button"
+            disabled={isSaving || isDeleting}
+            onClick={() => void handleSave()}
+            style={primaryButtonStyle}
+          >
+            {isSaving ? '保存中...' : '保存'}
+          </button>
+        </div>
       </div>
       <ConfirmDeleteDialog
         open={confirmOpen}
@@ -171,16 +178,50 @@ export function AccountDetailPage({
 
 function getEmptyFormValues(): AccountFormValues {
   return {
+    otpauthUri: '',
     issuer: '',
     accountName: '',
     secret: '',
     digits: '6',
     period: '30',
-    algorithm: 'SHA1'
+    algorithm: 'SHA1',
+    groupId: 'default'
   };
 }
 
-const actionStyle = {
+const pageLayoutStyle = {
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  flex: 1,
+  minHeight: 0,
+  gap: '14px'
+} satisfies React.CSSProperties;
+
+const scrollAreaStyle = {
+  display: 'grid',
+  gap: '14px',
+  flex: 1,
+  minHeight: 0,
+  overflowY: 'auto',
+  paddingRight: '4px'
+} satisfies React.CSSProperties;
+
+const panelStyle = {
+  padding: '18px',
+  borderRadius: '22px',
+  background: 'rgba(250, 252, 255, 0.92)',
+  border: '1px solid var(--color-line)'
+} satisfies React.CSSProperties;
+
+const footerStyle = {
+  display: 'grid',
+  gridTemplateColumns: '132px 1fr',
+  gap: '12px',
+  paddingTop: '6px'
+} satisfies React.CSSProperties;
+
+const secondaryButtonStyle = {
   minWidth: '74px',
   height: '36px',
   padding: '0 12px',
@@ -189,4 +230,33 @@ const actionStyle = {
   border: '1px solid var(--color-line)',
   color: 'var(--color-brand-strong)',
   cursor: 'pointer'
+} satisfies React.CSSProperties;
+
+const primaryButtonStyle = {
+  minHeight: '48px',
+  padding: '13px 18px',
+  borderRadius: '999px',
+  background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+  color: '#f8fbff',
+  fontWeight: 600,
+  cursor: 'pointer'
+} satisfies React.CSSProperties;
+
+const dangerButtonStyle = {
+  minHeight: '48px',
+  padding: '13px 18px',
+  borderRadius: '999px',
+  background: 'rgba(187, 83, 105, 0.12)',
+  color: '#a14157',
+  fontWeight: 600,
+  cursor: 'pointer'
+} satisfies React.CSSProperties;
+
+const messageStyle = {
+  margin: 0,
+  padding: '12px 14px',
+  borderRadius: '16px',
+  background: 'rgba(252, 236, 240, 0.96)',
+  color: '#9d4156',
+  lineHeight: 1.5
 } satisfies React.CSSProperties;

@@ -56,7 +56,7 @@ export function ConfirmDeleteDialog({
             lineHeight: 1.6
           }}
         >
-          This action removes the account from the local demo vault.
+          This action removes the account from the local vault.
         </p>
         <p
           style={{
