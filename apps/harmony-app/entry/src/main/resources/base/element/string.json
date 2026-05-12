@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "EntryAbility_label",
+      "value": "TOTP"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "TOTP HarmonyOS entry ability"
+    },
+    {
+      "name": "module_desc",
+      "value": "TOTP HarmonyOS entry module"
+    }
+  ]
+}

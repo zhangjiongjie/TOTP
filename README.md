@@ -1,16 +1,20 @@
-# TOTP 浏览器插件
+# TOTP 多端工程
 
-这是一个基于 React、TypeScript、Vite 与 Manifest V3 的浏览器插件脚手架，用于后续实现 TOTP 账号管理、验证码展示与同步能力。
+这是一个面向多个客户端形态的 TOTP 产品仓库，当前目标客户端包括浏览器插件端与 HarmonyOS NEXT 端，后续预留 Android 与独立 Web 端扩展空间。
 
-## 开发命令
+## Workspace 结构
+
+- `apps/browser-extension`：Chrome / Edge 浏览器插件端
+- `apps/harmony-app`：HarmonyOS NEXT 客户端
+- `packages/totp-core`：共享 TOTP 核心、加解密与导入导出逻辑
+- `packages/totp-sync`：共享 WebDAV 同步与冲突处理逻辑
+- `packages/totp-test-fixtures`：跨端测试夹具与演示数据
+
+## 常用命令
 
 - `npm install`
-- `npm run dev`
-- `npm run test:plan-smoke`
+- `npm run test:workspace-smoke`
+- `npm run test:browser`
+- `npm run build:browser`
+- `npm test`
 - `npm run build`
-
-## 当前范围
-
-- 提供 `popup` 的最小 React 入口。
-- 提供 Manifest V3 基础清单。
-- 提供 Vite 构建配置与 TypeScript 配置。

@@ -2,3 +2,9 @@
 .worktrees/
 dist/
 node_modules/
+.hvigor/
+.logs/
+*.tsbuildinfo
+apps/harmony-app/.hvigor/
+apps/harmony-app/.logs/
+apps/harmony-app/.logs
