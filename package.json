@@ -1,30 +1,22 @@
 {
-  "name": "totp-browser-plugin",
+  "name": "totp-monorepo",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest --passWithNoTests",
-    "test:plan-smoke": "node -e \"const fs=require('fs');['package.json','vite.config.ts','src/main.tsx'].forEach((f)=>{if(!fs.existsSync(f)) throw new Error(f+' missing')})\""
-  },
-  "dependencies": {
-    "jsqr": "^1.4.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:browser": "npm run build --workspace @totp/browser-extension",
+    "test:browser": "npm run test --workspace @totp/browser-extension",
+    "typecheck:browser": "npm run typecheck --workspace @totp/browser-extension",
+    "test:workspace-smoke": "node -e \"const fs=require('fs');['apps','packages','apps/browser-extension','packages/totp-core','packages/totp-sync'].forEach((p)=>{if(!fs.existsSync(p)) throw new Error(p+' missing')})\""
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
-    "@types/node": "^24.0.0",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
-    "@vitejs/plugin-react": "^5.0.0",
-    "jsdom": "^26.1.0",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.0",
-    "vitest": "^3.2.4"
+    "typescript": "^5.8.3"
   }
 }

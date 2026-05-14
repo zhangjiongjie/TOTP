@@ -1,0 +1,11 @@
+{
+  "name": "@totp/sync",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts src/sync/conflict.test.ts src/sync/webdav-client.test.ts --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

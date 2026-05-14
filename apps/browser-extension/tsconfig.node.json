@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "outDir": "../../node_modules/.cache/typescript/browser-extension-node",
+    "tsBuildInfoFile": "../../node_modules/.cache/typescript/browser-extension-node.tsbuildinfo"
+  },
+  "include": ["vite.config.ts", "manifest.config.ts", "public/manifest.json"]
+}
