@@ -8,3 +8,9 @@ node_modules/
 apps/harmony-app/.hvigor/
 apps/harmony-app/.logs/
 apps/harmony-app/.logs
+apps/harmony-app/.appanalyzer/
+apps/harmony-app/.idea/
+apps/harmony-app/entry/.preview/
+apps/harmony-app/build/
+apps/harmony-app/entry/build/
+apps/harmony-app/local.properties

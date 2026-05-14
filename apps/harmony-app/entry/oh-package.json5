@@ -1,6 +1,9 @@
 {
   "name": "entry",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "TOTP HarmonyOS entry module",
+  "main": "",
+  "author": "",
+  "license": "",
   "dependencies": {}
 }

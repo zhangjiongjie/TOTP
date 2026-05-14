@@ -8,6 +8,14 @@
     "deliveryWithInstall": true,
     "installationFree": false,
     "pages": "$profile:main_pages",
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.INTERNET"
+      },
+      {
+        "name": "ohos.permission.ACCESS_BIOMETRIC"
+      }
+    ],
     "abilities": [
       {
         "name": "EntryAbility",
