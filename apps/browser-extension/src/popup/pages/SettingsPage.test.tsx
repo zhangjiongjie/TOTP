@@ -45,7 +45,7 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('renders the WebDAV form from stored settings and saves updates', async () => {
+  it('renders the WebDAV form from stored settings and saves when enabling sync', async () => {
     mockGetSnapshot.mockResolvedValueOnce({
       webDavProfile: {
         id: 'webdav-primary',
@@ -88,12 +88,16 @@ describe('SettingsPage', () => {
         'https://dav.example.com/remote.php/dav/files/demo'
       );
     });
-    expect(screen.getByText('最近同步：2026-05-10T08:00:00.000Z')).toBeInTheDocument();
+    expect(screen.getByText('已保存 2026-05-10 16:00')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '设置' })).toBeInTheDocument();
+    expect(screen.queryByText('备份与同步')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '保存 WebDAV 设置' })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('远端文件路径'), {
       target: { value: '/totp/backup.json' }
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存 WebDAV 设置' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '启用同步' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '启用同步' }));
 
     await waitFor(() => {
       expect(mockSaveWebDavProfile).toHaveBeenCalledWith({
@@ -106,7 +110,7 @@ describe('SettingsPage', () => {
         syncIntervalMs: 300000
       });
     });
-    expect(await screen.findByText('WebDAV 设置已保存并启用。')).toBeInTheDocument();
+    expect(await screen.findByText('已启用 WebDAV 同步')).toBeInTheDocument();
   });
 
   it('exports the vault and imports a selected backup file', async () => {
@@ -121,21 +125,21 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: '导出备份' }));
+    fireEvent.click(screen.getByRole('button', { name: '导出' }));
     await waitFor(() => {
       expect(mockExportVault).toHaveBeenCalled();
     });
-    expect(await screen.findByText('已导出 totp-backup.json。')).toBeInTheDocument();
+    expect(await screen.findByText('已导出')).toBeInTheDocument();
 
     const importFile = new File(['{"mode":"plain"}'], 'backup.json', {
       type: 'application/json'
     });
-    fireEvent.change(await screen.findByLabelText('导入备份文件'), {
+    fireEvent.change(await screen.findByLabelText('导入'), {
       target: { files: [importFile] }
     });
 
     expect(mockImportVault).toHaveBeenCalledWith(importFile, { password: undefined });
-    expect(await screen.findByText('已从明文备份导入 2 个账号。')).toBeInTheDocument();
+    expect(await screen.findByText('已导入 2 个账号')).toBeInTheDocument();
   });
 
   it('shows WebDAV save errors next to the WebDAV form', async () => {
@@ -143,7 +147,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '保存 WebDAV 设置' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: '启用同步' }));
 
     expect(await screen.findByText('WebDAV unavailable.')).toBeInTheDocument();
   });

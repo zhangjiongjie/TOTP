@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
 import { resolveIconKey } from '../../../core/icons/icon-matchers';
-import { iconRegistry } from '../../../core/icons/icon-registry';
+import { iconRegistry, type IconKey } from '../../../core/icons/icon-registry';
 import { CountdownRing } from './CountdownRing';
-import { CopyButton } from './CopyButton';
 
 export interface DemoAccount {
   id: string;
@@ -11,41 +9,27 @@ export interface DemoAccount {
   code: string;
   period: number;
   secondsRemaining: number;
+  iconKey?: IconKey | null;
   groupLabel?: string;
 }
 
 export interface AccountCardProps {
   account: DemoAccount;
   onEdit?: (accountId: string) => void;
+  onCopyResult?: (issuer: string, status: 'success' | 'error') => void;
 }
 
 export function AccountCard({
   account,
-  onEdit
+  onEdit,
+  onCopyResult
 }: AccountCardProps) {
-  const [copied, setCopied] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState('点击验证码即可复制');
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>(
-    'idle'
-  );
-  const iconKey = resolveIconKey({
+  const resolvedIconKey = resolveIconKey({
     issuer: account.issuer,
     accountName: account.accountName
   });
-  const iconMarkup = iconKey ? iconRegistry[iconKey] : null;
-
-  useEffect(() => {
-    if (!copied) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      setCopied(false);
-      setCopyStatus('idle');
-      setCopyFeedback('点击验证码即可复制');
-    }, 1600);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+  const iconKey = resolvedIconKey !== 'default' ? resolvedIconKey : account.iconKey ?? resolvedIconKey;
+  const iconMarkup = iconRegistry[iconKey];
 
   async function handleCopy() {
     try {
@@ -54,232 +38,199 @@ export function AccountCard({
       }
 
       await navigator.clipboard.writeText(account.code.replace(/\s+/g, ''));
-      setCopyStatus('success');
-      setCopyFeedback('已复制到剪贴板');
-      setCopied(true);
+      onCopyResult?.(account.issuer, 'success');
     } catch {
-      setCopied(false);
-      setCopyStatus('error');
-      setCopyFeedback('复制失败，请手动复制');
+      onCopyResult?.(account.issuer, 'error');
     }
   }
 
-  const headerContent = (
-    <div
+  return (
+    <article
+      data-testid="account-card-grid"
       style={{
-        width: '100%',
-        display: 'flex',
+        position: 'relative',
+        display: 'grid',
+        gridTemplateColumns: '48px minmax(0, 1fr) 36px 58px',
+        gridTemplateRows: '30px 42px',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '12px'
+        gap: '6px 8px',
+        height: '104px',
+        minHeight: '104px',
+        padding: '12px 10px 12px 14px',
+        borderRadius: 'var(--radius-card)',
+        background: 'var(--color-card)',
+        border: '1px solid var(--color-line)',
+        boxShadow: 'var(--shadow-card)',
+        overflow: 'hidden',
+        flexShrink: 0
       }}
     >
       <div
+        aria-hidden="true"
         style={{
-          flex: '1 1 auto',
-          minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px'
+          gridColumn: '1',
+          gridRow: '1 / span 2',
+          width: '48px',
+          height: '48px',
+          aspectRatio: '1 / 1',
+          display: 'grid',
+          placeItems: 'center',
+          borderRadius: '16px',
+          background: 'var(--color-card-muted)',
+          border: '1px solid var(--color-line)'
         }}
       >
-        <div
-          aria-hidden="true"
-          style={{
-            width: '48px',
-            minWidth: '48px',
-            height: '48px',
-            aspectRatio: '1 / 1',
-            display: 'grid',
-            placeItems: 'center',
-            borderRadius: '14px',
-            background: 'var(--color-surface-muted)',
-            border: '1px solid var(--color-line)'
-          }}
-        >
-          {iconMarkup ? (
-            <span
-              className="brand-icon-plate"
-              style={{
-                width: '32px',
-                minWidth: '32px',
-                height: '32px',
-                aspectRatio: '1 / 1',
-                display: 'grid',
-                placeItems: 'center',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                background: 'rgba(255, 255, 255, 0.98)',
-                boxShadow: 'inset 0 0 0 1px rgba(109, 133, 161, 0.12)'
-              }}
-            >
-              <span
-                className="brand-icon-glyph"
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  aspectRatio: '1 / 1',
-                  display: 'grid',
-                  placeItems: 'center'
-                }}
-                dangerouslySetInnerHTML={{ __html: iconMarkup }}
-              />
-            </span>
-          ) : (
-            <span
-              className="brand-icon-plate"
-              style={{
-                width: '32px',
-                minWidth: '32px',
-                height: '32px',
-                aspectRatio: '1 / 1',
-                display: 'grid',
-                placeItems: 'center',
-                borderRadius: '10px',
-                overflow: 'hidden',
-                background: 'rgba(255, 255, 255, 0.98)',
-                boxShadow: 'inset 0 0 0 1px rgba(109, 133, 161, 0.12)',
-                color: 'var(--color-brand-strong)',
-                fontSize: '15px',
-                fontWeight: 700
-              }}
-            >
-              {account.issuer.slice(0, 1)}
-            </span>
-          )}
-        </div>
-        <div style={{ minWidth: 0 }}>
+        <span className="brand-icon-plate" style={iconPlateStyle}>
+          <span
+            className="brand-icon-glyph"
+            style={iconGlyphStyle}
+            dangerouslySetInnerHTML={{ __html: iconMarkup }}
+          />
+        </span>
+      </div>
+      <div
+        style={{
+          gridColumn: '2',
+          gridRow: '1 / span 2',
+          minWidth: 0,
+          alignSelf: 'center'
+        }}
+      >
           <h2
             style={{
               margin: 0,
               fontSize: '18px',
               lineHeight: 1.15,
-              color: 'var(--color-ink-strong)'
+              fontWeight: 800,
+              color: 'var(--color-ink-strong)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
           >
             {account.issuer}
           </h2>
           <p
+            data-testid="account-name"
             style={{
               margin: '4px 0 0',
               color: 'var(--color-ink-soft)',
               fontSize: '14px',
-              overflowWrap: 'anywhere'
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
           >
             {account.accountName}
           </p>
-          {account.groupLabel ? (
+          {account.groupLabel && account.groupLabel !== 'Default' ? (
             <p
               style={{
                 margin: '6px 0 0',
                 color: 'var(--color-brand-strong)',
                 fontSize: '12px',
                 fontWeight: 600,
-                overflowWrap: 'anywhere'
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}
             >
-              {`Group: ${account.groupLabel}`}
+              {account.groupLabel}
             </p>
           ) : null}
-        </div>
+          <p
+            style={{
+              margin: '7px 0 0',
+              color: 'var(--color-brand)',
+              fontSize: '27px',
+              lineHeight: 1,
+              fontWeight: 800,
+              letterSpacing: '0.12em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'clip',
+              maxWidth: '100%'
+            }}
+          >
+            {account.code}
+          </p>
       </div>
-      <div style={{ flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+
+      <button
+        type="button"
+        aria-label="Edit account"
+        title="编辑账号"
+        onClick={() => onEdit?.(account.id)}
+        style={{
+          gridColumn: '4',
+          gridRow: '1',
+          width: '34px',
+          height: '34px',
+          justifySelf: 'end',
+          display: 'grid',
+          placeItems: 'center',
+          borderRadius: '50%',
+          background: 'var(--color-card-muted)',
+          border: '1px solid var(--color-line)',
+          cursor: 'pointer'
+        }}
+      >
+        <img src="icons/action_edit.svg" alt="" aria-hidden="true" style={{ width: '18px', height: '18px' }} />
+      </button>
+      <div
+        style={{
+          gridColumn: '3',
+          gridRow: '2',
+          display: 'grid',
+          placeItems: 'center',
+          justifySelf: 'end'
+        }}
+      >
         <CountdownRing
           secondsRemaining={account.secondsRemaining}
           period={account.period}
         />
       </div>
-    </div>
-  );
-
-  return (
-    <article
-      style={{
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        padding: '18px',
-        borderRadius: 'var(--radius-card)',
-        background: 'rgba(255, 255, 255, 0.98)',
-        border: '1px solid var(--color-line)',
-        boxShadow: 'var(--shadow-card)'
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'stretch'
-          }}
-        >
-          {headerContent}
-        </div>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <button
-            type="button"
-            aria-label="Edit account"
-            title="编辑账号"
-            onClick={() => onEdit?.(account.id)}
-            style={{
-              width: '34px',
-              height: '34px',
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: '12px',
-              background: 'rgba(238, 244, 249, 0.92)',
-              border: '1px solid var(--color-line)',
-              color: 'var(--color-ink-soft)',
-              cursor: 'pointer'
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 20 20"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <path
-                d="M4.5 13.7v1.8h1.8l7.26-7.26-1.8-1.8L4.5 13.7Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M10.98 5.88 12.78 4.08a1.27 1.27 0 0 1 1.8 0l1.34 1.34a1.27 1.27 0 0 1 0 1.8l-1.8 1.8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <CopyButton code={account.code} copied={copied} onCopy={handleCopy} />
-        <p
-          aria-live="polite"
-          style={{
-            minHeight: '20px',
-            margin: '10px 0 0',
-            color:
-              copyStatus === 'success'
-                ? 'var(--color-success)'
-                : copyStatus === 'error'
-                  ? '#8a4452'
-                  : 'var(--color-ink-soft)',
-            fontSize: '13px'
-          }}
-        >
-          {copyFeedback}
-        </p>
-      </div>
+      <button
+        type="button"
+        aria-label={account.code}
+        onClick={handleCopy}
+        style={{
+          gridColumn: '4',
+          gridRow: '2',
+          width: '58px',
+          minHeight: '34px',
+          padding: 0,
+          borderRadius: 'var(--radius-pill)',
+          background: 'var(--color-card-muted)',
+          color: 'var(--color-brand)',
+          fontWeight: 800,
+          cursor: 'pointer'
+        }}
+      >
+        复制
+      </button>
     </article>
   );
 }
+
+const iconPlateStyle = {
+  width: '32px',
+  minWidth: '32px',
+  height: '32px',
+  aspectRatio: '1 / 1',
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: '10px',
+  overflow: 'hidden',
+  background: 'rgba(255, 255, 255, 0.98)',
+  boxShadow: 'inset 0 0 0 1px rgba(109, 133, 161, 0.12)'
+} satisfies React.CSSProperties;
+
+const iconGlyphStyle = {
+  width: '20px',
+  height: '20px',
+  aspectRatio: '1 / 1',
+  display: 'grid',
+  placeItems: 'center'
+} satisfies React.CSSProperties;

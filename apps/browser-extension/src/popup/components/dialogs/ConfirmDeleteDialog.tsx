@@ -38,7 +38,7 @@ export function ConfirmDeleteDialog({
           width: 'min(360px, calc(100vw - 32px))',
           padding: '22px',
           borderRadius: '24px',
-          background: 'rgba(255, 255, 255, 0.98)',
+          background: 'var(--color-card)',
           border: '1px solid var(--color-line)',
           boxShadow: '0 28px 50px rgba(30, 54, 82, 0.2)'
         }}
@@ -47,17 +47,8 @@ export function ConfirmDeleteDialog({
           id="delete-account-title"
           style={{ margin: 0, fontSize: '24px', color: 'var(--color-ink-strong)' }}
         >
-          Delete account?
+          删除账号？
         </h2>
-        <p
-          style={{
-            margin: '12px 0 0',
-            color: 'var(--color-ink-soft)',
-            lineHeight: 1.6
-          }}
-        >
-          This action removes the account from the local vault.
-        </p>
         <p
           style={{
             margin: '10px 0 0',
@@ -75,9 +66,9 @@ export function ConfirmDeleteDialog({
             marginTop: '22px'
           }}
         >
-          <DialogButton label="Cancel" onClick={onCancel} disabled={isSubmitting} />
+          <DialogButton label="取消" onClick={onCancel} disabled={isSubmitting} />
           <DialogButton
-            label={isSubmitting ? 'Deleting...' : 'Delete'}
+            label={isSubmitting ? '删除中...' : '删除'}
             onClick={onConfirm}
             tone="danger"
             disabled={isSubmitting}
@@ -110,8 +101,8 @@ function DialogButton({
         borderRadius: '999px',
         background:
           tone === 'danger'
-            ? 'linear-gradient(180deg, #bb5369 0%, #a14157 100%)'
-            : 'rgba(238, 244, 249, 0.96)',
+            ? 'var(--color-danger)'
+            : 'var(--color-card-muted)',
         color: tone === 'danger' ? '#fff' : 'var(--color-brand-strong)',
         cursor: disabled ? 'wait' : 'pointer',
         opacity: disabled ? 0.72 : 1

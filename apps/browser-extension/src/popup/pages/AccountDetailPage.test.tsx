@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { accountService } from '../../services/account-service';
 import { AccountDetailPage } from './AccountDetailPage';
@@ -22,8 +22,8 @@ describe('AccountDetailPage', () => {
       />
     );
 
-    expect(screen.getByText('Loading local account details...')).toBeInTheDocument();
-    expect(screen.queryByText('This account is no longer available.')).not.toBeInTheDocument();
+    expect(screen.getByText('加载中...')).toBeInTheDocument();
+    expect(screen.queryByText('账号不存在。')).not.toBeInTheDocument();
 
     getAccountSpy.mockRestore();
   });
@@ -109,9 +109,11 @@ describe('AccountDetailPage', () => {
 
     expect(await screen.findByDisplayValue('alice@company.com')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '删除' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '删除' }));
 
-    expect(screen.getByRole('button', { name: '删除中...' })).toBeDisabled();
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: '删除中...' })
+    ).toBeDisabled();
 
     deleteSpy.mockRestore();
   });
@@ -129,7 +131,7 @@ describe('AccountDetailPage', () => {
 
     expect(await screen.findByDisplayValue('alice@company.com')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '删除' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '删除' }));
 
     await waitFor(() => {
       expect(onDeleted).toHaveBeenCalledTimes(1);

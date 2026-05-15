@@ -7,12 +7,13 @@ export function CountdownRing({
   secondsRemaining,
   period
 }: CountdownRingProps) {
-  const size = 50;
-  const strokeWidth = 5;
+  const size = 34;
+  const strokeWidth = 3;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = Math.max(0, Math.min(1, secondsRemaining / period));
   const dashOffset = circumference * (1 - progress);
+  const label = `${secondsRemaining}s`;
 
   return (
     <div
@@ -37,7 +38,7 @@ export function CountdownRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(103, 126, 154, 0.18)"
+          stroke="var(--color-line)"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -56,12 +57,12 @@ export function CountdownRing({
       <strong
         style={{
           position: 'absolute',
-          fontSize: '13px',
+          fontSize: '10px',
           lineHeight: 1,
           color: 'var(--color-ink-strong)'
         }}
       >
-        {secondsRemaining}s
+        {label}
       </strong>
     </div>
   );

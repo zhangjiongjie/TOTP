@@ -18,13 +18,13 @@ body,
 body {
   font-family: var(--font-family, "Segoe UI", "PingFang SC", sans-serif);
   color: var(--color-ink);
-  background:
-    radial-gradient(circle at top left, rgba(223, 233, 244, 0.92), transparent 44%),
-    linear-gradient(180deg, #f4f8fb 0%, #e6eef7 100%);
+  background: var(--color-page);
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
 }
 
@@ -37,6 +37,21 @@ button {
 img {
   display: block;
   max-width: 100%;
+}
+
+input,
+textarea,
+select {
+  color-scheme: light dark;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-ink-soft) 58%, transparent);
+  border-radius: 999px;
 }
 
 .brand-icon-plate {

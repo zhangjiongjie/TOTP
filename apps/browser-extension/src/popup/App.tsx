@@ -5,6 +5,7 @@ import {
   initializeApp,
   navigate,
   submitUnlock,
+  submitWebAuthnUnlock,
   subscribeApp
 } from '../state/app-store';
 import { PopupRoutes } from './routes';
@@ -26,6 +27,7 @@ export function App() {
       unlockMessage={appState.unlockError}
       onNavigate={navigate}
       onUnlock={submitUnlock}
+      onWebAuthnUnlock={submitWebAuthnUnlock}
     />
   );
 }

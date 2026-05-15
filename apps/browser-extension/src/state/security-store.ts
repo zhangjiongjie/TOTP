@@ -5,6 +5,9 @@ const SESSION_CREDENTIALS_KEY = 'sessionCredentials';
 
 export interface SecurityPreferences {
   rememberSessionUntilBrowserRestart: boolean;
+  webAuthnUnlockEnabled: boolean;
+  webAuthnCredentialId: string | null;
+  webAuthnCredentialCreatedAt: string | null;
 }
 
 interface SessionCredentials {
@@ -23,7 +26,10 @@ export interface SessionCredentialsStore {
 }
 
 const defaultSecurityPreferences: SecurityPreferences = {
-  rememberSessionUntilBrowserRestart: true
+  rememberSessionUntilBrowserRestart: true,
+  webAuthnUnlockEnabled: false,
+  webAuthnCredentialId: null,
+  webAuthnCredentialCreatedAt: null
 };
 
 export const securityPreferencesStore = createSecurityPreferencesStore();
@@ -125,7 +131,20 @@ function normalizeSecurityPreferences(value: unknown): SecurityPreferences {
     rememberSessionUntilBrowserRestart:
       typeof record.rememberSessionUntilBrowserRestart === 'boolean'
         ? record.rememberSessionUntilBrowserRestart
-        : defaultSecurityPreferences.rememberSessionUntilBrowserRestart
+        : defaultSecurityPreferences.rememberSessionUntilBrowserRestart,
+    webAuthnUnlockEnabled:
+      typeof record.webAuthnUnlockEnabled === 'boolean'
+        ? record.webAuthnUnlockEnabled
+        : defaultSecurityPreferences.webAuthnUnlockEnabled,
+    webAuthnCredentialId:
+      typeof record.webAuthnCredentialId === 'string' && record.webAuthnCredentialId.length > 0
+        ? record.webAuthnCredentialId
+        : defaultSecurityPreferences.webAuthnCredentialId,
+    webAuthnCredentialCreatedAt:
+      typeof record.webAuthnCredentialCreatedAt === 'string' &&
+      record.webAuthnCredentialCreatedAt.length > 0
+        ? record.webAuthnCredentialCreatedAt
+        : defaultSecurityPreferences.webAuthnCredentialCreatedAt
   };
 }
 

@@ -37,6 +37,7 @@ import {
   setCurrentMasterPassword
 } from './master-password-store';
 import { securityPreferencesStore, sessionCredentialsStore } from './security-store';
+import { verifyWebAuthnUnlockAndReadPassword } from '../services/security-preferences-service';
 import {
   isProtectedRoute,
   readRoute,
@@ -49,7 +50,9 @@ export interface AppSyncSnapshot {
   phase: 'idle' | 'syncing';
   trigger: 'manual' | 'automatic' | null;
   lastResultStatus: SyncRunResult['status'] | null;
+  lastSyncedAt: string | null;
   lastError: string | null;
+  isWebDavEnabled: boolean;
 }
 
 export interface AppSnapshot {
@@ -153,13 +156,21 @@ export async function initializeApp() {
     hasStoredVault = await detectStoredVaultPresence();
     await restoreRememberedSessionIfPossible();
     const route = resolveRouteForSession(readRoute(), appState.session, hasStoredVault);
+    const syncMetadata = await syncStore.load();
 
     appState = {
       ...appState,
       isReady: true,
       route,
       selectedAccountId: getSelectedAccountId(route),
-      unlockError: null
+      unlockError: null,
+      sync: {
+        ...appState.sync,
+        lastResultStatus: toSyncResultStatus(syncMetadata.lastStatus),
+        lastSyncedAt: syncMetadata.lastSyncedAt,
+        lastError: syncMetadata.lastError,
+        isWebDavEnabled: syncMetadata.profile?.enabled === true
+      }
     };
     syncHash(route);
     emit();
@@ -191,27 +202,7 @@ export async function submitUnlock(password: string) {
 
   try {
     if (hasStoredVault) {
-      const storedVault = await loadEncryptedVault(vaultStorage);
-
-      if (!storedVault) {
-        hasStoredVault = false;
-        const fallbackRoute = resolveRouteForSession(readRoute(), appState.session, false);
-        appState = {
-          ...appState,
-          route: fallbackRoute,
-          selectedAccountId: getSelectedAccountId(fallbackRoute)
-        };
-        syncHash(fallbackRoute);
-        emit();
-        return;
-      }
-
-      const decryptedVault = await decryptVault(storedVault, password);
-      await accountService.replaceAllAccounts(decryptedVault.accounts);
-      setCurrentMasterPassword(password);
-      const keyMaterial = await deriveAesKey(password, decodeBase64(storedVault.salt));
-      unlockSession(keyMaterial);
-      await syncRememberedSessionPreference(password);
+      await unlockStoredVaultWithPassword(password);
       return;
     }
 
@@ -253,7 +244,10 @@ export async function __resetForTests() {
   await clearSyncMetadata();
   await sessionCredentialsStore.clear();
   await securityPreferencesStore.save({
-    rememberSessionUntilBrowserRestart: true
+    rememberSessionUntilBrowserRestart: true,
+    webAuthnUnlockEnabled: false,
+    webAuthnCredentialId: null,
+    webAuthnCredentialCreatedAt: null
   });
   accountService.__resetForTests?.();
   lockSession();
@@ -278,6 +272,10 @@ export async function __readStoredVaultForTests(password = 'very-secure-password
   return decryptVault(storedVault, password);
 }
 
+export async function __flushPendingLocalVaultWritesForTests() {
+  await flushPendingLocalVaultWrites();
+}
+
 export async function __corruptStoredVaultForTests() {
   await vaultStorage.area.set({ vault: { broken: true } });
   hasStoredVault = true;
@@ -285,6 +283,7 @@ export async function __corruptStoredVaultForTests() {
 
 export async function __saveSyncProfileForTests(profile: WebDavProfile) {
   await syncStore.save({ profile });
+  await refreshAppSyncSnapshot();
 }
 
 export async function __readSyncMetadataForTests(): Promise<SyncMetadataSnapshot> {
@@ -369,7 +368,9 @@ async function restoreRememberedSessionIfPossible() {
 
   const preferences = await securityPreferencesStore.load();
   if (!preferences.rememberSessionUntilBrowserRestart) {
-    await sessionCredentialsStore.clear();
+    if (!preferences.webAuthnUnlockEnabled) {
+      await sessionCredentialsStore.clear();
+    }
     return;
   }
 
@@ -399,12 +400,36 @@ async function restoreRememberedSessionIfPossible() {
 async function syncRememberedSessionPreference(password: string) {
   const preferences = await securityPreferencesStore.load();
 
-  if (!preferences.rememberSessionUntilBrowserRestart) {
+  if (!preferences.rememberSessionUntilBrowserRestart && !preferences.webAuthnUnlockEnabled) {
     await sessionCredentialsStore.clear();
     return;
   }
 
   await sessionCredentialsStore.save({ masterPassword: password });
+}
+
+async function unlockStoredVaultWithPassword(password: string) {
+  const storedVault = await loadEncryptedVault(vaultStorage);
+
+  if (!storedVault) {
+    hasStoredVault = false;
+    const fallbackRoute = resolveRouteForSession(readRoute(), appState.session, false);
+    appState = {
+      ...appState,
+      route: fallbackRoute,
+      selectedAccountId: getSelectedAccountId(fallbackRoute)
+    };
+    syncHash(fallbackRoute);
+    emit();
+    return;
+  }
+
+  const decryptedVault = await decryptVault(storedVault, password);
+  await accountService.replaceAllAccounts(decryptedVault.accounts);
+  setCurrentMasterPassword(password);
+  const keyMaterial = await deriveAesKey(password, decodeBase64(storedVault.salt));
+  unlockSession(keyMaterial);
+  await syncRememberedSessionPreference(password);
 }
 
 function syncHash(route: PopupRoute) {
@@ -427,7 +452,9 @@ function createAppState(): AppSnapshot {
       phase: 'idle',
       trigger: null,
       lastResultStatus: null,
-      lastError: null
+      lastSyncedAt: null,
+      lastError: null,
+      isWebDavEnabled: false
     }
   } satisfies AppSnapshot;
 }
@@ -461,13 +488,17 @@ function completeSyncActivity() {
   emit();
 }
 
-function setSyncResult(result: SyncRunResult) {
+async function setSyncResult(result: SyncRunResult) {
+  const syncMetadata = await syncStore.load();
+
   appState = {
     ...appState,
     sync: {
       ...appState.sync,
       lastResultStatus: result.status,
-      lastError: result.error?.message ?? null
+      lastSyncedAt: syncMetadata.lastSyncedAt,
+      lastError: result.error?.message ?? null,
+      isWebDavEnabled: syncMetadata.profile?.enabled === true
     }
   };
   emit();
@@ -482,6 +513,42 @@ function setSyncError(message: string) {
     }
   };
   emit();
+}
+
+function toSyncResultStatus(status: string | null): SyncRunResult['status'] | null {
+  switch (status) {
+    case 'disabled':
+    case 'local-cache':
+    case 'pulled':
+    case 'pushed':
+    case 'noop':
+    case 'conflict':
+    case 'download-error':
+    case 'upload-error':
+    case 'validation-error':
+      return status;
+    default:
+      return null;
+  }
+}
+
+export async function submitWebAuthnUnlock() {
+  appState = {
+    ...appState,
+    unlockError: null
+  };
+  emit();
+
+  try {
+    const password = await verifyWebAuthnUnlockAndReadPassword();
+    await unlockStoredVaultWithPassword(password);
+  } catch (error) {
+    appState = {
+      ...appState,
+      unlockError: formatWebAuthnUnlockError(error)
+    };
+    emit();
+  }
 }
 
 function resolveRouteForSession(
@@ -588,7 +655,7 @@ async function runAutomaticSyncNow(generation: number) {
           result.status,
           result.merged === true
         );
-        setSyncResult(result);
+        await setSyncResult(result);
 
         return result;
       } finally {
@@ -611,7 +678,7 @@ async function runSyncWithSharedState() {
       result.status,
       result.merged === true
     );
-    setSyncResult(result);
+    await setSyncResult(result);
 
     return result;
   } catch (error) {
@@ -701,4 +768,35 @@ async function clearSyncMetadata() {
   };
 
   await syncStore.replace(cleared);
+}
+export async function refreshAppSyncSnapshot() {
+  const syncMetadata = await syncStore.load();
+
+  appState = {
+    ...appState,
+    sync: {
+      ...appState.sync,
+      lastResultStatus: toSyncResultStatus(syncMetadata.lastStatus),
+      lastSyncedAt: syncMetadata.lastSyncedAt,
+      lastError: syncMetadata.lastError,
+      isWebDavEnabled: syncMetadata.profile?.enabled === true
+    }
+  };
+  emit();
+}
+
+function formatWebAuthnUnlockError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return 'Windows Hello 解锁失败。';
+  }
+
+  if (error.name === 'NotAllowedError') {
+    return 'Windows Hello 已取消或超时。';
+  }
+
+  if (error.message.includes('timed out') || error.message.includes('not allowed')) {
+    return 'Windows Hello 已取消或超时。';
+  }
+
+  return error.message || 'Windows Hello 解锁失败。';
 }

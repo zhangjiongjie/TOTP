@@ -53,36 +53,41 @@ export function AccountForm({
         </div>
       ) : null}
       <Field
-        label="Issuer"
+        label="发行方"
+        ariaLabel="Issuer"
         value={values.issuer}
         onChange={(value) => onChange('issuer', value)}
-        placeholder="GitHub"
+        placeholder="例如 GitHub / Google"
         disabled={isSubmitting}
       />
       <Field
-        label="Account name"
+        label="账号名称"
+        ariaLabel="Account name"
         value={values.accountName}
         onChange={(value) => onChange('accountName', value)}
-        placeholder="alice@company.com"
+        placeholder="例如 name@example.com"
         disabled={isSubmitting}
       />
       <Field
-        label="Secret"
+        label="密钥"
+        ariaLabel="Secret"
         value={values.secret}
         onChange={(value) => onChange('secret', value)}
-        placeholder="JBSWY3DPEHPK3PXP"
+        placeholder="Base32 密钥"
         disabled={isSubmitting}
       />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Field
-          label="Digits"
+          label="位数"
+          ariaLabel="Digits"
           value={values.digits}
           onChange={(value) => onChange('digits', value)}
           placeholder="6"
           disabled={isSubmitting}
         />
         <Field
-          label="Period"
+          label="周期"
+          ariaLabel="Period"
           value={values.period}
           onChange={(value) => onChange('period', value)}
           placeholder="30"
@@ -91,7 +96,7 @@ export function AccountForm({
       </div>
       <label style={{ display: 'grid', gap: '8px' }}>
         <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink-soft)' }}>
-          Algorithm
+          算法
         </span>
         <select
           aria-label="Algorithm"
@@ -107,7 +112,7 @@ export function AccountForm({
       </label>
       <label style={{ display: 'grid', gap: '8px' }}>
         <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink-soft)' }}>
-          Group
+          分组
         </span>
         <select
           aria-label="Group"
@@ -131,7 +136,7 @@ export function AccountForm({
             marginTop: '4px',
             padding: '13px 18px',
             borderRadius: '999px',
-            background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+            background: 'var(--color-brand)',
             color: '#f8fbff',
             fontWeight: 600,
             cursor: 'pointer'
@@ -146,12 +151,14 @@ export function AccountForm({
 
 function Field({
   label,
+  ariaLabel,
   value,
   onChange,
   placeholder,
   disabled = false
 }: {
   label: string;
+  ariaLabel?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
@@ -163,7 +170,7 @@ function Field({
         {label}
       </span>
       <input
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -178,7 +185,7 @@ const fieldStyle = {
   width: '100%',
   padding: '12px 14px',
   borderRadius: '16px',
-  background: 'rgba(248, 251, 254, 0.94)',
+  background: 'var(--color-input)',
   border: '1px solid var(--color-line)',
   color: 'var(--color-ink-strong)',
   outline: 'none'

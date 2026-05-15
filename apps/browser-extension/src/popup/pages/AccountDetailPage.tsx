@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AccountForm } from '../components/forms/AccountForm';
 import { ConfirmDeleteDialog } from '../components/dialogs/ConfirmDeleteDialog';
+import { IconButton } from '../components/layout/IconButton';
 import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
 import { accountService, type AccountFormValues } from '../../services/account-service';
@@ -51,9 +52,9 @@ export function AccountDetailPage({
 
   if (isLoading) {
     return (
-      <PopupShell topBar={<TopBar eyebrow="Account" title="Loading account" actions={null} />}>
+      <PopupShell topBar={<TopBar title="编辑账号" actions={null} />}>
         <div style={{ width: '100%' }}>
-          <p style={{ color: 'var(--color-ink-soft)' }}>Loading local account details...</p>
+          <p style={{ color: 'var(--color-ink-soft)' }}>加载中...</p>
         </div>
       </PopupShell>
     );
@@ -62,14 +63,14 @@ export function AccountDetailPage({
   if (!account) {
     return (
       <PopupShell
-        topBar={<TopBar eyebrow="Account" title="Missing account" actions={null} />}
+        topBar={<TopBar title="编辑账号" actions={null} />}
       >
         <div style={{ width: '100%' }}>
           <p style={{ color: 'var(--color-ink-soft)' }}>
-            This account is no longer available.
+            账号不存在。
           </p>
           <button type="button" onClick={onBack} style={secondaryButtonStyle}>
-            Back to accounts
+            返回
           </button>
         </div>
       </PopupShell>
@@ -92,7 +93,7 @@ export function AccountDetailPage({
       await accountService.updateAccount(accountId, importService.fromManualForm(values));
       onBack();
     } catch (caughtError) {
-      setMessage(caughtError instanceof Error ? caughtError.message : 'Unable to update account.');
+      setMessage(caughtError instanceof Error ? caughtError.message : '保存失败。');
     } finally {
       setIsSaving(false);
     }
@@ -102,13 +103,14 @@ export function AccountDetailPage({
     <PopupShell
       topBar={
         <TopBar
-          eyebrow="Account"
           title="编辑账号"
-          subtitle="修改账号信息与分组，保存后会返回主列表。"
           actions={
-            <button type="button" aria-label="返回" onClick={onBack} style={secondaryButtonStyle}>
-              返回
-            </button>
+            <IconButton
+              label="返回"
+              title="返回"
+              icon="icons/action_back.svg"
+              onClick={onBack}
+            />
           }
         />
       }
@@ -117,8 +119,7 @@ export function AccountDetailPage({
         <div style={scrollAreaStyle}>
           <section style={panelStyle}>
             <AccountForm
-              title={`${account.issuer} · ${account.accountName}`}
-              helperText="Group 会在保存时一起提交，删除操作也统一放在底部。"
+              title="账号信息"
               values={values}
               onChange={updateField}
               isSubmitting={isSaving || isDeleting}
@@ -165,7 +166,7 @@ export function AccountDetailPage({
           } catch (caughtError) {
             setConfirmOpen(false);
             setMessage(
-              caughtError instanceof Error ? caughtError.message : 'Unable to delete account.'
+              caughtError instanceof Error ? caughtError.message : '删除失败。'
             );
           } finally {
             setIsDeleting(false);
@@ -210,7 +211,7 @@ const scrollAreaStyle = {
 const panelStyle = {
   padding: '18px',
   borderRadius: '22px',
-  background: 'rgba(250, 252, 255, 0.92)',
+  background: 'var(--color-card)',
   border: '1px solid var(--color-line)'
 } satisfies React.CSSProperties;
 
@@ -226,7 +227,7 @@ const secondaryButtonStyle = {
   height: '36px',
   padding: '0 12px',
   borderRadius: '12px',
-  background: 'rgba(238, 244, 249, 0.96)',
+  background: 'var(--color-card-muted)',
   border: '1px solid var(--color-line)',
   color: 'var(--color-brand-strong)',
   cursor: 'pointer'
@@ -236,7 +237,7 @@ const primaryButtonStyle = {
   minHeight: '48px',
   padding: '13px 18px',
   borderRadius: '999px',
-  background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+  background: 'var(--color-brand)',
   color: '#f8fbff',
   fontWeight: 600,
   cursor: 'pointer'
@@ -246,8 +247,8 @@ const dangerButtonStyle = {
   minHeight: '48px',
   padding: '13px 18px',
   borderRadius: '999px',
-  background: 'rgba(187, 83, 105, 0.12)',
-  color: '#a14157',
+  background: 'color-mix(in srgb, var(--color-danger) 14%, transparent)',
+  color: 'var(--color-danger)',
   fontWeight: 600,
   cursor: 'pointer'
 } satisfies React.CSSProperties;
@@ -256,7 +257,7 @@ const messageStyle = {
   margin: 0,
   padding: '12px 14px',
   borderRadius: '16px',
-  background: 'rgba(252, 236, 240, 0.96)',
-  color: '#9d4156',
+  background: 'color-mix(in srgb, var(--color-danger) 12%, var(--color-card))',
+  color: 'var(--color-danger)',
   lineHeight: 1.5
 } satisfies React.CSSProperties;

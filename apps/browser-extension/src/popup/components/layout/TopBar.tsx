@@ -12,19 +12,20 @@ export function TopBar({ eyebrow, title, subtitle, actions }: TopBarProps) {
     <header
       style={{
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '16px'
+        gap: '12px',
+        minHeight: '58px',
+        padding: '0 6px',
+        flexShrink: 0
       }}
     >
-      <div>
+      <div style={{ minWidth: 0 }}>
         {eyebrow ? (
           <p
             style={{
               margin: 0,
               fontSize: '12px',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
               color: 'var(--color-ink-soft)'
             }}
           >
@@ -33,9 +34,9 @@ export function TopBar({ eyebrow, title, subtitle, actions }: TopBarProps) {
         ) : null}
         <h1
           style={{
-            margin: eyebrow ? '6px 0 0' : 0,
-            fontSize: '30px',
-            fontWeight: 600,
+            margin: 0,
+            fontSize: '28px',
+            fontWeight: 800,
             lineHeight: 1.15,
             color: 'var(--color-ink-strong)'
           }}
@@ -46,9 +47,12 @@ export function TopBar({ eyebrow, title, subtitle, actions }: TopBarProps) {
           <p
             style={{
               margin: '8px 0 0',
-              fontSize: '14px',
-              lineHeight: 1.5,
-              color: 'var(--color-ink-soft)'
+              fontSize: '12px',
+              lineHeight: 1.35,
+              color: 'var(--color-ink-soft)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
             }}
           >
             {subtitle}

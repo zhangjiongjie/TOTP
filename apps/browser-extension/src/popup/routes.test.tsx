@@ -40,7 +40,7 @@ describe('PopupRoutes', () => {
       />
     );
 
-    expect(await screen.findByRole('heading', { name: '备份与同步' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '返回' }));
 

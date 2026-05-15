@@ -7,6 +7,7 @@ import {
 } from '../core/vault/crypto';
 import {
   __corruptStoredVaultForTests,
+  __flushPendingLocalVaultWritesForTests,
   __readSyncMetadataForTests,
   __readStoredVaultForTests,
   __resetForTests,
@@ -38,7 +39,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: '创建主密码' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '备份与同步' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '设置' })).not.toBeInTheDocument();
   });
 
   it('routes existing vaults into the unlock flow before showing protected pages', async () => {
@@ -47,7 +48,7 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: '输入主密码' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '备份与同步' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '设置' })).not.toBeInTheDocument();
   });
 
   it('hydrates accounts from the encrypted vault after a successful unlock', async () => {
@@ -88,7 +89,7 @@ describe('App', () => {
       target: { value: 'very-secure-password' }
     });
     fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
-    await screen.findByRole('heading', { name: 'TOTP Authenticator' });
+    await screen.findByRole('button', { name: 'Sync' });
 
     await act(async () => {
       await accountService.addAccount({
@@ -100,6 +101,7 @@ describe('App', () => {
         algorithm: 'SHA1'
       });
     });
+    await __flushPendingLocalVaultWritesForTests();
 
     await waitFor(async () => {
       const storedVault = await __readStoredVaultForTests();
@@ -119,7 +121,7 @@ describe('App', () => {
       target: { value: 'very-secure-password' }
     });
     fireEvent.click(screen.getByRole('button', { name: '解锁' }));
-    await screen.findByRole('heading', { name: 'TOTP Authenticator' });
+    await screen.findByRole('button', { name: 'Sync' });
 
     await act(async () => {
       await accountService.addAccount({
@@ -131,6 +133,7 @@ describe('App', () => {
         algorithm: 'SHA1'
       });
     });
+    await __flushPendingLocalVaultWritesForTests();
 
     await waitFor(async () => {
       const storedVault = await __readStoredVaultForTests();
@@ -252,7 +255,7 @@ describe('App', () => {
       target: { value: password }
     });
     fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
-    await screen.findByRole('heading', { name: 'TOTP Authenticator' });
+    await screen.findByRole('button', { name: 'Sync' });
 
     await act(async () => {
       await accountService.addAccount({
@@ -380,7 +383,7 @@ describe('App', () => {
       target: { value: password }
     });
     fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
-    await screen.findByRole('heading', { name: 'TOTP Authenticator' });
+    await screen.findByRole('button', { name: 'Sync' });
 
     await act(async () => {
       await accountService.addAccount({
@@ -440,7 +443,7 @@ describe('App', () => {
       target: { value: password }
     });
     fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
-    await screen.findByRole('heading', { name: 'TOTP Authenticator' });
+    await screen.findByRole('button', { name: 'Sync' });
 
     await act(async () => {
       await accountService.addAccount({
@@ -593,7 +596,7 @@ describe('App', () => {
       target: { value: password }
     });
     fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
-    await screen.findByRole('heading', { name: 'TOTP Authenticator' });
+    await screen.findByRole('button', { name: 'Sync' });
 
     await act(async () => {
       await accountService.addAccount({

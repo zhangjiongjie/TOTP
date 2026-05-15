@@ -101,7 +101,7 @@ export function QrImportDialog({
           width: 'min(380px, calc(100vw - 32px))',
           padding: '22px',
           borderRadius: '24px',
-          background: 'rgba(255, 255, 255, 0.98)',
+          background: 'var(--color-card)',
           border: '1px solid var(--color-line)',
           boxShadow: '0 28px 50px rgba(30, 54, 82, 0.2)'
         }}
@@ -109,9 +109,6 @@ export function QrImportDialog({
         <h2 id="qr-import-title" style={{ margin: 0, fontSize: '24px' }}>
           扫描二维码
         </h2>
-        <p style={{ margin: '12px 0 0', lineHeight: 1.6, color: 'var(--color-ink-soft)' }}>
-          默认会先扫描当前网页中的二维码；如果当前页面无法识别，再手动上传图片。
-        </p>
         <div
           style={{
             display: 'grid',
@@ -127,30 +124,30 @@ export function QrImportDialog({
               minHeight: '46px',
               padding: '0 16px',
               borderRadius: '14px',
-              background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+              background: 'var(--color-brand)',
               color: '#f8fbff',
               fontWeight: 600,
               cursor: isImporting || isScanningCurrentPage ? 'wait' : 'pointer',
               opacity: isImporting || isScanningCurrentPage ? 0.72 : 1
             }}
           >
-            {isScanningCurrentPage ? '正在扫描当前网页...' : '重新扫描当前网页'}
+            {isScanningCurrentPage ? '扫描中...' : '扫描'}
           </button>
           <label
             style={{
               display: 'block',
               padding: '16px',
               borderRadius: '18px',
-              background: 'var(--color-surface-muted)',
+              background: 'var(--color-card-muted)',
               border: '1px dashed var(--color-line)',
               color: 'var(--color-ink-strong)'
             }}
           >
             <span style={{ display: 'block', marginBottom: '10px', fontWeight: 600 }}>
-              上传二维码图片
+              上传图片
             </span>
             <input
-              aria-label="上传二维码图片"
+              aria-label="上传图片"
               type="file"
               accept="image/*"
               onChange={handleFileChange}
@@ -159,7 +156,7 @@ export function QrImportDialog({
           </label>
         </div>
         {error ? (
-          <p style={{ margin: '12px 0 0', color: '#9d4156', lineHeight: 1.5 }}>{error}</p>
+          <p style={{ margin: '12px 0 0', color: 'var(--color-danger)', lineHeight: 1.5 }}>{error}</p>
         ) : null}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '22px' }}>
           <button
@@ -170,7 +167,7 @@ export function QrImportDialog({
               minWidth: '96px',
               padding: '11px 16px',
               borderRadius: '999px',
-              background: 'rgba(238, 244, 249, 0.96)',
+              background: 'var(--color-card-muted)',
               color: 'var(--color-brand-strong)',
               cursor: isImporting || isScanningCurrentPage ? 'wait' : 'pointer',
               opacity: isImporting || isScanningCurrentPage ? 0.72 : 1

@@ -1,23 +1,48 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   font-family: "Segoe UI", "PingFang SC", sans-serif;
   --popup-width: 392px;
   --popup-height: 580px;
-  --color-ink-strong: #142033;
-  --color-ink: #243852;
-  --color-ink-soft: #60748b;
-  --color-surface: rgba(247, 250, 252, 0.96);
-  --color-surface-strong: #ffffff;
-  --color-surface-muted: #edf3f8;
-  --color-line: rgba(109, 133, 161, 0.22);
-  --color-line-strong: rgba(58, 88, 124, 0.18);
-  --color-brand: #2f5f8f;
-  --color-brand-soft: #dbe7f3;
-  --color-brand-strong: #1c466e;
-  --color-success: #2f6e62;
-  --shadow-shell: 0 20px 44px rgba(18, 34, 54, 0.16);
-  --shadow-card: 0 10px 24px rgba(28, 48, 76, 0.08);
-  --radius-shell: 28px;
-  --radius-card: 22px;
+  --color-page: #eef4fa;
+  --color-shell: #f8fbff;
+  --color-card: #ffffff;
+  --color-card-muted: #edf3f8;
+  --color-input: #f7fbff;
+  --color-ink-strong: #111827;
+  --color-ink: #24364f;
+  --color-ink-soft: #61738a;
+  --color-line: rgba(75, 97, 122, 0.22);
+  --color-line-strong: rgba(75, 97, 122, 0.34);
+  --color-brand: #2878c8;
+  --color-brand-soft: #e6f1ff;
+  --color-brand-strong: #245f96;
+  --color-success: #2d7a59;
+  --color-danger: #c53d3d;
+  --shadow-shell: 0 18px 38px rgba(18, 34, 54, 0.14);
+  --shadow-card: 0 8px 20px rgba(21, 35, 52, 0.08);
+  --radius-shell: 24px;
+  --radius-card: 20px;
   --radius-pill: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #000000;
+    --color-shell: #000000;
+    --color-card: #191919;
+    --color-card-muted: #101010;
+    --color-input: #000000;
+    --color-ink-strong: #f4f4f5;
+    --color-ink: #e3e7ee;
+    --color-ink-soft: #a0a4ad;
+    --color-line: rgba(255, 255, 255, 0.16);
+    --color-line-strong: rgba(255, 255, 255, 0.26);
+    --color-brand: #2d83d4;
+    --color-brand-soft: #102845;
+    --color-brand-strong: #62b7ff;
+    --color-success: #58c18f;
+    --color-danger: #ff6b6b;
+    --shadow-shell: none;
+    --shadow-card: none;
+  }
 }

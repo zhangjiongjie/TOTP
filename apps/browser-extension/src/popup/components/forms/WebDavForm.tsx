@@ -44,22 +44,30 @@ export function WebDavForm({
     setFormState((current) => ({ ...current, [field]: value }));
   }
 
+  function handleEnabledChange(enabled: boolean) {
+    const nextProfile = { ...formState, enabled };
+    setFormState(nextProfile);
+    void onSubmit(nextProfile);
+  }
+
   return (
     <section style={sectionStyle}>
       <div style={sectionHeaderStyle}>
         <div>
           <h2 style={headingStyle}>WebDAV 同步</h2>
-          <p style={helperStyle}>
-            配置 WebDAV 端点后，可以在不同设备之间同步当前加密保管库。
-          </p>
+          <p style={helperStyle}>{message || formatSavedLabel(syncStatus.lastSyncedAt)}</p>
         </div>
         <label style={toggleStyle}>
           <input
+            data-testid="webdav-enabled-checkbox"
+            aria-label="启用同步"
             type="checkbox"
             checked={formState.enabled}
-            onChange={(event) => updateField('enabled', event.target.checked)}
+            disabled={isSaving}
+            onChange={(event) => handleEnabledChange(event.target.checked)}
+            style={checkboxStyle}
           />
-          启用同步
+          <span data-testid="webdav-enabled-caption" style={toggleCaptionStyle(formState.enabled)}>{formState.enabled ? '已启用' : '未启用'}</span>
         </label>
       </div>
       <div style={gridStyle}>
@@ -117,10 +125,9 @@ export function WebDavForm({
         </Field>
       </div>
       <div style={statusCardStyle}>
-        <p style={statusLineStyle}>最近同步：{syncStatus.lastSyncedAt ?? '尚未同步'}</p>
-        <p style={statusLineStyle}>最近状态：{formatSyncStatus(syncStatus.lastStatus)}</p>
+        <p style={statusLineStyle}>{formatSyncStatus(syncStatus.lastStatus)}</p>
         {syncStatus.lastError ? (
-          <p style={{ ...statusLineStyle, color: '#9d4156' }}>最近错误：{syncStatus.lastError}</p>
+          <p style={{ ...statusLineStyle, color: 'var(--color-danger)' }}>{syncStatus.lastError}</p>
         ) : null}
         {syncStatus.pendingConflict ? (
           <button type="button" onClick={onOpenConflict} style={secondaryButtonStyle}>
@@ -128,17 +135,12 @@ export function WebDavForm({
           </button>
         ) : null}
       </div>
-      <button
-        type="button"
-        onClick={() => void onSubmit(formState)}
-        disabled={isSaving}
-        style={primaryButtonStyle}
-      >
-        {isSaving ? '保存中...' : '保存 WebDAV 设置'}
-      </button>
-      {message ? <p style={messageStyle}>{message}</p> : null}
     </section>
   );
+}
+
+function formatSavedLabel(value: string | null) {
+  return value ? `已保存 ${formatDateLabel(value)}` : '';
 }
 
 function formatSyncStatus(status: string | null) {
@@ -150,9 +152,9 @@ function formatSyncStatus(status: string | null) {
     case 'local-cache':
       return '已使用本地缓存';
     case 'pulled':
-      return '已拉取远端';
+      return '已同步';
     case 'pushed':
-      return '已推送本地';
+      return '已同步';
     case 'conflict':
       return '存在冲突';
     case 'download-error':
@@ -164,6 +166,19 @@ function formatSyncStatus(status: string | null) {
     default:
       return '空闲';
   }
+}
+
+function formatDateLabel(isoText: string): string {
+  const date = new Date(isoText);
+  if (Number.isNaN(date.getTime())) {
+    return isoText;
+  }
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function pad(value: number): string {
+  return value < 10 ? `0${value}` : `${value}`;
 }
 
 function Field({
@@ -187,8 +202,8 @@ const sectionStyle = {
   display: 'grid',
   gap: '16px',
   padding: '18px',
-  borderRadius: '22px',
-  background: 'rgba(250, 252, 255, 0.92)',
+  borderRadius: 'var(--radius-card)',
+  background: 'var(--color-card)',
   border: '1px solid var(--color-line)'
 } satisfies React.CSSProperties;
 
@@ -212,12 +227,26 @@ const helperStyle = {
 } satisfies React.CSSProperties;
 
 const toggleStyle = {
-  display: 'inline-flex',
-  gap: '8px',
-  alignItems: 'center',
+  display: 'grid',
+  justifyItems: 'center',
+  gap: '6px',
   fontWeight: 600,
-  color: 'var(--color-brand-strong)'
+  color: 'var(--color-ink-soft)'
 } satisfies React.CSSProperties;
+
+const checkboxStyle = {
+  width: '16px',
+  height: '16px',
+  accentColor: 'var(--color-brand)',
+  cursor: 'pointer'
+} satisfies React.CSSProperties;
+
+function toggleCaptionStyle(enabled: boolean): React.CSSProperties {
+  return {
+    fontSize: '12px',
+    color: enabled ? 'var(--color-brand)' : 'var(--color-ink-soft)'
+  };
+}
 
 const gridStyle = {
   display: 'grid',
@@ -231,7 +260,7 @@ const inputStyle = {
   padding: '10px 12px',
   borderRadius: '14px',
   border: '1px solid var(--color-line)',
-  background: 'rgba(248, 251, 254, 0.94)',
+  background: 'var(--color-input)',
   color: 'var(--color-ink-strong)'
 } satisfies React.CSSProperties;
 
@@ -240,7 +269,7 @@ const statusCardStyle = {
   gap: '8px',
   padding: '14px',
   borderRadius: '16px',
-  background: 'rgba(238, 244, 249, 0.72)'
+  background: 'var(--color-card-muted)'
 } satisfies React.CSSProperties;
 
 const statusLineStyle = {
@@ -249,31 +278,15 @@ const statusLineStyle = {
   color: 'var(--color-ink-soft)'
 } satisfies React.CSSProperties;
 
-const primaryButtonStyle = {
-  justifySelf: 'start',
-  minWidth: '180px',
-  padding: '13px 18px',
-  borderRadius: '999px',
-  background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
-  color: '#f8fbff',
-  fontWeight: 600,
-  cursor: 'pointer'
-} satisfies React.CSSProperties;
-
 const secondaryButtonStyle = {
   justifySelf: 'start',
   minWidth: '180px',
   minHeight: '38px',
   padding: '0 14px',
   borderRadius: '12px',
-  background: 'rgba(255, 255, 255, 0.9)',
+  background: 'var(--color-card)',
   border: '1px solid var(--color-line)',
   color: 'var(--color-brand-strong)',
   cursor: 'pointer'
 } satisfies React.CSSProperties;
 
-const messageStyle = {
-  margin: 0,
-  lineHeight: 1.5,
-  color: 'var(--color-ink-soft)'
-} satisfies React.CSSProperties;

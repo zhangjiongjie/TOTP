@@ -171,7 +171,7 @@ export class RemoteVaultCryptoService {
         tags: [],
         groupId: this.toRemoteGroupId(account.groupName),
         pinned: false,
-        iconKey: account.iconKey.length > 0 ? account.iconKey : this.resolveIconKey(account.issuer, account.accountName),
+        iconKey: this.resolveIconKey(account.issuer, account.accountName),
         updatedAt: account.updatedAt
       });
     }
@@ -201,6 +201,7 @@ export class RemoteVaultCryptoService {
     let issuer: string = this.readString(record, 'issuer', '');
     let accountName: string = this.readString(record, 'accountName', '');
     let iconKey: string = this.readNullableString(record, 'iconKey', '');
+    let resolvedIconKey: string = this.resolveIconKey(issuer, accountName);
     return new TotpAccount(
       this.readString(record, 'id', `remote-${Date.now()}`),
       issuer,
@@ -210,7 +211,7 @@ export class RemoteVaultCryptoService {
       this.readNumber(record, 'period', 30),
       this.normalizeAlgorithm(this.readString(record, 'algorithm', 'SHA1')),
       this.toLocalGroupName(this.readNullableString(record, 'groupId', 'default')),
-      iconKey.length > 0 ? iconKey : this.resolveIconKey(issuer, accountName),
+      resolvedIconKey,
       this.readString(record, 'updatedAt', new Date().toISOString())
     );
   }
@@ -290,11 +291,20 @@ export class RemoteVaultCryptoService {
 
   private resolveIconKey(issuer: string, accountName: string): string {
     let candidate: string = `${issuer} ${accountName}`.toLowerCase();
+    if (candidate.indexOf('bitwarden') >= 0) {
+      return 'bitwarden';
+    }
     if (candidate.indexOf('github') >= 0) {
       return 'github';
     }
+    if (candidate.indexOf('gitlab') >= 0 || candidate.indexOf('git01.mobiwire.com') >= 0) {
+      return 'gitlab';
+    }
     if (candidate.indexOf('google') >= 0 || candidate.indexOf('gmail') >= 0) {
       return 'google';
+    }
+    if (candidate.indexOf('paypal') >= 0) {
+      return 'paypal';
     }
     if (candidate.indexOf('microsoft') >= 0 || candidate.indexOf('outlook') >= 0 || candidate.indexOf('azure') >= 0) {
       return 'microsoft';
@@ -311,10 +321,28 @@ export class RemoteVaultCryptoService {
     if (candidate.indexOf('discord') >= 0) {
       return 'discord';
     }
+    if (candidate.indexOf('dropbox') >= 0) {
+      return 'dropbox';
+    }
+    if (candidate.indexOf('linkedin') >= 0) {
+      return 'linkedin';
+    }
+    if (candidate.indexOf('notion') >= 0) {
+      return 'notion';
+    }
+    if (candidate.indexOf('onedrive') >= 0) {
+      return 'onedrive';
+    }
     if (candidate.indexOf('spotify') >= 0) {
       return 'spotify';
     }
-    return '';
+    if (candidate.indexOf('telegram') >= 0) {
+      return 'telegram';
+    }
+    if (candidate === 'x' || candidate.indexOf('twitter') >= 0) {
+      return 'x';
+    }
+    return 'default';
   }
 
   private normalizeAlgorithm(value: string): string {

@@ -190,7 +190,7 @@ async function requireEnabledProfile(): Promise<WebDavProfile> {
   const metadata = await syncStore.load();
 
   if (!metadata.profile?.enabled) {
-    throw new Error('请先启用并保存 WebDAV 同步配置。');
+    throw new Error('请先启用 WebDAV 同步。');
   }
 
   return metadata.profile;

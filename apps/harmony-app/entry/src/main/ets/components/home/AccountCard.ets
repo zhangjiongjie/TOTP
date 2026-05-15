@@ -20,9 +20,78 @@ function normalizeToken(text: string): string {
   return text.trim().toLowerCase();
 }
 
-function resolveBrandPalette(iconKey: string, issuer: string): BrandPalette {
-  let token: string = normalizeToken(iconKey.length > 0 ? iconKey : issuer);
+function resolveRecognizedBrandKey(issuer: string, accountName: string): string {
+  let candidate: string = `${issuer} ${accountName}`.toLowerCase();
+  if (candidate.indexOf('bitwarden') >= 0) {
+    return 'bitwarden';
+  }
+  if (candidate.indexOf('github') >= 0) {
+    return 'github';
+  }
+  if (candidate.indexOf('gitlab') >= 0 || candidate.indexOf('git01.mobiwire.com') >= 0) {
+    return 'gitlab';
+  }
+  if (candidate.indexOf('google') >= 0 || candidate.indexOf('gmail') >= 0) {
+    return 'google';
+  }
+  if (candidate.indexOf('paypal') >= 0) {
+    return 'paypal';
+  }
+  if (candidate.indexOf('microsoft') >= 0 || candidate.indexOf('outlook') >= 0 || candidate.indexOf('azure') >= 0) {
+    return 'microsoft';
+  }
+  if (candidate.indexOf('openai') >= 0 || candidate.indexOf('chatgpt') >= 0) {
+    return 'openai';
+  }
+  if (candidate.indexOf('slack') >= 0) {
+    return 'slack';
+  }
+  if (candidate.indexOf('apple') >= 0 || candidate.indexOf('icloud') >= 0) {
+    return 'apple';
+  }
+  if (candidate.indexOf('discord') >= 0) {
+    return 'discord';
+  }
+  if (candidate.indexOf('dropbox') >= 0) {
+    return 'dropbox';
+  }
+  if (candidate.indexOf('linkedin') >= 0) {
+    return 'linkedin';
+  }
+  if (candidate.indexOf('notion') >= 0) {
+    return 'notion';
+  }
+  if (candidate.indexOf('onedrive') >= 0) {
+    return 'onedrive';
+  }
+  if (candidate.indexOf('spotify') >= 0) {
+    return 'spotify';
+  }
+  if (candidate.indexOf('telegram') >= 0) {
+    return 'telegram';
+  }
+  if (candidate === 'x' || candidate.indexOf('twitter') >= 0) {
+    return 'x';
+  }
+  return 'default';
+}
+
+function resolveDisplayBrandKey(iconKey: string, issuer: string, accountName: string): string {
+  let recognizedKey: string = resolveRecognizedBrandKey(issuer, accountName);
+  if (recognizedKey !== 'default') {
+    return recognizedKey;
+  }
+
+  return 'default';
+}
+
+function resolveBrandPalette(iconKey: string, issuer: string, accountName: string): BrandPalette {
+  let token: string = resolveDisplayBrandKey(iconKey, issuer, accountName);
   switch (token) {
+    case 'bitwarden':
+      return new BrandPalette('#EAF3FF', '#175DDC', '#F8FBFF');
+    case 'default':
+      return new BrandPalette('#EAF3FF', '#2878C8', '#F8FBFF');
     case 'google':
     case 'gmail':
       return new BrandPalette('#EAF3FF', '#2F63AE', '#F8FBFF');
@@ -32,6 +101,10 @@ function resolveBrandPalette(iconKey: string, issuer: string): BrandPalette {
       return new BrandPalette('#EAF4FB', '#285C88', '#F8FCFF');
     case 'github':
       return new BrandPalette('#EEF1F5', '#394657', '#FBFCFD');
+    case 'gitlab':
+      return new BrandPalette('#FFF2E2', '#E24329', '#FFFDFC');
+    case 'paypal':
+      return new BrandPalette('#EAF5FB', '#003087', '#FBFEFF');
     case 'aws':
     case 'amazon':
       return new BrandPalette('#EEF3F7', '#546478', '#FBFCFD');
@@ -306,7 +379,7 @@ export struct AccountCard {
   }
 
   private resolvePalette(): BrandPalette {
-    return resolveBrandPalette(this.account.iconKey, this.account.issuer);
+    return resolveBrandPalette(this.account.iconKey, this.account.issuer, this.account.accountName);
   }
 
   private copyCurrentCode(): void {
@@ -316,15 +389,18 @@ export struct AccountCard {
   }
 
   private resolveBrandKey(): string {
-    return normalizeToken(this.account.iconKey.length > 0 ? this.account.iconKey : this.account.issuer);
+    return resolveDisplayBrandKey(this.account.iconKey, this.account.issuer, this.account.accountName);
   }
 
   private hasBrandIcon(): boolean {
     switch (this.resolveBrandKey()) {
       case 'apple':
+      case 'bitwarden':
+      case 'default':
       case 'discord':
       case 'dropbox':
       case 'github':
+      case 'gitlab':
       case 'google':
       case 'gmail':
       case 'linkedin':
@@ -335,6 +411,7 @@ export struct AccountCard {
       case 'onedrive':
       case 'openai':
       case 'chatgpt':
+      case 'paypal':
       case 'slack':
       case 'spotify':
       case 'telegram':
@@ -342,7 +419,7 @@ export struct AccountCard {
       case 'twitter':
         return true;
       default:
-        return false;
+        return true;
     }
   }
 
@@ -350,12 +427,18 @@ export struct AccountCard {
   private buildBrandIcon(): void {
     if (this.resolveBrandKey() === 'apple') {
       Image($r('app.media.brand_apple')).width(34).height(34)
+    } else if (this.resolveBrandKey() === 'bitwarden') {
+      Image($r('app.media.brand_bitwarden')).width(34).height(34)
+    } else if (this.resolveBrandKey() === 'default') {
+      Image($r('app.media.brand_default')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'discord') {
       Image($r('app.media.brand_discord')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'dropbox') {
       Image($r('app.media.brand_dropbox')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'github') {
       Image($r('app.media.brand_github')).width(34).height(34)
+    } else if (this.resolveBrandKey() === 'gitlab') {
+      Image($r('app.media.brand_gitlab')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'google' || this.resolveBrandKey() === 'gmail') {
       Image($r('app.media.brand_google')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'linkedin') {
@@ -368,6 +451,8 @@ export struct AccountCard {
       Image($r('app.media.brand_onedrive')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'openai' || this.resolveBrandKey() === 'chatgpt') {
       Image($r('app.media.brand_openai')).width(34).height(34)
+    } else if (this.resolveBrandKey() === 'paypal') {
+      Image($r('app.media.brand_paypal')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'slack') {
       Image($r('app.media.brand_slack')).width(34).height(34)
     } else if (this.resolveBrandKey() === 'spotify') {
@@ -375,7 +460,7 @@ export struct AccountCard {
     } else if (this.resolveBrandKey() === 'telegram') {
       Image($r('app.media.brand_telegram')).width(34).height(34)
     } else {
-      Image($r('app.media.brand_x')).width(34).height(34)
+      Image($r('app.media.brand_default')).width(34).height(34)
     }
   }
 }

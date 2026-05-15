@@ -1,4 +1,5 @@
 .superpowers/
+.qoder/
 .worktrees/
 dist/
 node_modules/
@@ -13,4 +14,5 @@ apps/harmony-app/.idea/
 apps/harmony-app/entry/.preview/
 apps/harmony-app/build/
 apps/harmony-app/entry/build/
+browser-extension-*.zip
 apps/harmony-app/local.properties

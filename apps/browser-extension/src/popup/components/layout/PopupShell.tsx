@@ -16,23 +16,22 @@ export function PopupShell({
         position: 'relative',
         width: 'var(--popup-width)',
         height: 'var(--popup-height)',
-        padding: '20px',
+        padding: '16px',
         color: 'var(--color-ink)',
+        background: 'var(--color-shell)',
         overflow: 'hidden'
       }}
     >
       <section
         style={{
-          height: 'calc(var(--popup-height) - 40px)',
+          height: 'calc(var(--popup-height) - 32px)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '18px',
-          padding: '18px',
+          gap: '14px',
+          padding: '12px 10px 0',
           borderRadius: 'var(--radius-shell)',
-          background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 248, 251, 0.94))',
+          background: 'var(--color-shell)',
           boxShadow: 'var(--shadow-shell)',
-          border: '1px solid rgba(255, 255, 255, 0.82)',
-          backdropFilter: 'blur(14px)',
           overflow: 'hidden'
         }}
       >

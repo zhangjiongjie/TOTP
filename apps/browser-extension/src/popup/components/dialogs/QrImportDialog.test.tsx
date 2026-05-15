@@ -48,7 +48,7 @@ describe('QrImportDialog', () => {
       />
     );
 
-    await waitFor(() => expect(screen.getByLabelText('上传二维码图片')).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText('上传图片')).toBeEnabled());
     expect(currentPageSpy).not.toHaveBeenCalled();
   });
 
@@ -75,7 +75,7 @@ describe('QrImportDialog', () => {
       />
     );
 
-    fireEvent.change(await screen.findByLabelText('上传二维码图片'), {
+    fireEvent.change(await screen.findByLabelText('上传图片'), {
       target: {
         files: [new File(['qr'], 'account.png', { type: 'image/png' })]
       }

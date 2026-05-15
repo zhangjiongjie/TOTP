@@ -16,6 +16,7 @@ interface PopupRoutesProps {
   unlockMessage?: string | null;
   onNavigate: (route: PopupRoute) => void;
   onUnlock: (password: string) => void;
+  onWebAuthnUnlock?: () => void | Promise<void>;
 }
 
 export function readRoute(hash = window.location.hash): PopupRoute {
@@ -71,11 +72,17 @@ export function PopupRoutes({
   route,
   unlockMessage = null,
   onNavigate,
-  onUnlock
+  onUnlock,
+  onWebAuthnUnlock
 }: PopupRoutesProps) {
   if (route.name === 'setup' || route.name === 'unlock') {
     return (
-      <UnlockPage mode={route.name} message={unlockMessage} onSubmit={onUnlock} />
+      <UnlockPage
+        mode={route.name}
+        message={unlockMessage}
+        onSubmit={onUnlock}
+        onWebAuthnUnlock={onWebAuthnUnlock}
+      />
     );
   }
 

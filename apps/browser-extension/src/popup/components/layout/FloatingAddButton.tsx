@@ -10,16 +10,19 @@ export function FloatingAddButton({ onClick }: FloatingAddButtonProps) {
       onClick={onClick}
       style={{
         position: 'absolute',
-        right: '32px',
-        bottom: '32px',
+        right: '24px',
+        bottom: '24px',
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '10px',
-        padding: '14px 18px',
+        justifyContent: 'center',
+        gap: '8px',
+        padding: '0 16px',
+        minWidth: '58px',
+        height: '48px',
         borderRadius: 'var(--radius-pill)',
-        background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+        background: 'var(--color-brand)',
         color: '#f8fbff',
-        boxShadow: '0 14px 28px rgba(28, 70, 110, 0.28)',
+        boxShadow: '0 12px 24px rgba(28, 70, 110, 0.3)',
         cursor: 'pointer'
       }}
     >
@@ -31,15 +34,11 @@ export function FloatingAddButton({ onClick }: FloatingAddButtonProps) {
           justifyContent: 'center',
           width: '24px',
           height: '24px',
-          borderRadius: '50%',
-          background: 'rgba(255, 255, 255, 0.16)',
-          fontSize: '20px',
-          lineHeight: 1
+          borderRadius: '50%'
         }}
       >
-        +
+        <img src="icons/nav_add.svg" alt="" aria-hidden="true" style={{ width: '22px', height: '22px' }} />
       </span>
-      <span style={{ fontWeight: 600 }}>Add</span>
     </button>
   );
 }

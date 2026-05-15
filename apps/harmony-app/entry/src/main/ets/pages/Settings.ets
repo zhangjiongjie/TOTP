@@ -153,9 +153,9 @@ export struct Settings {
       this.buildInput('用户名', 'WebDAV 用户名', this.username, (value: string) => {
         this.username = value;
       })
-      this.buildInput('密码或应用密码', 'WebDAV 密码', this.password, (value: string) => {
+      this.buildInput('密码', '密码', this.password, (value: string) => {
         this.password = value;
-      })
+      }, true)
       this.buildInput('自动同步间隔（分钟）', '15', this.syncIntervalMinutes, (value: string) => {
         this.syncIntervalMinutes = value;
       })
@@ -231,7 +231,13 @@ export struct Settings {
   }
 
   @Builder
-  private buildInput(label: string, placeholder: string, textValue: string, onChanged: (value: string) => void): void {
+  private buildInput(
+    label: string,
+    placeholder: string,
+    textValue: string,
+    onChanged: (value: string) => void,
+    isPassword: boolean = false
+  ): void {
     Column({ space: 8 }) {
       Text(label)
         .fontSize(14)
@@ -240,6 +246,7 @@ export struct Settings {
         .width('100%')
 
       TextInput({ text: textValue, placeholder: placeholder })
+        .type(isPassword ? InputType.Password : InputType.Normal)
         .height(46)
         .fontSize(15)
         .fontColor($r('sys.color.font_primary'))

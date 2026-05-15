@@ -5,21 +5,20 @@ export type UnlockMode = 'setup' | 'unlock';
 interface UnlockFormProps {
   mode: UnlockMode;
   onSubmit?: (password: string) => void;
+  children?: React.ReactNode;
 }
 
-export function UnlockForm({ mode, onSubmit }: UnlockFormProps) {
+export function UnlockForm({ mode, onSubmit, children }: UnlockFormProps) {
   const [password, setPassword] = useState('');
 
   const copy =
     mode === 'setup'
       ? {
           title: '创建主密码',
-          body: '设置一个仅保存在本地的主密码，用来解锁验证码与同步信息。',
           action: '创建并继续'
         }
       : {
           title: '输入主密码',
-          body: '使用主密码解锁保管库，继续查看当前设备上的验证码列表。',
           action: '解锁'
         };
 
@@ -35,7 +34,7 @@ export function UnlockForm({ mode, onSubmit }: UnlockFormProps) {
         gap: '18px',
         padding: '24px',
         borderRadius: 'var(--radius-card)',
-        background: 'var(--color-surface)',
+        background: 'var(--color-card)',
         border: '1px solid var(--color-line)',
         boxShadow: 'var(--shadow-card)'
       }}
@@ -51,15 +50,6 @@ export function UnlockForm({ mode, onSubmit }: UnlockFormProps) {
         >
           {copy.title}
         </h2>
-        <p
-          style={{
-            margin: '10px 0 0',
-            lineHeight: 1.6,
-            color: 'var(--color-ink-soft)'
-          }}
-        >
-          {copy.body}
-        </p>
       </div>
 
       <label
@@ -82,7 +72,7 @@ export function UnlockForm({ mode, onSubmit }: UnlockFormProps) {
             padding: '0 14px',
             borderRadius: '16px',
             border: '1px solid var(--color-line)',
-            background: '#fff',
+            background: 'var(--color-input)',
             color: 'var(--color-ink-strong)',
             outline: 'none'
           }}
@@ -93,8 +83,8 @@ export function UnlockForm({ mode, onSubmit }: UnlockFormProps) {
         type="submit"
         style={{
           height: '48px',
-          borderRadius: '16px',
-          background: 'linear-gradient(180deg, #315e8d 0%, #244c76 100%)',
+          borderRadius: '999px',
+          background: 'var(--color-brand)',
           color: '#f7fbff',
           fontWeight: 600,
           cursor: 'pointer'
@@ -102,6 +92,7 @@ export function UnlockForm({ mode, onSubmit }: UnlockFormProps) {
       >
         {copy.action}
       </button>
+      {children}
     </form>
   );
 }

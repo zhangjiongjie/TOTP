@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccountForm } from '../components/forms/AccountForm';
+import { IconButton } from '../components/layout/IconButton';
 import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
 import {
@@ -21,7 +22,7 @@ export function AddAccountPage({
 }: AddAccountPageProps) {
   const [formValues, setFormValues] = useState<AccountFormValues>(getDefaultAccountFormValues);
   const [message, setMessage] = useState('');
-  const [messageTone, setMessageTone] = useState<'idle' | 'warning' | 'error'>('idle');
+  const [messageTone, setMessageTone] = useState<'success' | 'error'>('error');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -55,7 +56,7 @@ export function AddAccountPage({
     }
 
     setMessage('');
-    setMessageTone('idle');
+    setMessageTone('error');
     setIsSubmitting(true);
 
     try {
@@ -67,6 +68,19 @@ export function AddAccountPage({
       setMessageTone('error');
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function handleParseOtpAuthUri() {
+    setMessage('');
+    setMessageTone('error');
+
+    try {
+      const parsed = importService.fromOtpAuthUri(formValues.otpauthUri);
+      applyImportedDraft(parsed, '已解析', formValues.otpauthUri);
+    } catch (caughtError) {
+      setMessage(caughtError instanceof Error ? caughtError.message : '解析失败');
+      setMessageTone('error');
     }
   }
 
@@ -92,8 +106,9 @@ export function AddAccountPage({
       applyImportedDraft(
         draft,
         source === 'auto-scan'
-          ? '已识别当前网页二维码，请确认后保存。'
-          : '已重新扫描并填充当前网页二维码信息。'
+          ? '已解析'
+          : '已解析',
+        buildOtpAuthUri(draft)
       );
     } catch (caughtError) {
       if (!silentFailure) {
@@ -102,10 +117,10 @@ export function AddAccountPage({
             ? caughtError.message
             : '当前网页未识别到二维码，请改用图片上传或手动填写。'
         );
-        setMessageTone('warning');
+        setMessageTone('error');
       } else {
         setMessage('未识别到二维码，可上传图片或手动填写。');
-        setMessageTone('warning');
+        setMessageTone('error');
       }
     } finally {
       setIsImporting(false);
@@ -126,7 +141,7 @@ export function AddAccountPage({
         return;
       }
 
-      applyImportedDraft(draft, '图片解析成功，已自动填充字段。');
+      applyImportedDraft(draft, '已解析', buildOtpAuthUri(draft));
     } catch (caughtError) {
       setMessage(caughtError instanceof Error ? caughtError.message : '无法识别所选二维码图片。');
       setMessageTone('error');
@@ -136,9 +151,10 @@ export function AddAccountPage({
     }
   }
 
-  function applyImportedDraft(draft: AccountDraft, nextMessage: string) {
+  function applyImportedDraft(draft: AccountDraft, nextMessage: string, otpauthUri?: string) {
     setFormValues((current) => ({
       ...current,
+      otpauthUri: otpauthUri ?? current.otpauthUri,
       issuer: draft.issuer,
       accountName: draft.accountName,
       secret: draft.secret,
@@ -148,7 +164,7 @@ export function AddAccountPage({
       groupId: draft.groupId ?? current.groupId
     }));
     setMessage(nextMessage);
-    setMessageTone('idle');
+    setMessageTone('success');
   }
 
   function shouldOverwriteForm(draft: AccountDraft) {
@@ -184,57 +200,54 @@ export function AddAccountPage({
     <PopupShell
       topBar={
         <TopBar
-          eyebrow="Account"
           title="添加账号"
-          subtitle="进入页面会先尝试扫描当前网页二维码，也可以上传图片或粘贴 otpauth:// 链接。"
           actions={
             <>
               <button
                 type="button"
                 aria-label="返回"
                 onClick={onBack}
-                style={secondaryIconButtonStyle}
+                style={backButtonStyle}
               >
-                返回
+                <img src="icons/action_back.svg" alt="" aria-hidden="true" style={{ width: '22px', height: '22px' }} />
               </button>
-              <button
-                type="button"
-                aria-label="上传图片"
-                title="上传二维码图片"
+              <IconButton
+                label="上传图片"
+                title="上传图片"
                 disabled={isSubmitting || isImporting}
                 onClick={() => fileInputRef.current?.click()}
-                style={iconButtonStyle}
-              >
-                <UploadIcon />
-              </button>
-              <button
-                type="button"
-                aria-label="重新扫码"
-                title="重新扫描当前网页"
+                icon="icons/action_photo.svg"
+              />
+              <IconButton
+                label="扫描"
+                title="扫描"
                 disabled={isSubmitting || isImporting}
                 onClick={() => void handleCurrentPageScan({ source: 'manual-scan' })}
-                style={iconButtonStyle}
-              >
-                <ScanIcon />
-              </button>
+                icon="icons/action_scan.svg"
+              />
             </>
           }
         />
       }
     >
       <div style={pageLayoutStyle}>
+        {message ? (
+          <p data-testid="add-account-message" style={messageStyle(messageTone)}>
+            {message}
+          </p>
+        ) : null}
         <div style={formScrollStyle}>
           <input
             ref={fileInputRef}
-            aria-label="上传二维码图片"
+            aria-label="上传图片"
             type="file"
             accept="image/*"
             onChange={handleFileChange}
             style={{ display: 'none' }}
           />
           <section style={panelStyle}>
-            <label style={{ display: 'grid', gap: '8px' }}>
-              <span style={fieldLabelStyle}>otpauth 链接</span>
+            <label style={{ display: 'grid', gap: '10px' }}>
+              <span style={sectionTitleStyle}>otpauth 链接</span>
               <textarea
                 aria-label="otpauth link"
                 disabled={isSubmitting || isImporting}
@@ -245,11 +258,18 @@ export function AddAccountPage({
                 style={textAreaStyle}
               />
             </label>
+            <button
+              type="button"
+              onClick={handleParseOtpAuthUri}
+              disabled={isSubmitting || isImporting}
+              style={{ ...primaryButtonStyle, marginTop: '14px', minHeight: '44px' }}
+            >
+              解析
+            </button>
           </section>
           <section style={panelStyle}>
             <AccountForm
               title="账号信息"
-              helperText="Issuer、Account 和 Secret 为必填，其他字段会自动带默认值。"
               values={formValues}
               onChange={updateField}
               isSubmitting={isSubmitting || isImporting}
@@ -257,30 +277,6 @@ export function AddAccountPage({
               groups={accountService.getGroups()}
             />
           </section>
-          {message ? (
-            <p
-              style={{
-                margin: 0,
-                padding: '12px 14px',
-                borderRadius: '16px',
-                background:
-                  messageTone === 'error'
-                    ? 'rgba(252, 236, 240, 0.96)'
-                    : messageTone === 'warning'
-                      ? 'rgba(233, 240, 248, 0.92)'
-                      : 'rgba(241, 246, 250, 0.92)',
-                color:
-                  messageTone === 'error'
-                    ? '#9d4156'
-                    : messageTone === 'warning'
-                      ? 'var(--color-brand-strong)'
-                      : 'var(--color-ink-soft)',
-                lineHeight: 1.5
-              }}
-            >
-              {message}
-            </p>
-          ) : null}
         </div>
         <div style={footerStyle}>
           <button
@@ -301,26 +297,30 @@ function hasMeaningfulInput(values: AccountFormValues) {
   return Boolean(values.issuer.trim() || values.accountName.trim() || values.secret.trim());
 }
 
-function UploadIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M10 13V5.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M7.25 8.3 10 5.5l2.75 2.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4.5 13.5v.75A1.25 1.25 0 0 0 5.75 15.5h8.5a1.25 1.25 0 0 0 1.25-1.25v-.75" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function buildOtpAuthUri(draft: AccountDraft): string {
+  const label = `${draft.issuer}:${draft.accountName}`;
+  const params = new URLSearchParams({
+    secret: draft.secret,
+    issuer: draft.issuer,
+    algorithm: draft.algorithm,
+    digits: String(draft.digits),
+    period: String(draft.period)
+  });
+
+  return `otpauth://totp/${encodeURIComponent(label)}?${params.toString()}`;
 }
 
-function ScanIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6 4.5H4.75A1.25 1.25 0 0 0 3.5 5.75V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M14 4.5h1.25A1.25 1.25 0 0 1 16.5 5.75V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M6 15.5H4.75A1.25 1.25 0 0 1 3.5 14.25V13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M14 15.5h1.25a1.25 1.25 0 0 0 1.25-1.25V13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M6.5 10h7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
+function messageStyle(tone: 'success' | 'error'): React.CSSProperties {
+  return {
+    margin: 0,
+    padding: '12px 14px',
+    borderRadius: '22px',
+    background: 'var(--color-card)',
+    border: '1px solid var(--color-line)',
+    color: tone === 'success' ? 'var(--color-success)' : 'var(--color-danger)',
+    lineHeight: 1.45,
+    fontSize: '13px'
+  };
 }
 
 const pageLayoutStyle = {
@@ -349,47 +349,35 @@ const footerStyle = {
 
 const panelStyle = {
   padding: '18px',
-  borderRadius: '22px',
-  background: 'rgba(250, 252, 255, 0.92)',
+  borderRadius: 'var(--radius-card)',
+  background: 'var(--color-card)',
   border: '1px solid var(--color-line)'
 } satisfies React.CSSProperties;
 
-const fieldLabelStyle = {
-  fontSize: '13px',
-  fontWeight: 600,
-  color: 'var(--color-ink-soft)'
+const sectionTitleStyle = {
+  fontSize: '20px',
+  fontWeight: 700,
+  color: 'var(--color-ink-strong)'
 } satisfies React.CSSProperties;
 
 const textAreaStyle = {
   width: '100%',
   padding: '12px 14px',
   borderRadius: '16px',
-  background: 'rgba(248, 251, 254, 0.94)',
+  background: 'var(--color-input)',
   border: '1px solid var(--color-line)',
   color: 'var(--color-ink-strong)',
   resize: 'vertical'
 } satisfies React.CSSProperties;
 
-const secondaryIconButtonStyle = {
-  minWidth: '74px',
-  height: '36px',
-  padding: '0 12px',
-  borderRadius: '12px',
-  background: 'rgba(238, 244, 249, 0.96)',
-  border: '1px solid var(--color-line)',
-  color: 'var(--color-brand-strong)',
-  cursor: 'pointer'
-} satisfies React.CSSProperties;
-
-const iconButtonStyle = {
-  width: '36px',
-  height: '36px',
+const backButtonStyle = {
+  width: '42px',
+  height: '42px',
   display: 'grid',
   placeItems: 'center',
-  borderRadius: '12px',
-  background: 'rgba(238, 244, 249, 0.96)',
+  borderRadius: '50%',
+  background: 'var(--color-card-muted)',
   border: '1px solid var(--color-line)',
-  color: 'var(--color-brand-strong)',
   cursor: 'pointer'
 } satisfies React.CSSProperties;
 
@@ -398,7 +386,7 @@ const primaryButtonStyle = {
   minHeight: '48px',
   padding: '13px 18px',
   borderRadius: '999px',
-  background: 'linear-gradient(180deg, #386897 0%, #2c557d 100%)',
+  background: 'var(--color-brand)',
   color: '#f8fbff',
   fontWeight: 600,
   cursor: 'pointer'

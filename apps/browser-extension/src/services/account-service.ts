@@ -1,5 +1,6 @@
 import type { AccountRecord, TotpAlgorithm } from '../core/types';
 import { resolveIconKey } from '../core/icons/icon-matchers';
+import { generateTotpCode } from '../core/totp/totp';
 
 export interface AccountDraft {
   issuer: string;
@@ -31,6 +32,7 @@ export interface AccountRuntime {
   id: string;
   issuer: string;
   accountName: string;
+  iconKey: AccountRecord['iconKey'];
   code: string;
   period: number;
   secondsRemaining: number;
@@ -189,18 +191,29 @@ export const accountService = {
     return accountGroups.find((group) => group.id === groupId)?.label ?? 'Ungrouped';
   },
 
-  createRuntime(account: AccountRecord, now = Date.now()): AccountRuntime {
+  async createRuntime(account: AccountRecord, now = Date.now()): Promise<AccountRuntime> {
     const period = account.period || 30;
     const elapsedSeconds = Math.floor(now / 1000);
     const cyclePosition = elapsedSeconds % period;
     const secondsRemaining = cyclePosition === 0 ? period : period - cyclePosition;
-    const code = createDemoCode(account, Math.floor(now / (period * 1000)));
+    const code = await generateTotpCode({
+      secret: account.secret,
+      digits: account.digits,
+      period,
+      algorithm: account.algorithm,
+      timestamp: now
+    });
+    const resolvedIconKey = resolveIconKey({
+      issuer: account.issuer,
+      accountName: account.accountName
+    });
 
     return {
       id: account.id,
       issuer: account.issuer,
       accountName: account.accountName,
-      code,
+      iconKey: resolvedIconKey !== 'default' ? resolvedIconKey : account.iconKey ?? resolvedIconKey,
+      code: formatTotpCode(code),
       period,
       secondsRemaining,
       groupId: account.groupId,
@@ -284,16 +297,21 @@ function cloneAccount(account: AccountRecord): AccountRecord {
   };
 }
 
-function createDemoCode(account: AccountRecord, timeSlice: number): string {
-  const source = `${account.id}:${account.secret}:${timeSlice}`;
-  let hash = 0;
-
-  for (let index = 0; index < source.length; index += 1) {
-    hash = (hash * 31 + source.charCodeAt(index)) % 1_000_000;
+function formatTotpCode(rawCode: string): string {
+  if (rawCode.length === 6) {
+    return `${rawCode.slice(0, 3)} ${rawCode.slice(3)}`;
   }
 
-  const raw = String(Math.abs(hash)).padStart(account.digits, '0').slice(0, account.digits);
-  return raw.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
+  if (rawCode.length === 8) {
+    return `${rawCode.slice(0, 4)} ${rawCode.slice(4)}`;
+  }
+
+  if (rawCode.length > 4 && rawCode.length % 2 === 0) {
+    const middle = rawCode.length / 2;
+    return `${rawCode.slice(0, middle)} ${rawCode.slice(middle)}`;
+  }
+
+  return rawCode;
 }
 
 export function getDefaultAccountFormValues(): AccountFormValues {
