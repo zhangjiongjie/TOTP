@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { EncryptedVaultBlob } from '../../../totp-core/src/vault/crypto';
-import { createMemoryVaultStorageAdapter } from '../../../totp-core/src/vault/vault-store';
+import type { EncryptedVaultBlob } from '@totp/core';
+import { createMemoryVaultStorageAdapter } from '@totp/core';
 import { createMemorySyncMetadataStore } from '../state/sync-store';
 import {
   createSyncEngine,

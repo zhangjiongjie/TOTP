@@ -1,5 +1,5 @@
-import { isEncryptedVaultBlob, type EncryptedVaultBlob } from '../../../totp-core/src/vault/crypto';
-import type { StorageAreaLike } from '../../../totp-core/src/vault/vault-store';
+import { isEncryptedVaultBlob, type EncryptedVaultBlob } from '@totp/core';
+import type { StorageAreaLike } from '@totp/core';
 import type { PendingSyncConflict } from '../sync/conflict';
 import type { WebDavProfile } from '../sync/webdav-client';
 

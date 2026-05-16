@@ -4,7 +4,7 @@ import {
   decryptVault,
   encryptVault,
   type EncryptedVaultBlob
-} from '../core/vault/crypto';
+} from '@totp/core';
 import {
   __corruptStoredVaultForTests,
   __flushPendingLocalVaultWritesForTests,

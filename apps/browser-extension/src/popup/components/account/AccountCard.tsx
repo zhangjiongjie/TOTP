@@ -1,5 +1,5 @@
-import { resolveIconKey } from '../../../core/icons/icon-matchers';
-import { iconRegistry, type IconKey } from '../../../core/icons/icon-registry';
+import { resolveIconKey } from '@totp/core';
+import { iconRegistry, type IconKey } from '@totp/core';
 import { CountdownRing } from './CountdownRing';
 
 export interface DemoAccount {

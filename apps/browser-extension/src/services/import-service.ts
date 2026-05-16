@@ -1,6 +1,6 @@
-import { parseOtpAuthUri } from '../core/totp/otpauth';
-import type { TotpAlgorithm } from '../core/types';
-import { decodeQrFromDataUrl, decodeQrFromImageFile } from '../core/import/qr-decode';
+import { parseOtpAuthUri } from '@totp/core';
+import type { TotpAlgorithm } from '@totp/core';
+import { decodeQrFromDataUrl, decodeQrFromImageFile } from '@totp/core';
 import type { AccountDraft, AccountFormValues } from './account-service';
 
 export class ImportServiceError extends Error {

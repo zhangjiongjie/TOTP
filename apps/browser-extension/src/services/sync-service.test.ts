@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { decryptVault, encryptVault, type VaultPayload } from '../core/vault/crypto';
-import { createMemoryVaultStorageAdapter } from '../core/vault/vault-store';
-import { createMemorySyncMetadataStore } from '../state/sync-store';
+import { decryptVault, encryptVault, type VaultPayload } from '@totp/core';
+import { createMemoryVaultStorageAdapter } from '@totp/core';
+import { createMemorySyncMetadataStore } from '@totp/sync';
 import { clearCurrentMasterPassword, setCurrentMasterPassword } from '../state/master-password-store';
 import { getSeedVaultPayload } from './account-service';
 import { createSyncService } from './sync-service';

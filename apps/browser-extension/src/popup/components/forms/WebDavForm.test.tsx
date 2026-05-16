@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WebDavForm } from './WebDavForm';
-import type { WebDavProfile } from '../../../core/sync/webdav-client';
+import type { WebDavProfile } from '@totp/sync';
 
 const baseProfile: WebDavProfile = {
   id: 'webdav-primary',

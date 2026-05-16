@@ -1,24 +1,24 @@
-import { exportVaultBundle, importVaultBundle } from '../core/vault/export';
-import { decryptVault } from '../core/vault/crypto';
-import type { SyncRunResult } from '../core/sync/sync-engine';
+import { exportVaultBundle, importVaultBundle } from '@totp/core';
+import { decryptVault } from '@totp/core';
+import type { SyncRunResult } from '@totp/sync';
 import {
   clearEncryptedVault,
   createChromeVaultStorageAdapter,
   createMemoryVaultStorageAdapter
-} from '../core/vault/vault-store';
+} from '@totp/core';
 import { accountService } from './account-service';
 import { createSyncService } from './sync-service';
 import { refreshAutomaticSync } from '../state/app-store';
-import type { PendingSyncConflict } from '../core/sync/conflict';
+import type { PendingSyncConflict } from '@totp/sync';
 import {
   createFetchWebDavClient,
   type WebDavProfile
-} from '../core/sync/webdav-client';
+} from '@totp/sync';
 import {
   createChromeSyncMetadataStore,
   createMemorySyncMetadataStore,
   type SyncMetadataSnapshot
-} from '../state/sync-store';
+} from '@totp/sync';
 import { getCurrentMasterPassword } from '../state/master-password-store';
 
 export type BackupMode = 'plain' | 'encrypted';

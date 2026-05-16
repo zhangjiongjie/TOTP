@@ -17,8 +17,8 @@ import {
 } from '../../services/settings-service';
 import { getCurrentMasterPassword } from '../../state/master-password-store';
 import { refreshAppSyncSnapshot } from '../../state/app-store';
-import type { PendingSyncConflict } from '../../core/sync/conflict';
-import type { WebDavProfile } from '../../core/sync/webdav-client';
+import type { PendingSyncConflict } from '@totp/sync';
+import type { WebDavProfile } from '@totp/sync';
 
 const emptySnapshot: SettingsSnapshot = {
   webDavProfile: null,

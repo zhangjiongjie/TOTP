@@ -9,6 +9,10 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "generate:core-icon-registry": "node scripts/generate-core-icon-registry.mjs",
+    "generate:harmony-brand-matcher": "node scripts/generate-harmony-brand-matcher.mjs",
+    "sync:brand-icons": "npm run generate:core-icon-registry && npm run generate:harmony-brand-matcher && npm run sync:harmony-brand-assets",
+    "sync:harmony-brand-assets": "node scripts/sync-harmony-brand-assets.mjs",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build:browser": "npm run build --workspace @totp/browser-extension",

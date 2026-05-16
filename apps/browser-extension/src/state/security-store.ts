@@ -1,4 +1,4 @@
-import type { StorageAreaLike } from '../core/vault/vault-store';
+import type { StorageAreaLike } from '@totp/core';
 
 const SECURITY_PREFERENCES_KEY = 'securityPreferences';
 const SESSION_CREDENTIALS_KEY = 'sessionCredentials';

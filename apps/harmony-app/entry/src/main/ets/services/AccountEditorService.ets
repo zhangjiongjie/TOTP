@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { LocalVault } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
 import { LocalVaultStore } from '../storage/LocalVaultStore';
+import { resolveIconKey } from './BrandIconMatcher';
 
 export interface AccountDraft {
   issuer: string;
@@ -20,7 +21,7 @@ export class AccountEditorService {
     let vault: LocalVault = this.store.load(context);
     let now: string = this.createTimestamp();
     let accounts: TotpAccount[] = this.cloneAccounts(vault.accounts);
-    accounts.push(this.buildAccount(this.createAccountId(), draft, this.resolveIconKey(draft.issuer, draft.accountName), now));
+    accounts.push(this.buildAccount(this.createAccountId(), draft, resolveIconKey(draft.issuer, draft.accountName), now));
     return this.store.save(context, new LocalVault(vault.schemaVersion, now, accounts));
   }
 
@@ -35,7 +36,7 @@ export class AccountEditorService {
     }
 
     let current: TotpAccount = accounts[accountIndex];
-    accounts[accountIndex] = this.buildAccount(current.id, draft, this.resolveIconKey(draft.issuer, draft.accountName), now);
+    accounts[accountIndex] = this.buildAccount(current.id, draft, resolveIconKey(draft.issuer, draft.accountName), now);
     return this.store.save(context, new LocalVault(vault.schemaVersion, now, accounts));
   }
 
@@ -124,62 +125,6 @@ export class AccountEditorService {
       return normalized;
     }
     return 'SHA1';
-  }
-
-  private resolveIconKey(issuer: string, accountName: string): string {
-    let candidate: string = `${issuer} ${accountName}`.toLowerCase();
-    if (candidate.indexOf('bitwarden') >= 0) {
-      return 'bitwarden';
-    }
-    if (candidate.indexOf('github') >= 0) {
-      return 'github';
-    }
-    if (candidate.indexOf('gitlab') >= 0 || candidate.indexOf('git01.mobiwire.com') >= 0) {
-      return 'gitlab';
-    }
-    if (candidate.indexOf('google') >= 0 || candidate.indexOf('gmail') >= 0) {
-      return 'google';
-    }
-    if (candidate.indexOf('paypal') >= 0) {
-      return 'paypal';
-    }
-    if (candidate.indexOf('microsoft') >= 0 || candidate.indexOf('outlook') >= 0 || candidate.indexOf('azure') >= 0) {
-      return 'microsoft';
-    }
-    if (candidate.indexOf('openai') >= 0 || candidate.indexOf('chatgpt') >= 0) {
-      return 'openai';
-    }
-    if (candidate.indexOf('slack') >= 0) {
-      return 'slack';
-    }
-    if (candidate.indexOf('apple') >= 0 || candidate.indexOf('icloud') >= 0) {
-      return 'apple';
-    }
-    if (candidate.indexOf('discord') >= 0) {
-      return 'discord';
-    }
-    if (candidate.indexOf('dropbox') >= 0) {
-      return 'dropbox';
-    }
-    if (candidate.indexOf('linkedin') >= 0) {
-      return 'linkedin';
-    }
-    if (candidate.indexOf('notion') >= 0) {
-      return 'notion';
-    }
-    if (candidate.indexOf('onedrive') >= 0) {
-      return 'onedrive';
-    }
-    if (candidate.indexOf('spotify') >= 0) {
-      return 'spotify';
-    }
-    if (candidate.indexOf('telegram') >= 0) {
-      return 'telegram';
-    }
-    if (candidate === 'x' || candidate.indexOf('twitter') >= 0) {
-      return 'x';
-    }
-    return 'default';
   }
 
   private createTimestamp(): string {

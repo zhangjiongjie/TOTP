@@ -1,4 +1,4 @@
-import type { EncryptedVaultBlob } from '../../../totp-core/src/vault/crypto';
+import type { EncryptedVaultBlob } from '@totp/core';
 
 export type SyncEntitySource = 'local' | 'remote' | 'local-cache';
 export type SyncEntityStatus = 'ready' | 'missing';

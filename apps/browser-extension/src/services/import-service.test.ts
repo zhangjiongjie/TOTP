@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import * as qrDecodeModule from '../core/import/qr-decode';
+import * as qrDecodeModule from '@totp/core';
 import { importService } from './import-service';
 
 describe('importService', () => {

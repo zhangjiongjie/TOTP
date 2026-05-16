@@ -1,7 +1,7 @@
 import {
   isEncryptedVaultBlob,
   type EncryptedVaultBlob
-} from '../../../totp-core/src/vault/crypto';
+} from '@totp/core';
 
 export interface WebDavProfile {
   id: string;

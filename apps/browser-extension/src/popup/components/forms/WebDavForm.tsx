@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { WebDavProfile } from '../../../core/sync/webdav-client';
-import type { PendingSyncConflict } from '../../../core/sync/conflict';
+import type { WebDavProfile } from '@totp/sync';
+import type { PendingSyncConflict } from '@totp/sync';
 
 interface WebDavFormProps {
   profile: WebDavProfile | null;

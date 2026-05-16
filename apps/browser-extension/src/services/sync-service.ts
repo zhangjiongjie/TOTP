@@ -1,6 +1,6 @@
 import { getSessionState } from '../state/session-store';
-import { decryptVault, encryptVault, type EncryptedVaultBlob, type VaultPayload } from '../core/vault/crypto';
-import type { PendingConflictSnapshot, SyncInspectionSnapshot } from '../core/sync/conflict';
+import { decryptVault, encryptVault, type EncryptedVaultBlob, type VaultPayload } from '@totp/core';
+import type { PendingConflictSnapshot, SyncInspectionSnapshot } from '@totp/sync';
 import { getCurrentMasterPassword } from '../state/master-password-store';
 import {
   createSyncEngine,
@@ -8,8 +8,8 @@ import {
   type PendingSyncConflict,
   type SyncOnOpenResult,
   type SyncRunResult
-} from '../core/sync/sync-engine';
-import type { SyncMetadataSnapshot } from '../state/sync-store';
+} from '@totp/sync';
+import type { SyncMetadataSnapshot } from '@totp/sync';
 
 export interface SyncScheduler {
   start(): void;

@@ -3,6 +3,7 @@ import { buffer, util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { LocalVault } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
+import { resolveIconKey } from './BrandIconMatcher';
 import { UnlockService } from './UnlockService';
 
 const REMOTE_FORMAT_VERSION: number = 1;
@@ -171,7 +172,7 @@ export class RemoteVaultCryptoService {
         tags: [],
         groupId: this.toRemoteGroupId(account.groupName),
         pinned: false,
-        iconKey: this.resolveIconKey(account.issuer, account.accountName),
+        iconKey: resolveIconKey(account.issuer, account.accountName),
         updatedAt: account.updatedAt
       });
     }
@@ -201,7 +202,7 @@ export class RemoteVaultCryptoService {
     let issuer: string = this.readString(record, 'issuer', '');
     let accountName: string = this.readString(record, 'accountName', '');
     let iconKey: string = this.readNullableString(record, 'iconKey', '');
-    let resolvedIconKey: string = this.resolveIconKey(issuer, accountName);
+    let resolvedIconKey: string = resolveIconKey(issuer, accountName);
     return new TotpAccount(
       this.readString(record, 'id', `remote-${Date.now()}`),
       issuer,
@@ -287,62 +288,6 @@ export class RemoteVaultCryptoService {
       return 'Work';
     }
     return 'Default';
-  }
-
-  private resolveIconKey(issuer: string, accountName: string): string {
-    let candidate: string = `${issuer} ${accountName}`.toLowerCase();
-    if (candidate.indexOf('bitwarden') >= 0) {
-      return 'bitwarden';
-    }
-    if (candidate.indexOf('github') >= 0) {
-      return 'github';
-    }
-    if (candidate.indexOf('gitlab') >= 0 || candidate.indexOf('git01.mobiwire.com') >= 0) {
-      return 'gitlab';
-    }
-    if (candidate.indexOf('google') >= 0 || candidate.indexOf('gmail') >= 0) {
-      return 'google';
-    }
-    if (candidate.indexOf('paypal') >= 0) {
-      return 'paypal';
-    }
-    if (candidate.indexOf('microsoft') >= 0 || candidate.indexOf('outlook') >= 0 || candidate.indexOf('azure') >= 0) {
-      return 'microsoft';
-    }
-    if (candidate.indexOf('openai') >= 0 || candidate.indexOf('chatgpt') >= 0) {
-      return 'openai';
-    }
-    if (candidate.indexOf('slack') >= 0) {
-      return 'slack';
-    }
-    if (candidate.indexOf('apple') >= 0 || candidate.indexOf('icloud') >= 0) {
-      return 'apple';
-    }
-    if (candidate.indexOf('discord') >= 0) {
-      return 'discord';
-    }
-    if (candidate.indexOf('dropbox') >= 0) {
-      return 'dropbox';
-    }
-    if (candidate.indexOf('linkedin') >= 0) {
-      return 'linkedin';
-    }
-    if (candidate.indexOf('notion') >= 0) {
-      return 'notion';
-    }
-    if (candidate.indexOf('onedrive') >= 0) {
-      return 'onedrive';
-    }
-    if (candidate.indexOf('spotify') >= 0) {
-      return 'spotify';
-    }
-    if (candidate.indexOf('telegram') >= 0) {
-      return 'telegram';
-    }
-    if (candidate === 'x' || candidate.indexOf('twitter') >= 0) {
-      return 'x';
-    }
-    return 'default';
   }
 
   private normalizeAlgorithm(value: string): string {

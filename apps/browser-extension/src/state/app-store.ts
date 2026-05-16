@@ -1,12 +1,12 @@
 import { accountService } from '../services/account-service';
 import { createSyncService } from '../services/sync-service';
-import { decodeBase64 } from '../core/vault/base64';
-import { decryptVault, encryptVault, type EncryptedVaultBlob } from '../core/vault/crypto';
+import { decodeBase64 } from '@totp/core';
+import { decryptVault, encryptVault, type EncryptedVaultBlob } from '@totp/core';
 import {
   createFetchWebDavClient,
   type WebDavClient,
   type WebDavProfile
-} from '../core/sync/webdav-client';
+} from '@totp/sync';
 import {
   clearEncryptedVault,
   createChromeVaultStorageAdapter,
@@ -14,16 +14,16 @@ import {
   loadEncryptedVault,
   saveEncryptedVault,
   type VaultStorageAdapter
-} from '../core/vault/vault-store';
-import { deriveAesKey } from '../core/vault/password';
-import type { SyncRunResult } from '../core/sync/sync-engine';
+} from '@totp/core';
+import { deriveAesKey } from '@totp/core';
+import type { SyncRunResult } from '@totp/sync';
 import {
   createChromeSyncMetadataStore,
   createMemorySyncMetadataStore,
   type SyncMetadata,
   type SyncMetadataSnapshot,
   type SyncMetadataStore
-} from './sync-store';
+} from '@totp/sync';
 import {
   getSessionState,
   lockSession,

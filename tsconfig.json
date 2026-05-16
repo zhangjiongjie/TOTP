@@ -11,6 +11,11 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@totp/core": ["packages/totp-core/src/index.ts"],
+      "@totp/sync": ["packages/totp-sync/src/index.ts"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "incremental": true,

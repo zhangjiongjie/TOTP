@@ -1,4 +1,4 @@
-import type { PendingSyncConflict } from '../../../core/sync/conflict';
+import type { PendingSyncConflict } from '@totp/sync';
 
 interface SyncConflictDialogProps {
   open: boolean;

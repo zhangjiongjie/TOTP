@@ -15,8 +15,8 @@ import {
   loadEncryptedVault,
   saveEncryptedVault,
   type VaultStorageAdapter
-} from '../../../totp-core/src/vault/vault-store';
-import type { EncryptedVaultBlob } from '../../../totp-core/src/vault/crypto';
+} from '@totp/core';
+import type { EncryptedVaultBlob } from '@totp/core';
 import type { SyncMetadataSnapshot, SyncMetadataStore } from '../state/sync-store';
 
 export { WebDavClientError, type PendingSyncConflict, type WebDavProfile, type WebDavRemoteSnapshot };

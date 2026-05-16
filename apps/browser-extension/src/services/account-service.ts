@@ -1,6 +1,6 @@
-import type { AccountRecord, TotpAlgorithm } from '../core/types';
-import { resolveIconKey } from '../core/icons/icon-matchers';
-import { generateTotpCode } from '../core/totp/totp';
+import type { AccountRecord, TotpAlgorithm } from '@totp/core';
+import { resolveIconKey } from '@totp/core';
+import { generateTotpCode } from '@totp/core';
 
 export interface AccountDraft {
   issuer: string;

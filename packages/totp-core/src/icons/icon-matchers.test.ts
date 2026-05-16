@@ -30,3 +30,26 @@ it('matches Mobiwire GitLab issuer to gitlab icon', () => {
     'gitlab'
   );
 });
+
+it('matches common social and commerce issuers', () => {
+  expect(resolveIconKey({ issuer: 'Facebook', accountName: 'alice' })).toBe('facebook');
+  expect(resolveIconKey({ issuer: 'Instagram', accountName: 'alice' })).toBe('instagram');
+  expect(resolveIconKey({ issuer: 'TikTok', accountName: 'alice' })).toBe('tiktok');
+  expect(resolveIconKey({ issuer: 'Reddit', accountName: 'alice' })).toBe('reddit');
+  expect(resolveIconKey({ issuer: 'WhatsApp', accountName: 'alice' })).toBe('whatsapp');
+  expect(resolveIconKey({ issuer: 'Amazon', accountName: 'alice' })).toBe('amazon');
+  expect(resolveIconKey({ issuer: 'AWS', accountName: 'alice' })).toBe('aws');
+  expect(resolveIconKey({ issuer: 'Amazon Web Services', accountName: 'alice' })).toBe('aws');
+  expect(resolveIconKey({ issuer: 'Zoom', accountName: 'alice' })).toBe('zoom');
+  expect(resolveIconKey({ issuer: 'Yahoo', accountName: 'alice' })).toBe('yahoo');
+});
+
+it('matches productivity, cloud, payment, and game issuers', () => {
+  expect(resolveIconKey({ issuer: 'Steam', accountName: 'alice' })).toBe('steam');
+  expect(resolveIconKey({ issuer: 'Canva', accountName: 'alice' })).toBe('canva');
+  expect(resolveIconKey({ issuer: 'Stripe', accountName: 'alice' })).toBe('stripe');
+  expect(resolveIconKey({ issuer: 'Binance', accountName: 'alice' })).toBe('binance');
+  expect(resolveIconKey({ issuer: 'Coinbase', accountName: 'alice' })).toBe('coinbase');
+  expect(resolveIconKey({ issuer: 'Cloudflare', accountName: 'alice' })).toBe('cloudflare');
+  expect(resolveIconKey({ issuer: 'Twitch', accountName: 'alice' })).toBe('twitch');
+});

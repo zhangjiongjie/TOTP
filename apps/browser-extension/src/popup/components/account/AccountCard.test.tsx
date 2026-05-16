@@ -119,7 +119,7 @@ describe('AccountCard', () => {
     );
 
     expect(document.querySelector('.brand-icon-glyph')?.innerHTML).toContain(
-      '#003087'
+      '#002991'
     );
   });
 

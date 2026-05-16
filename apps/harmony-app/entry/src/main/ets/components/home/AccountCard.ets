@@ -1,4 +1,6 @@
 import { TotpAccount } from '../../model/TotpAccount';
+import { resolveBrandResource } from '../../services/BrandIconResources';
+import { resolveDisplayBrandKey } from '../../services/BrandIconMatcher';
 
 class BrandPalette {
   backgroundColor: string;
@@ -16,80 +18,13 @@ function createFallbackAccount(): TotpAccount {
   return new TotpAccount('', '', '', '', 6, 30, 'SHA1', 'Default', '', '');
 }
 
-function normalizeToken(text: string): string {
-  return text.trim().toLowerCase();
-}
-
-function resolveRecognizedBrandKey(issuer: string, accountName: string): string {
-  let candidate: string = `${issuer} ${accountName}`.toLowerCase();
-  if (candidate.indexOf('bitwarden') >= 0) {
-    return 'bitwarden';
-  }
-  if (candidate.indexOf('github') >= 0) {
-    return 'github';
-  }
-  if (candidate.indexOf('gitlab') >= 0 || candidate.indexOf('git01.mobiwire.com') >= 0) {
-    return 'gitlab';
-  }
-  if (candidate.indexOf('google') >= 0 || candidate.indexOf('gmail') >= 0) {
-    return 'google';
-  }
-  if (candidate.indexOf('paypal') >= 0) {
-    return 'paypal';
-  }
-  if (candidate.indexOf('microsoft') >= 0 || candidate.indexOf('outlook') >= 0 || candidate.indexOf('azure') >= 0) {
-    return 'microsoft';
-  }
-  if (candidate.indexOf('openai') >= 0 || candidate.indexOf('chatgpt') >= 0) {
-    return 'openai';
-  }
-  if (candidate.indexOf('slack') >= 0) {
-    return 'slack';
-  }
-  if (candidate.indexOf('apple') >= 0 || candidate.indexOf('icloud') >= 0) {
-    return 'apple';
-  }
-  if (candidate.indexOf('discord') >= 0) {
-    return 'discord';
-  }
-  if (candidate.indexOf('dropbox') >= 0) {
-    return 'dropbox';
-  }
-  if (candidate.indexOf('linkedin') >= 0) {
-    return 'linkedin';
-  }
-  if (candidate.indexOf('notion') >= 0) {
-    return 'notion';
-  }
-  if (candidate.indexOf('onedrive') >= 0) {
-    return 'onedrive';
-  }
-  if (candidate.indexOf('spotify') >= 0) {
-    return 'spotify';
-  }
-  if (candidate.indexOf('telegram') >= 0) {
-    return 'telegram';
-  }
-  if (candidate === 'x' || candidate.indexOf('twitter') >= 0) {
-    return 'x';
-  }
-  return 'default';
-}
-
-function resolveDisplayBrandKey(iconKey: string, issuer: string, accountName: string): string {
-  let recognizedKey: string = resolveRecognizedBrandKey(issuer, accountName);
-  if (recognizedKey !== 'default') {
-    return recognizedKey;
-  }
-
-  return 'default';
-}
-
 function resolveBrandPalette(iconKey: string, issuer: string, accountName: string): BrandPalette {
   let token: string = resolveDisplayBrandKey(iconKey, issuer, accountName);
   switch (token) {
     case 'bitwarden':
       return new BrandPalette('#EAF3FF', '#175DDC', '#F8FBFF');
+    case 'facebook':
+      return new BrandPalette('#EAF3FF', '#1877F2', '#F8FBFF');
     case 'default':
       return new BrandPalette('#EAF3FF', '#2878C8', '#F8FBFF');
     case 'google':
@@ -106,12 +41,39 @@ function resolveBrandPalette(iconKey: string, issuer: string, accountName: strin
     case 'paypal':
       return new BrandPalette('#EAF5FB', '#003087', '#FBFEFF');
     case 'aws':
+      return new BrandPalette('#FFF6E8', '#FF9900', '#FFFDFC');
     case 'amazon':
-      return new BrandPalette('#EEF3F7', '#546478', '#FBFCFD');
+      return new BrandPalette('#FFF6E8', '#111111', '#FFFDFC');
+    case 'binance':
+      return new BrandPalette('#FFF8D6', '#F0B90B', '#FFFDF2');
+    case 'canva':
+      return new BrandPalette('#F0F1FF', '#7D2AE7', '#FFFBFF');
+    case 'cloudflare':
+      return new BrandPalette('#FFF1E4', '#F38020', '#FFFDFC');
+    case 'coinbase':
+      return new BrandPalette('#EAF1FF', '#0052FF', '#FBFDFF');
+    case 'instagram':
+      return new BrandPalette('#FFF0F6', '#C13584', '#FFFDFC');
+    case 'reddit':
+      return new BrandPalette('#FFF0E8', '#FF4500', '#FFFDFC');
+    case 'tiktok':
+      return new BrandPalette('#EEF2F7', '#111111', '#FBFCFD');
+    case 'whatsapp':
+      return new BrandPalette('#ECFAEF', '#25D366', '#FBFFFC');
+    case 'yahoo':
+      return new BrandPalette('#F2ECFF', '#6001D2', '#FBFAFF');
+    case 'zoom':
+      return new BrandPalette('#EAF6FF', '#0B8BEF', '#FBFEFF');
     case 'discord':
       return new BrandPalette('#EEF0FB', '#4C5F91', '#FAFBFF');
     case 'telegram':
       return new BrandPalette('#EAF6FB', '#2A7595', '#F7FCFE');
+    case 'steam':
+      return new BrandPalette('#EAF0F6', '#136497', '#FBFCFD');
+    case 'stripe':
+      return new BrandPalette('#F1F0FF', '#635BFF', '#FBFAFF');
+    case 'twitch':
+      return new BrandPalette('#F3ECFF', '#9146FF', '#FCFAFF');
     case 'notion':
       return new BrandPalette('#F1F3F7', '#3A4554', '#FCFCFD');
     case 'slack':
@@ -214,20 +176,7 @@ export struct AccountCard {
         .borderRadius(14)
         .border({ width: 1, color: '#CFDCEB' })
 
-      if (this.hasBrandIcon()) {
-        this.buildBrandIcon()
-      } else {
-        Text(this.resolveBrandMonogram())
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.resolvePalette().foregroundColor)
-          .backgroundColor(Color.White)
-          .borderRadius(12)
-          .width(32)
-          .height(32)
-          .textAlign(TextAlign.Center)
-          .padding({ top: 6 })
-      }
+      this.buildBrandIcon()
     }
   }
 
@@ -363,21 +312,6 @@ export struct AccountCard {
     return remaining > 0 ? `${remaining}s` : this.statusLabel;
   }
 
-  private resolveBrandMonogram(): string {
-    let seed: string = this.account.iconKey.length > 0 ? this.account.iconKey : this.resolveIssuerLabel();
-    let trimmed: string = seed.trim();
-    if (trimmed.length === 0) {
-      return 'T';
-    }
-
-    let firstChar: string = trimmed.substring(0, 1).toUpperCase();
-    if (trimmed.length === 1) {
-      return firstChar;
-    }
-
-    return `${firstChar}${trimmed.substring(1, 2).toUpperCase()}`;
-  }
-
   private resolvePalette(): BrandPalette {
     return resolveBrandPalette(this.account.iconKey, this.account.issuer, this.account.accountName);
   }
@@ -392,75 +326,12 @@ export struct AccountCard {
     return resolveDisplayBrandKey(this.account.iconKey, this.account.issuer, this.account.accountName);
   }
 
-  private hasBrandIcon(): boolean {
-    switch (this.resolveBrandKey()) {
-      case 'apple':
-      case 'bitwarden':
-      case 'default':
-      case 'discord':
-      case 'dropbox':
-      case 'github':
-      case 'gitlab':
-      case 'google':
-      case 'gmail':
-      case 'linkedin':
-      case 'microsoft':
-      case 'azure':
-      case 'outlook':
-      case 'notion':
-      case 'onedrive':
-      case 'openai':
-      case 'chatgpt':
-      case 'paypal':
-      case 'slack':
-      case 'spotify':
-      case 'telegram':
-      case 'x':
-      case 'twitter':
-        return true;
-      default:
-        return true;
-    }
-  }
-
   @Builder
   private buildBrandIcon(): void {
-    if (this.resolveBrandKey() === 'apple') {
-      Image($r('app.media.brand_apple')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'bitwarden') {
-      Image($r('app.media.brand_bitwarden')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'default') {
-      Image($r('app.media.brand_default')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'discord') {
-      Image($r('app.media.brand_discord')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'dropbox') {
-      Image($r('app.media.brand_dropbox')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'github') {
-      Image($r('app.media.brand_github')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'gitlab') {
-      Image($r('app.media.brand_gitlab')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'google' || this.resolveBrandKey() === 'gmail') {
-      Image($r('app.media.brand_google')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'linkedin') {
-      Image($r('app.media.brand_linkedin')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'microsoft' || this.resolveBrandKey() === 'azure' || this.resolveBrandKey() === 'outlook') {
-      Image($r('app.media.brand_microsoft')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'notion') {
-      Image($r('app.media.brand_notion')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'onedrive') {
-      Image($r('app.media.brand_onedrive')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'openai' || this.resolveBrandKey() === 'chatgpt') {
-      Image($r('app.media.brand_openai')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'paypal') {
-      Image($r('app.media.brand_paypal')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'slack') {
-      Image($r('app.media.brand_slack')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'spotify') {
-      Image($r('app.media.brand_spotify')).width(34).height(34)
-    } else if (this.resolveBrandKey() === 'telegram') {
-      Image($r('app.media.brand_telegram')).width(34).height(34)
-    } else {
-      Image($r('app.media.brand_default')).width(34).height(34)
-    }
+    Image(resolveBrandResource(this.resolveBrandKey()))
+      .width(34)
+      .height(34)
+      .objectFit(ImageFit.Contain)
+      .supportSvg2(true)
   }
 }
