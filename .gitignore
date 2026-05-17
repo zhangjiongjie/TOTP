@@ -14,5 +14,9 @@ apps/harmony-app/.idea/
 apps/harmony-app/entry/.preview/
 apps/harmony-app/build/
 apps/harmony-app/entry/build/
+apps/android-app/.gradle/
+apps/android-app/build/
+apps/android-app/app/build/
+apps/android-app/local.properties
 browser-extension-*.zip
 apps/harmony-app/local.properties

@@ -1,0 +1,5 @@
+<resources>
+    <color name="totp_primary">#2E7D6B</color>
+    <color name="totp_on_primary">#FFFFFF</color>
+    <color name="totp_background">#FAFBF8</color>
+</resources>
