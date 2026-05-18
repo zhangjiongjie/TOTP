@@ -12,6 +12,10 @@ class VaultRepository(
         return preferences.contains(KEY_ENCRYPTED_VAULT)
     }
 
+    fun warmUpCrypto() {
+        vaultCipher.warmUp()
+    }
+
     fun create(password: String): LocalVault {
         val vault = LocalVault(
             schemaVersion = CURRENT_SCHEMA_VERSION,

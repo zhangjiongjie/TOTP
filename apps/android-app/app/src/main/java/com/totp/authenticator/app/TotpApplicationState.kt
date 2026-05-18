@@ -29,6 +29,9 @@ class TotpApplicationState(
     }
 
     fun navigate(route: TotpRoute) {
+        if (currentRoute == route) {
+            return
+        }
         currentRoute = route
     }
 

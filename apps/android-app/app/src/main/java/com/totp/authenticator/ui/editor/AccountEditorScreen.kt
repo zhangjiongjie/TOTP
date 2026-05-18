@@ -38,7 +38,6 @@ fun AccountEditorScreen(
     existingAccount: TotpAccount?,
     onSave: (TotpAccount) -> Unit,
     onDelete: ((String) -> Unit)?,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     showTitle: Boolean = true
 ) {
@@ -164,13 +163,6 @@ fun AccountEditorScreen(
                 }
             ) {
                 Text("Save")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onBack
-            ) {
-                Text("Back")
             }
             if (existingAccount != null && onDelete != null) {
                 Spacer(modifier = Modifier.height(8.dp))

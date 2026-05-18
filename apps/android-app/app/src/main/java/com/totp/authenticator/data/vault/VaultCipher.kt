@@ -46,7 +46,11 @@ class VaultCipher(
 
     fun decrypt(envelope: EncryptedVaultEnvelope, password: String): LocalVault {
         return try {
-            val vaultKey = keyDeriver.deriveKey(password, unbase64(envelope.salt))
+            val vaultKey = keyDeriver.deriveKey(
+                password,
+                unbase64(envelope.salt),
+                iterations = iterationsFromKdfLabel(envelope.kdf)
+            )
             val plaintext = decryptAesGcm(
                 vaultKey,
                 unbase64(envelope.nonce),
@@ -58,6 +62,12 @@ class VaultCipher(
         } catch (error: GeneralSecurityException) {
             throw VaultDecryptException("Unable to decrypt vault", error)
         }
+    }
+
+    fun warmUp() {
+        Cipher.getInstance(AES_GCM)
+        keyDeriver.warmUp()
+        wrappingKeyProvider.getOrCreateWrappingKey()
     }
 
     private fun randomNonce(): ByteArray {
@@ -98,6 +108,11 @@ class VaultCipher(
                 throw error
             }
         }
+    }
+
+    private fun iterationsFromKdfLabel(kdfLabel: String): Int {
+        val parts = kdfLabel.split(":")
+        return parts.getOrNull(1)?.toIntOrNull()?.takeIf { it > 0 } ?: keyDeriver.iterations
     }
 
     private companion object {

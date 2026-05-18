@@ -2,10 +2,10 @@ package com.totp.authenticator.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Primary = Color(0xFF2563EB)
+val Primary = Color(0xFF1F6BAE)
 val OnPrimary = Color(0xFFFFFFFF)
-val PrimaryContainer = Color(0xFFD8E2FF)
-val OnPrimaryContainer = Color(0xFF001A43)
+val PrimaryContainer = Color(0xFFD4E9F8)
+val OnPrimaryContainer = Color(0xFF082B45)
 val Secondary = Color(0xFF50606E)
 val OnSecondary = Color(0xFFFFFFFF)
 val Background = Color(0xFFF8FAFC)

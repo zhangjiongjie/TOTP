@@ -5,6 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,6 +16,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.totp.authenticator.R
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultRepository
@@ -40,6 +44,9 @@ fun TotpApp() {
     var unlockBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
+        launch(Dispatchers.IO) {
+            runCatching { repository.warmUpCrypto() }
+        }
         while (true) {
             nowMillis = System.currentTimeMillis()
             delay(1_000)
@@ -113,44 +120,53 @@ fun TotpApp() {
     }
 
     when (state.currentRoute) {
-        TotpRoute.Unlock -> UnlockScreen(
-            hasExistingVault = hasExistingVault,
-            errorMessage = errorMessage,
-            isBusy = unlockBusy,
-            onCreatePassword = { password ->
-                appScope.launch {
-                    unlockBusy = true
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            repository.create(password, now = System.currentTimeMillis())
+        TotpRoute.Unlock -> TotpMainScaffold(
+            title = "TOTP Authenticator",
+            selectedDestination = null,
+            onHome = { state.navigate(TotpRoute.Home) },
+            onAdd = { state.navigate(TotpRoute.Add) },
+            onSettings = { state.navigate(TotpRoute.Settings) }
+        ) { padding ->
+            UnlockScreen(
+                hasExistingVault = hasExistingVault,
+                errorMessage = errorMessage,
+                isBusy = unlockBusy,
+                modifier = Modifier.padding(padding),
+                onCreatePassword = { password ->
+                    appScope.launch {
+                        unlockBusy = true
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                repository.create(password, now = System.currentTimeMillis())
+                            }
+                        }.onSuccess { vault ->
+                            hasExistingVault = true
+                            errorMessage = null
+                            state.applyUnlockedVault(vault, password)
+                        }.onFailure {
+                            errorMessage = "Could not create vault"
                         }
-                    }.onSuccess { vault ->
-                        hasExistingVault = true
-                        errorMessage = null
-                        state.applyUnlockedVault(vault, password)
-                    }.onFailure {
-                        errorMessage = "Could not create vault"
+                        unlockBusy = false
                     }
-                    unlockBusy = false
-                }
-            },
-            onUnlock = { password ->
-                appScope.launch {
-                    unlockBusy = true
-                    runCatching {
-                        withContext(Dispatchers.IO) {
-                            repository.unlock(password)
+                },
+                onUnlock = { password ->
+                    appScope.launch {
+                        unlockBusy = true
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                repository.unlock(password)
+                            }
+                        }.onSuccess { vault ->
+                            errorMessage = null
+                            state.applyUnlockedVault(vault, password)
+                        }.onFailure {
+                            errorMessage = "Could not unlock vault"
                         }
-                    }.onSuccess { vault ->
-                        errorMessage = null
-                        state.applyUnlockedVault(vault, password)
-                    }.onFailure {
-                        errorMessage = "Could not unlock vault"
+                        unlockBusy = false
                     }
-                    unlockBusy = false
                 }
-            }
-        )
+            )
+        }
 
         TotpRoute.Home -> {
             val vault = state.vault
@@ -186,14 +202,34 @@ fun TotpApp() {
             onHome = { state.navigate(TotpRoute.Home) },
             onAdd = { state.navigate(TotpRoute.Add) },
             onSettings = { state.navigate(TotpRoute.Settings) },
-            onBack = { state.navigate(TotpRoute.Home) }
+            actions = {
+                IconButton(
+                    onClick = {
+                        Toast.makeText(context, "QR image import is not available on Android yet", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.action_photo),
+                        contentDescription = "Import QR image"
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        Toast.makeText(context, "QR scan is not available on Android yet", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.action_scan),
+                        contentDescription = "Scan QR code"
+                    )
+                }
+            }
         ) { padding ->
             AccountEditorScreen(
                 title = "Add account",
                 existingAccount = null,
                 onSave = { account -> saveAccount(account, replaceExisting = false) },
                 onDelete = null,
-                onBack = { state.navigate(TotpRoute.Home) },
                 modifier = Modifier.padding(padding),
                 showTitle = false
             )
@@ -221,7 +257,6 @@ fun TotpApp() {
                         existingAccount = account,
                         onSave = { updatedAccount -> saveAccount(updatedAccount, replaceExisting = true) },
                         onDelete = { accountId -> deleteAccount(accountId) },
-                        onBack = { state.navigate(TotpRoute.Home) },
                         modifier = Modifier.padding(padding),
                         showTitle = false
                     )
@@ -234,8 +269,7 @@ fun TotpApp() {
             selectedDestination = MainDestination.Settings,
             onHome = { state.navigate(TotpRoute.Home) },
             onAdd = { state.navigate(TotpRoute.Add) },
-            onSettings = { state.navigate(TotpRoute.Settings) },
-            onBack = { state.navigate(TotpRoute.Home) }
+            onSettings = { state.navigate(TotpRoute.Settings) }
         ) { padding ->
             SettingsScreen(
                 accountCount = state.vault?.accounts?.size ?: 0,

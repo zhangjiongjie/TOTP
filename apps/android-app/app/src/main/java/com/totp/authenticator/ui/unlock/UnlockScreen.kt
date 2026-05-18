@@ -28,6 +28,7 @@ fun UnlockScreen(
     hasExistingVault: Boolean,
     errorMessage: String?,
     isBusy: Boolean,
+    modifier: Modifier = Modifier,
     onCreatePassword: (String) -> Unit,
     onUnlock: (String) -> Unit
 ) {
@@ -35,7 +36,7 @@ fun UnlockScreen(
     val displayedError = formState.localError ?: errorMessage
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
@@ -44,12 +45,6 @@ fun UnlockScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "TOTP Authenticator",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(32.dp))
             OutlinedTextField(
                 value = formState.password,
                 onValueChange = {
