@@ -18,6 +18,7 @@
 .
 ├── apps/
 │   ├── browser-extension/            # Chrome / Edge 浏览器插件
+│   ├── android-app/                  # Android 原生应用
 │   └── harmony-app/                  # HarmonyOS NEXT 应用
 ├── packages/
 │   ├── totp-core/                    # TOTP、账号模型、加密、导入导出、品牌图标
@@ -170,6 +171,34 @@ apps/harmony-app/README.md
 ```
 
 签名配置通常依赖本机 DevEco Studio、证书和 Profile 文件。迁移机器或设备时，建议在 DevEco Studio 中重新生成调试签名配置。
+
+## Android 应用
+
+目录：`apps/android-app`
+
+技术栈：
+
+- Kotlin
+- Jetpack Compose
+- Material 3
+- Android Keystore
+
+第一阶段已覆盖：
+
+- 主密码创建和解锁。
+- 本地加密 vault。
+- 账号添加、编辑和删除。
+- TOTP 验证码、倒计时和复制。
+- `otpauth://` 粘贴解析。
+
+常用命令：
+
+```powershell
+cd apps/android-app
+.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:assembleDebug
+android run --apks .\app\build\outputs\apk\debug\app-debug.apk
+```
 
 ## 开发环境
 
