@@ -8,6 +8,8 @@ class BrandIconMatcherTest {
     fun matchesKnownIssuers() {
         assertEquals(BrandIcon.Google, BrandIconMatcher.match("Google"))
         assertEquals(BrandIcon.GitHub, BrandIconMatcher.match("github"))
+        assertEquals(BrandIcon.Canva, BrandIconMatcher.match("Canva"))
+        assertEquals(BrandIcon.Instagram, BrandIconMatcher.match("instagram"))
         assertEquals(BrandIcon.OpenAI, BrandIconMatcher.match("OpenAI Platform"))
     }
 

@@ -38,14 +38,16 @@ fun AccountEditorScreen(
     existingAccount: TotpAccount?,
     onSave: (TotpAccount) -> Unit,
     onDelete: ((String) -> Unit)?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    showTitle: Boolean = true
 ) {
     val formState = remember(existingAccount?.id) { AccountFormState(existingAccount) }
     var otpAuthUri by remember(existingAccount?.id) { mutableStateOf("") }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
@@ -54,12 +56,14 @@ fun AccountEditorScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            if (showTitle) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
             OutlinedTextField(
                 value = formState.issuer,
                 onValueChange = { formState.issuer = it },

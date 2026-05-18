@@ -2,7 +2,6 @@ package com.totp.authenticator.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,25 +26,20 @@ fun HomeScreen(
     nowMillis: Long,
     onAdd: () -> Unit,
     onEdit: (String) -> Unit,
-    onSettings: () -> Unit,
-    onCopy: (String) -> Unit
+    onCopy: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val accounts = AccountSorter.sort(vault.accounts)
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            Text(
-                text = "TOTP Authenticator",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground
-            )
             Text(
                 text = "${accounts.size} accounts",
                 style = MaterialTheme.typography.bodyMedium,
@@ -84,31 +77,6 @@ fun HomeScreen(
                             onEdit = onEdit
                         )
                     }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = {}
-                ) {
-                    Text("Home")
-                }
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = onAdd
-                ) {
-                    Text("Add")
-                }
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = onSettings
-                ) {
-                    Text("Settings")
                 }
             }
         }

@@ -25,6 +25,7 @@ class AndroidKeystoreWrappingKeyProvider(
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
+                .setRandomizedEncryptionRequired(false)
                 .build()
         )
         return keyGenerator.generateKey()
@@ -32,6 +33,6 @@ class AndroidKeystoreWrappingKeyProvider(
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val DEFAULT_ALIAS = "totp_local_vault_wrapping_key"
+        const val DEFAULT_ALIAS = "totp_local_vault_wrapping_key_v2"
     }
 }

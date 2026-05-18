@@ -1,6 +1,7 @@
 package com.totp.authenticator.ui.home
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,10 +23,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.totp.authenticator.R
 import com.totp.authenticator.core.account.TotpAccount
+import com.totp.authenticator.ui.brand.BrandIcon
 import com.totp.authenticator.ui.brand.BrandIconMatcher
 
 @Composable
@@ -98,6 +103,18 @@ fun AccountCard(
 @Composable
 private fun BrandBadge(issuer: String) {
     val icon = BrandIconMatcher.match(issuer)
+    val imageRes = icon.drawableResIdOrNull()
+    if (imageRes != null) {
+        Image(
+            painter = painterResource(imageRes),
+            contentDescription = null,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+        )
+        return
+    }
+
     val label = when (icon.name) {
         "Default" -> issuer.take(1).uppercase().ifEmpty { "T" }
         else -> icon.name.take(1)
@@ -115,5 +132,15 @@ private fun BrandBadge(issuer: String) {
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+private fun BrandIcon.drawableResIdOrNull(): Int? {
+    return when (this) {
+        BrandIcon.Canva -> R.drawable.brand_canva
+        BrandIcon.Google -> R.drawable.brand_google
+        BrandIcon.Instagram -> R.drawable.brand_instagram
+        BrandIcon.Default -> R.drawable.brand_default
+        else -> null
     }
 }

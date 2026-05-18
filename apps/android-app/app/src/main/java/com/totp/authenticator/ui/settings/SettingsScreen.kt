@@ -1,15 +1,12 @@
 package com.totp.authenticator.ui.settings
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,59 +23,60 @@ fun SettingsScreen(
     accountCount: Int,
     onClearVault: () -> Unit,
     onLock: () -> Unit,
-    onBack: () -> Unit
+    modifier: Modifier = Modifier
 ) {
     var showClearConfirmation by remember { mutableStateOf(false) }
+    val items = settingsMenuItems()
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(vertical = 8.dp)
         ) {
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground
+            ListItem(
+                headlineContent = { Text("Local vault unlocked") },
+                supportingContent = { Text("$accountCount accounts") }
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Local vault unlocked",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = "$accountCount accounts",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            DisabledSetting("WebDAV sync")
-            DisabledSetting("Import / Export")
-            DisabledSetting("Biometric unlock")
-            Spacer(modifier = Modifier.weight(1f))
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onLock
-            ) {
-                Text("Lock")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onBack
-            ) {
-                Text("Back")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { showClearConfirmation = true }
-            ) {
-                Text("Clear vault")
+            HorizontalDivider()
+            items.forEach { item ->
+                ListItem(
+                    headlineContent = { Text(item.title) },
+                    supportingContent = { Text(item.summary) },
+                    trailingContent = {
+                        if (!item.enabled) {
+                            Text(
+                                text = "Off",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    modifier = Modifier.then(
+                        when (item.title) {
+                            "Clear local vault" -> Modifier.padding(top = 8.dp)
+                            else -> Modifier
+                        }
+                    )
+                )
+                when (item.title) {
+                    "Clear local vault" -> TextButton(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        onClick = { showClearConfirmation = true }
+                    ) {
+                        Text("Clear")
+                    }
+                    "Lock vault" -> TextButton(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        onClick = onLock
+                    ) {
+                        Text("Lock")
+                    }
+                }
+                HorizontalDivider()
             }
         }
     }
@@ -98,22 +96,6 @@ fun SettingsScreen(
                     Text("Cancel")
                 }
             }
-        )
-    }
-}
-
-@Composable
-private fun DisabledSetting(title: String) {
-    Column(modifier = Modifier.padding(vertical = 10.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "Available in a later version",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

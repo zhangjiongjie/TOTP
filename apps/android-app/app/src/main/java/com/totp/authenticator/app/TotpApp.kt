@@ -4,30 +4,40 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultRepository
+import com.totp.authenticator.ui.app.MainDestination
+import com.totp.authenticator.ui.app.TotpMainScaffold
 import com.totp.authenticator.ui.editor.AccountEditorScreen
 import com.totp.authenticator.ui.home.HomeScreen
 import com.totp.authenticator.ui.settings.SettingsScreen
 import com.totp.authenticator.ui.unlock.UnlockScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun TotpApp() {
     val context = LocalContext.current.applicationContext
     val repository = remember { VaultRepository(context) }
+    val appScope = rememberCoroutineScope()
     var hasExistingVault by remember { mutableStateOf(repository.hasVault()) }
     val state = remember { TotpApplicationState(hasExistingVault) }
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var unlockBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -39,18 +49,6 @@ fun TotpApp() {
     fun showPersistenceError(message: String) {
         errorMessage = message
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
-
-    fun saveVault(updatedVault: LocalVault, password: String): Boolean {
-        return runCatching {
-            repository.save(updatedVault, password)
-        }.onSuccess {
-            hasExistingVault = true
-            errorMessage = null
-            state.applyUnlockedVault(updatedVault, password)
-        }.onFailure {
-            showPersistenceError("Could not save vault")
-        }.isSuccess
     }
 
     fun saveAccount(account: TotpAccount, replaceExisting: Boolean) {
@@ -68,8 +66,20 @@ fun TotpApp() {
         } else {
             vault.accounts + account
         }
-        if (saveVault(vault.copy(accounts = accounts, updatedAt = account.updatedAt), password)) {
-            state.navigate(TotpRoute.Home)
+        val updatedVault = vault.copy(accounts = accounts, updatedAt = account.updatedAt)
+        appScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.save(updatedVault, password)
+                }
+            }.onSuccess {
+                hasExistingVault = true
+                errorMessage = null
+                state.applyUnlockedVault(updatedVault, password)
+                state.navigate(TotpRoute.Home)
+            }.onFailure {
+                showPersistenceError("Could not save vault")
+            }
         }
     }
 
@@ -86,8 +96,19 @@ fun TotpApp() {
             accounts = vault.accounts.filterNot { it.id == accountId },
             updatedAt = now
         )
-        if (saveVault(updatedVault, password)) {
-            state.navigate(TotpRoute.Home)
+        appScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.save(updatedVault, password)
+                }
+            }.onSuccess {
+                hasExistingVault = true
+                errorMessage = null
+                state.applyUnlockedVault(updatedVault, password)
+                state.navigate(TotpRoute.Home)
+            }.onFailure {
+                showPersistenceError("Could not save vault")
+            }
         }
     }
 
@@ -95,25 +116,38 @@ fun TotpApp() {
         TotpRoute.Unlock -> UnlockScreen(
             hasExistingVault = hasExistingVault,
             errorMessage = errorMessage,
+            isBusy = unlockBusy,
             onCreatePassword = { password ->
-                runCatching {
-                    repository.create(password, now = System.currentTimeMillis())
-                }.onSuccess { vault ->
-                    hasExistingVault = true
-                    errorMessage = null
-                    state.applyUnlockedVault(vault, password)
-                }.onFailure {
-                    errorMessage = "Could not create vault"
+                appScope.launch {
+                    unlockBusy = true
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            repository.create(password, now = System.currentTimeMillis())
+                        }
+                    }.onSuccess { vault ->
+                        hasExistingVault = true
+                        errorMessage = null
+                        state.applyUnlockedVault(vault, password)
+                    }.onFailure {
+                        errorMessage = "Could not create vault"
+                    }
+                    unlockBusy = false
                 }
             },
             onUnlock = { password ->
-                runCatching {
-                    repository.unlock(password)
-                }.onSuccess { vault ->
-                    errorMessage = null
-                    state.applyUnlockedVault(vault, password)
-                }.onFailure {
-                    errorMessage = "Could not unlock vault"
+                appScope.launch {
+                    unlockBusy = true
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            repository.unlock(password)
+                        }
+                    }.onSuccess { vault ->
+                        errorMessage = null
+                        state.applyUnlockedVault(vault, password)
+                    }.onFailure {
+                        errorMessage = "Could not unlock vault"
+                    }
+                    unlockBusy = false
                 }
             }
         )
@@ -123,28 +157,47 @@ fun TotpApp() {
             if (vault == null) {
                 MissingVaultEffect { state.lock() }
             } else {
-                HomeScreen(
-                    vault = vault,
-                    nowMillis = nowMillis,
+                TotpMainScaffold(
+                    title = "TOTP Authenticator",
+                    selectedDestination = MainDestination.Home,
+                    onHome = { state.navigate(TotpRoute.Home) },
                     onAdd = { state.navigate(TotpRoute.Add) },
-                    onEdit = { accountId -> state.navigate(TotpRoute.Edit(accountId)) },
-                    onSettings = { state.navigate(TotpRoute.Settings) },
-                    onCopy = { code ->
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("TOTP code", code))
-                        Toast.makeText(context, "Code copied", Toast.LENGTH_SHORT).show()
-                    }
-                )
+                    onSettings = { state.navigate(TotpRoute.Settings) }
+                ) { padding ->
+                    HomeScreen(
+                        vault = vault,
+                        nowMillis = nowMillis,
+                        onAdd = { state.navigate(TotpRoute.Add) },
+                        onEdit = { accountId -> state.navigate(TotpRoute.Edit(accountId)) },
+                        onCopy = { code ->
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("TOTP code", code))
+                            Toast.makeText(context, "Code copied", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.padding(padding)
+                    )
+                }
             }
         }
 
-        TotpRoute.Add -> AccountEditorScreen(
+        TotpRoute.Add -> TotpMainScaffold(
             title = "Add account",
-            existingAccount = null,
-            onSave = { account -> saveAccount(account, replaceExisting = false) },
-            onDelete = null,
+            selectedDestination = MainDestination.Add,
+            onHome = { state.navigate(TotpRoute.Home) },
+            onAdd = { state.navigate(TotpRoute.Add) },
+            onSettings = { state.navigate(TotpRoute.Settings) },
             onBack = { state.navigate(TotpRoute.Home) }
-        )
+        ) { padding ->
+            AccountEditorScreen(
+                title = "Add account",
+                existingAccount = null,
+                onSave = { account -> saveAccount(account, replaceExisting = false) },
+                onDelete = null,
+                onBack = { state.navigate(TotpRoute.Home) },
+                modifier = Modifier.padding(padding),
+                showTitle = false
+            )
+        }
 
         is TotpRoute.Edit -> {
             val route = state.currentRoute as TotpRoute.Edit
@@ -155,27 +208,51 @@ fun TotpApp() {
                     state.navigate(TotpRoute.Home)
                 }
             } else {
-                AccountEditorScreen(
+                TotpMainScaffold(
                     title = "Edit account",
-                    existingAccount = account,
-                    onSave = { updatedAccount -> saveAccount(updatedAccount, replaceExisting = true) },
-                    onDelete = { accountId -> deleteAccount(accountId) },
+                    selectedDestination = null,
+                    onHome = { state.navigate(TotpRoute.Home) },
+                    onAdd = { state.navigate(TotpRoute.Add) },
+                    onSettings = { state.navigate(TotpRoute.Settings) },
                     onBack = { state.navigate(TotpRoute.Home) }
-                )
+                ) { padding ->
+                    AccountEditorScreen(
+                        title = "Edit account",
+                        existingAccount = account,
+                        onSave = { updatedAccount -> saveAccount(updatedAccount, replaceExisting = true) },
+                        onDelete = { accountId -> deleteAccount(accountId) },
+                        onBack = { state.navigate(TotpRoute.Home) },
+                        modifier = Modifier.padding(padding),
+                        showTitle = false
+                    )
+                }
             }
         }
 
-        TotpRoute.Settings -> SettingsScreen(
-            accountCount = state.vault?.accounts?.size ?: 0,
-            onClearVault = {
-                repository.clear()
-                hasExistingVault = false
-                errorMessage = null
-                state.lock()
-            },
-            onLock = { state.lock() },
+        TotpRoute.Settings -> TotpMainScaffold(
+            title = "Settings",
+            selectedDestination = MainDestination.Settings,
+            onHome = { state.navigate(TotpRoute.Home) },
+            onAdd = { state.navigate(TotpRoute.Add) },
+            onSettings = { state.navigate(TotpRoute.Settings) },
             onBack = { state.navigate(TotpRoute.Home) }
-        )
+        ) { padding ->
+            SettingsScreen(
+                accountCount = state.vault?.accounts?.size ?: 0,
+                onClearVault = {
+                    appScope.launch {
+                        withContext(Dispatchers.IO) {
+                            repository.clear()
+                        }
+                        hasExistingVault = false
+                        errorMessage = null
+                        state.lock()
+                    }
+                },
+                onLock = { state.lock() },
+                modifier = Modifier.padding(padding)
+            )
+        }
     }
 }
 
