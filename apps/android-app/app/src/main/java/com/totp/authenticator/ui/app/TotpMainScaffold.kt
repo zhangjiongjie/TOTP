@@ -1,8 +1,11 @@
 package com.totp.authenticator.ui.app
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -11,12 +14,15 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import com.totp.authenticator.R
 
 enum class MainDestination(
@@ -100,4 +106,25 @@ fun TotpMainScaffold(
         contentColor = Color.Unspecified,
         content = content
     )
+}
+
+@Composable
+fun HeaderCircleIconButton(
+    @DrawableRes iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.size(40.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f))
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = contentDescription
+            )
+        }
+    }
 }

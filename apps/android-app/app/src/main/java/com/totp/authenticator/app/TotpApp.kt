@@ -4,9 +4,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,15 +19,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import com.totp.authenticator.R
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultRepository
+import com.totp.authenticator.ui.app.HeaderCircleIconButton
 import com.totp.authenticator.ui.app.MainDestination
 import com.totp.authenticator.ui.app.TotpMainScaffold
 import com.totp.authenticator.ui.editor.AccountEditorScreen
 import com.totp.authenticator.ui.home.HomeScreen
+import com.totp.authenticator.ui.importer.QrImportException
+import com.totp.authenticator.ui.importer.QrImportService
+import com.totp.authenticator.ui.importer.await
 import com.totp.authenticator.ui.settings.SettingsScreen
 import com.totp.authenticator.ui.unlock.UnlockScreen
 import kotlinx.coroutines.Dispatchers
@@ -34,14 +44,47 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun TotpApp() {
-    val context = LocalContext.current.applicationContext
+    val activityContext = LocalContext.current
+    val context = activityContext.applicationContext
     val repository = remember { VaultRepository(context) }
+    val qrImportService = remember(activityContext) { QrImportService(activityContext) }
     val appScope = rememberCoroutineScope()
     var hasExistingVault by remember { mutableStateOf(repository.hasVault()) }
     val state = remember { TotpApplicationState(hasExistingVault) }
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var unlockBusy by remember { mutableStateOf(false) }
+    var importedOtpAuthUri by remember { mutableStateOf<String?>(null) }
+
+    fun acceptImportedOtpAuthUri(uri: String) {
+        importedOtpAuthUri = uri
+        state.navigate(TotpRoute.Add)
+        Toast.makeText(context, "QR code imported", Toast.LENGTH_SHORT).show()
+    }
+
+    fun showQrImportError(message: String = "Could not read QR code") {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null) {
+            return@rememberLauncherForActivityResult
+        }
+        appScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    qrImportService.decodeImage(uri)
+                }
+            }.onSuccess(::acceptImportedOtpAuthUri)
+                .onFailure { error ->
+                    showQrImportError(
+                        if (error is QrImportException) error.message ?: "No QR code found in image" else "Could not read QR image"
+                    )
+                }
+        }
+    }
 
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
@@ -56,6 +99,32 @@ fun TotpApp() {
     fun showPersistenceError(message: String) {
         errorMessage = message
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    fun startQrImageImport() {
+        imagePickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+    }
+
+    fun startQrScan() {
+        appScope.launch {
+            runCatching {
+                val options = GmsBarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                    .build()
+                GmsBarcodeScanning.getClient(activityContext, options)
+                    .startScan()
+                    .await()
+                    .rawValue
+                    ?: throw QrImportException("No QR code found")
+            }.onSuccess(::acceptImportedOtpAuthUri)
+                .onFailure { error ->
+                    showQrImportError(
+                        if (error is QrImportException) error.message ?: "No QR code found" else "Could not scan QR code"
+                    )
+                }
+        }
     }
 
     fun saveAccount(account: TotpAccount, replaceExisting: Boolean) {
@@ -203,26 +272,17 @@ fun TotpApp() {
             onAdd = { state.navigate(TotpRoute.Add) },
             onSettings = { state.navigate(TotpRoute.Settings) },
             actions = {
-                IconButton(
-                    onClick = {
-                        Toast.makeText(context, "QR image import is not available on Android yet", Toast.LENGTH_SHORT).show()
-                    }
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.action_photo),
-                        contentDescription = "Import QR image"
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        Toast.makeText(context, "QR scan is not available on Android yet", Toast.LENGTH_SHORT).show()
-                    }
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.action_scan),
-                        contentDescription = "Scan QR code"
-                    )
-                }
+                HeaderCircleIconButton(
+                    iconRes = R.drawable.action_photo,
+                    contentDescription = "Import QR image",
+                    onClick = ::startQrImageImport
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                HeaderCircleIconButton(
+                    iconRes = R.drawable.action_scan,
+                    contentDescription = "Scan QR code",
+                    onClick = ::startQrScan
+                )
             }
         ) { padding ->
             AccountEditorScreen(
@@ -231,7 +291,9 @@ fun TotpApp() {
                 onSave = { account -> saveAccount(account, replaceExisting = false) },
                 onDelete = null,
                 modifier = Modifier.padding(padding),
-                showTitle = false
+                showTitle = false,
+                importedOtpAuthUri = importedOtpAuthUri,
+                onImportedOtpAuthUriConsumed = { importedOtpAuthUri = null }
             )
         }
 
