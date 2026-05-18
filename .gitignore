@@ -15,8 +15,10 @@ apps/harmony-app/entry/.preview/
 apps/harmony-app/build/
 apps/harmony-app/entry/build/
 apps/android-app/.gradle/
+apps/android-app/.idea/
 apps/android-app/build/
 apps/android-app/app/build/
+apps/android-app/gradle/gradle-daemon-jvm.properties
 apps/android-app/local.properties
 browser-extension-*.zip
 apps/harmony-app/local.properties
