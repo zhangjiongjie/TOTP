@@ -101,24 +101,20 @@ private data class TotpAccountDto(
 
 @Serializable
 private data class EnvelopeDto(
-    val schemaVersion: Int,
-    val kdf: String,
-    val salt: String,
-    val nonce: String,
-    val wrappedKeyNonce: String,
-    val wrappedVaultKey: String,
-    val ciphertext: String,
+    val formatVersion: Int,
+    val vaultId: String,
+    val kdf: VaultKdfDto,
+    val keyEncryption: AesGcmPayloadDto,
+    val vaultEncryption: AesGcmPayloadDto,
     val updatedAt: Long
 ) {
     fun toDomain(): EncryptedVaultEnvelope {
         return EncryptedVaultEnvelope(
-            schemaVersion = schemaVersion,
-            kdf = kdf,
-            salt = salt,
-            nonce = nonce,
-            wrappedKeyNonce = wrappedKeyNonce,
-            wrappedVaultKey = wrappedVaultKey,
-            ciphertext = ciphertext,
+            formatVersion = formatVersion,
+            vaultId = vaultId,
+            kdf = kdf.toDomain(),
+            keyEncryption = keyEncryption.toDomain(),
+            vaultEncryption = vaultEncryption.toDomain(),
             updatedAt = updatedAt
         )
     }
@@ -126,14 +122,65 @@ private data class EnvelopeDto(
     companion object {
         fun fromDomain(envelope: EncryptedVaultEnvelope): EnvelopeDto {
             return EnvelopeDto(
-                schemaVersion = envelope.schemaVersion,
-                kdf = envelope.kdf,
-                salt = envelope.salt,
-                nonce = envelope.nonce,
-                wrappedKeyNonce = envelope.wrappedKeyNonce,
-                wrappedVaultKey = envelope.wrappedVaultKey,
-                ciphertext = envelope.ciphertext,
+                formatVersion = envelope.formatVersion,
+                vaultId = envelope.vaultId,
+                kdf = VaultKdfDto.fromDomain(envelope.kdf),
+                keyEncryption = AesGcmPayloadDto.fromDomain(envelope.keyEncryption),
+                vaultEncryption = AesGcmPayloadDto.fromDomain(envelope.vaultEncryption),
                 updatedAt = envelope.updatedAt
+            )
+        }
+    }
+}
+
+@Serializable
+private data class VaultKdfDto(
+    val name: String,
+    val iterations: Int,
+    val hash: String,
+    val salt: String
+) {
+    fun toDomain(): VaultKdf {
+        return VaultKdf(
+            name = name,
+            iterations = iterations,
+            hash = hash,
+            salt = salt
+        )
+    }
+
+    companion object {
+        fun fromDomain(kdf: VaultKdf): VaultKdfDto {
+            return VaultKdfDto(
+                name = kdf.name,
+                iterations = kdf.iterations,
+                hash = kdf.hash,
+                salt = kdf.salt
+            )
+        }
+    }
+}
+
+@Serializable
+private data class AesGcmPayloadDto(
+    val cipher: String,
+    val iv: String,
+    val ciphertext: String
+) {
+    fun toDomain(): AesGcmPayload {
+        return AesGcmPayload(
+            cipher = cipher,
+            iv = iv,
+            ciphertext = ciphertext
+        )
+    }
+
+    companion object {
+        fun fromDomain(payload: AesGcmPayload): AesGcmPayloadDto {
+            return AesGcmPayloadDto(
+                cipher = payload.cipher,
+                iv = payload.iv,
+                ciphertext = payload.ciphertext
             )
         }
     }

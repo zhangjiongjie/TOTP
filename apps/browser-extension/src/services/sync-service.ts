@@ -1,5 +1,11 @@
 import { getSessionState } from '../state/session-store';
-import { decryptVault, encryptVault, type EncryptedVaultBlob, type VaultPayload } from '@totp/core';
+import {
+  decryptVault,
+  encryptVaultWithKey,
+  unlockVault,
+  type EncryptedVaultBlob,
+  type VaultPayload
+} from '@totp/core';
 import type { PendingConflictSnapshot, SyncInspectionSnapshot } from '@totp/sync';
 import { getCurrentMasterPassword } from '../state/master-password-store';
 import {
@@ -168,11 +174,13 @@ async function mergeAccountLevelConflict(
   }
 
   try {
-    const [baseVault, localVault, remoteVault] = await Promise.all([
-      decryptVault(metadata.baseVault, masterPassword),
+    const [baseUnlocked, localVault, remoteUnlocked] = await Promise.all([
+      unlockVault(metadata.baseVault, masterPassword),
       decryptVault(local.encryptedVault, masterPassword),
-      decryptVault(remote.encryptedVault, masterPassword)
+      unlockVault(remote.encryptedVault, masterPassword)
     ]);
+    const baseVault = baseUnlocked.vault;
+    const remoteVault = remoteUnlocked.vault;
     const mergedAccounts = mergeAccountRecords(
       baseVault.accounts,
       localVault.accounts,
@@ -183,12 +191,13 @@ async function mergeAccountLevelConflict(
       return null;
     }
 
-    return encryptVault(
+    return encryptVaultWithKey(
       {
         version: Math.max(baseVault.version, localVault.version, remoteVault.version),
         accounts: mergedAccounts
       },
-      masterPassword
+      remote.encryptedVault,
+      remoteUnlocked.vaultKey
     );
   } catch {
     return null;

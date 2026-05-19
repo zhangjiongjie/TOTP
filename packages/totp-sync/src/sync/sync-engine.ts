@@ -523,6 +523,19 @@ async function uploadLocalSnapshot(
     );
   }
 
+  if (!uploaded || !uploaded.encryptedVault) {
+    return handleSyncError(
+      'upload',
+      new WebDavClientError('validation', 'WebDAV upload response is invalid'),
+      {
+        localVault: local.encryptedVault,
+        localSnapshot: local.snapshot,
+        metadata: await syncStore.load()
+      },
+      syncStore
+    );
+  }
+
   const remote = await createCandidateSnapshot({
     encryptedVault: uploaded.encryptedVault,
     revision: uploaded.revision,

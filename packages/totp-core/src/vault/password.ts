@@ -1,4 +1,4 @@
-export const CURRENT_ENVELOPE_VERSION = 1;
+export const CURRENT_ENVELOPE_VERSION = 2;
 
 export const CURRENT_KDF_CONFIG = {
   name: 'PBKDF2',
@@ -9,6 +9,10 @@ export const CURRENT_KDF_CONFIG = {
 export const CURRENT_CIPHER = 'AES-GCM' as const;
 
 export async function deriveAesKey(password: string, salt: Uint8Array) {
+  return deriveWrappingKey(password, salt);
+}
+
+export async function deriveWrappingKey(password: string, salt: Uint8Array) {
   const material = await crypto.subtle.importKey(
     'raw',
     toArrayBuffer(new TextEncoder().encode(password)),
@@ -28,6 +32,16 @@ export async function deriveAesKey(password: string, salt: Uint8Array) {
     { name: CURRENT_CIPHER, length: 256 },
     false,
     ['encrypt', 'decrypt']
+  );
+}
+
+export async function importAesKey(keyBytes: Uint8Array, usages: KeyUsage[] = ['encrypt', 'decrypt']) {
+  return crypto.subtle.importKey(
+    'raw',
+    toArrayBuffer(keyBytes),
+    { name: CURRENT_CIPHER },
+    false,
+    usages
   );
 }
 

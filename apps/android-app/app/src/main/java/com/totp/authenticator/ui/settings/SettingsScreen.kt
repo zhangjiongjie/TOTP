@@ -61,11 +61,13 @@ fun SettingsScreen(
     onTestWebDav: (WebDavSettings) -> Unit,
     onSyncWebDav: () -> Unit,
     onBiometricUnlockChanged: (Boolean) -> Unit,
+    onChangeMasterPassword: (String, String) -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showWebDavDialog by remember { mutableStateOf(false) }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -107,6 +109,32 @@ fun SettingsScreen(
                         enabled = !isBiometricBusy && (biometricUnlockAvailable || quickUnlockSetupRequired),
                         onCheckedChange = onBiometricUnlockChanged
                     )
+                }
+            }
+
+            SettingsCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "主密码",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "修改后会重新保护保管库密钥，账号数据密钥保持不变。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(onClick = { showChangePasswordDialog = true }) {
+                        Text("修改")
+                    }
                 }
             }
 
@@ -227,6 +255,16 @@ fun SettingsScreen(
                 showWebDavDialog = false
             },
             onTest = onTestWebDav
+        )
+    }
+
+    if (showChangePasswordDialog) {
+        ChangeMasterPasswordDialog(
+            onDismiss = { showChangePasswordDialog = false },
+            onSave = { currentPassword, nextPassword ->
+                onChangeMasterPassword(currentPassword, nextPassword)
+                showChangePasswordDialog = false
+            }
         )
     }
 }
@@ -370,6 +408,86 @@ private fun WebDavSettingsDialog(
         },
         confirmButton = {
             TextButton(enabled = !isBusy, onClick = { onSave(draft) }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ChangeMasterPasswordDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var currentPassword by remember { mutableStateOf("") }
+    var nextPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var currentVisible by remember { mutableStateOf(false) }
+    var nextVisible by remember { mutableStateOf(false) }
+    var confirmVisible by remember { mutableStateOf(false) }
+    val canSave = currentPassword.isNotBlank() && nextPassword.length >= 6 && nextPassword == confirmPassword
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("修改主密码") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = currentPassword,
+                    onValueChange = { currentPassword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("当前主密码") },
+                    visualTransformation = if (currentVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        PasswordVisibilityIcon(
+                            visible = currentVisible,
+                            onToggle = { currentVisible = !currentVisible }
+                        )
+                    },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = nextPassword,
+                    onValueChange = { nextPassword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("新主密码") },
+                    visualTransformation = if (nextVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        PasswordVisibilityIcon(
+                            visible = nextVisible,
+                            onToggle = { nextVisible = !nextVisible }
+                        )
+                    },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("再次输入新主密码") },
+                    visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        PasswordVisibilityIcon(
+                            visible = confirmVisible,
+                            onToggle = { confirmVisible = !confirmVisible }
+                        )
+                    },
+                    supportingText = {
+                        if (confirmPassword.isNotBlank() && nextPassword != confirmPassword) {
+                            Text("两次输入的新主密码不一致。")
+                        }
+                    },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = canSave, onClick = { onSave(currentPassword, nextPassword) }) {
                 Text("保存")
             }
         },

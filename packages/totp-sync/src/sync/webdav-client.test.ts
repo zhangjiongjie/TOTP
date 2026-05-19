@@ -19,17 +19,24 @@ describe('createFetchWebDavClient', () => {
           revision: 'rev-1',
           updatedAt: '2026-05-11T10:00:00.000Z',
           encryptedVault: {
-            formatVersion: 1,
+            formatVersion: 2,
+            vaultId: 'vault-1',
             kdf: {
               name: 'PBKDF2',
               iterations: 310000,
-              hash: 'SHA-256'
+              hash: 'SHA-256',
+              salt: 'salt'
             },
-            cipher: 'AES-GCM',
-            salt: 'salt',
-            iv: 'iv',
-            ciphertext: 'ciphertext',
-            passwordVerifier: 'verifier'
+            keyEncryption: {
+              cipher: 'AES-GCM',
+              iv: 'key-iv',
+              ciphertext: 'wrapped-key'
+            },
+            vaultEncryption: {
+              cipher: 'AES-GCM',
+              iv: 'vault-iv',
+              ciphertext: 'ciphertext'
+            }
           }
         }),
         {
@@ -72,17 +79,24 @@ describe('createFetchWebDavClient', () => {
       revision: 'local:123',
       updatedAt: '2026-05-11T10:05:00.000Z',
       encryptedVault: {
-        formatVersion: 1,
+        formatVersion: 2,
+        vaultId: 'vault-1',
         kdf: {
           name: 'PBKDF2',
           iterations: 310000,
-          hash: 'SHA-256'
+          hash: 'SHA-256',
+          salt: 'salt'
         },
-        cipher: 'AES-GCM',
-        salt: 'salt',
-        iv: 'iv',
-        ciphertext: 'ciphertext',
-        passwordVerifier: 'verifier'
+        keyEncryption: {
+          cipher: 'AES-GCM',
+          iv: 'key-iv',
+          ciphertext: 'wrapped-key'
+        },
+        vaultEncryption: {
+          cipher: 'AES-GCM',
+          iv: 'vault-iv',
+          ciphertext: 'ciphertext'
+        }
       },
       previousEtag: '"etag-1"'
     });

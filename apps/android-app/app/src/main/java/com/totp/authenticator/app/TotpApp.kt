@@ -995,6 +995,39 @@ fun TotpApp() {
                         disableBiometricUnlock()
                     }
                 },
+                onChangeMasterPassword = { currentPassword, nextPassword ->
+                    appScope.launch {
+                        webDavBusy = true
+                        runCatching {
+                            withContext(Dispatchers.IO) {
+                                val vault = repository.changePassword(currentPassword, nextPassword)
+                                val syncResult = if (webDavSyncService.loadSettings().enabled) {
+                                    webDavSyncService.syncNow(vault, nextPassword)
+                                } else {
+                                    null
+                                }
+                                vault to syncResult
+                            }
+                        }.onSuccess { (vault, syncResult) ->
+                            state.updateUnlockedVault(vault, nextPassword)
+                            webDavMetadata = webDavSyncService.loadMetadata()
+                            biometricUnlockStore.disable()
+                            biometricUnlockEnabled = false
+                            Toast.makeText(
+                                context,
+                                syncResult?.message ?: "主密码已修改，请重新开启快速解锁。",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }.onFailure { error ->
+                            Toast.makeText(
+                                context,
+                                error.message ?: "主密码修改失败",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        webDavBusy = false
+                    }
+                },
                 onExportBackup = ::startBackupExport,
                 onImportBackup = ::startBackupImport,
                 modifier = Modifier.padding(padding)

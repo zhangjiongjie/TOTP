@@ -2,21 +2,12 @@ package com.totp.authenticator.data.vault
 
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.core.totp.TotpAlgorithm
-import javax.crypto.SecretKey
-import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class VaultCipherTest {
-    private val wrappingKeyProvider = object : WrappingKeyProvider {
-        override fun getOrCreateWrappingKey(): SecretKey {
-            return SecretKeySpec(ByteArray(32) { 7 }, "AES")
-        }
-    }
-
     private val cipher = VaultCipher(
-        keyDeriver = PasswordKeyDeriver(),
-        wrappingKeyProvider = wrappingKeyProvider
+        keyDeriver = PasswordKeyDeriver()
     )
 
     @Test
@@ -52,8 +43,21 @@ class VaultCipherTest {
 
         assertEquals(updatedVault, decrypted)
         assertEquals(envelope.kdf, updatedEnvelope.kdf)
-        assertEquals(envelope.salt, updatedEnvelope.salt)
-        assertEquals(envelope.wrappedVaultKey, updatedEnvelope.wrappedVaultKey)
+        assertEquals(envelope.keyEncryption, updatedEnvelope.keyEncryption)
+    }
+
+    @Test
+    fun rewrapsVaultKeyWhenPasswordChanges() {
+        val vault = sampleVault()
+        val envelope = cipher.encrypt(vault, "correct horse battery staple")
+        val vaultKey = cipher.deriveVaultKey(envelope, "correct horse battery staple")
+
+        val rewrapped = cipher.rewrapVaultKey(envelope, "correct horse battery staple", "new correct horse battery staple")
+        val rewrappedVaultKey = cipher.deriveVaultKey(rewrapped, "new correct horse battery staple")
+
+        assertEquals(vault, cipher.decrypt(rewrapped, "new correct horse battery staple"))
+        assertEquals(vaultKey.encoded.toList(), rewrappedVaultKey.encoded.toList())
+        assertEquals(envelope.vaultEncryption, rewrapped.vaultEncryption)
     }
 
     @Test(expected = VaultDecryptException::class)
