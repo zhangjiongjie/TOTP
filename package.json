@@ -21,6 +21,7 @@
     "test:workspace-smoke": "node -e \"const fs=require('fs');['apps','packages','apps/browser-extension','packages/totp-core','packages/totp-sync'].forEach((p)=>{if(!fs.existsSync(p)) throw new Error(p+' missing')})\""
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "typescript": "^5.8.3"
   }
 }

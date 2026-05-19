@@ -1,0 +1,115 @@
+package com.totp.authenticator.ui.editor
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.totp.authenticator.core.account.AccountValidationError
+import com.totp.authenticator.core.account.AccountValidator
+import com.totp.authenticator.core.account.TotpAccount
+import com.totp.authenticator.core.otpauth.OtpAuthParser
+import com.totp.authenticator.core.totp.TotpAlgorithm
+import com.totp.authenticator.core.totp.TotpGenerator
+import java.util.UUID
+
+class AccountFormState(existing: TotpAccount? = null) {
+    var issuer by mutableStateOf(existing?.issuer.orEmpty())
+    var accountName by mutableStateOf(existing?.accountName.orEmpty())
+    var secret by mutableStateOf(existing?.secret.orEmpty())
+    var digits by mutableStateOf((existing?.digits ?: 6).toString())
+    var period by mutableStateOf((existing?.period ?: 30).toString())
+    var algorithm by mutableStateOf(existing?.algorithm ?: TotpAlgorithm.SHA1)
+    var group by mutableStateOf(localizedGroup(existing?.group ?: "默认"))
+    var errors by mutableStateOf<List<String>>(emptyList())
+        private set
+
+    fun applyOtpAuthUri(value: String): Boolean {
+        return runCatching { OtpAuthParser.parse(value) }
+            .onSuccess { parsed ->
+                issuer = parsed.issuer
+                accountName = parsed.accountName
+                secret = parsed.secret
+                digits = parsed.digits.toString()
+                period = parsed.period.toString()
+                algorithm = parsed.algorithm
+                errors = emptyList()
+            }
+            .onFailure {
+                errors = listOf("otpauth 链接无效")
+            }
+            .isSuccess
+    }
+
+    fun toAccount(existing: TotpAccount?, nowMillis: Long): TotpAccount? {
+        val digitsInt = digits.toIntOrNull()
+        val periodInt = period.toIntOrNull()
+        if (digitsInt == null || periodInt == null) {
+            val fieldErrors = buildList {
+                if (digitsInt == null) add(AccountValidationError.DigitsOutOfRange)
+                if (periodInt == null) add(AccountValidationError.PeriodInvalid)
+            }
+            errors = fieldErrors.map { it.message }
+            return null
+        }
+
+        val result = AccountValidator.validate(
+            issuer = issuer,
+            accountName = accountName,
+            secret = secret,
+            digits = digitsInt,
+            period = periodInt,
+            algorithm = algorithm,
+            group = group
+        )
+        if (!result.isValid) {
+            errors = result.errors.map { it.message }
+            return null
+        }
+
+        runCatching {
+            TotpGenerator.generate(
+                secret = secret,
+                timestampMillis = nowMillis,
+                period = periodInt,
+                digits = digitsInt,
+                algorithm = algorithm
+            )
+        }.onFailure {
+            errors = listOf("无法生成验证码")
+            return null
+        }
+
+        errors = emptyList()
+        return TotpAccount(
+            id = existing?.id ?: UUID.randomUUID().toString(),
+            issuer = issuer.trim(),
+            accountName = accountName.trim(),
+            secret = secret.trim(),
+            algorithm = algorithm,
+            digits = digitsInt,
+            period = periodInt,
+            group = group.trim(),
+            createdAt = existing?.createdAt ?: nowMillis,
+            updatedAt = nowMillis
+        )
+    }
+}
+
+private val AccountValidationError.message: String
+    get() = when (this) {
+        AccountValidationError.IssuerRequired -> "请输入发行方"
+        AccountValidationError.AccountNameRequired -> "请输入账号"
+        AccountValidationError.SecretRequired -> "请输入密钥"
+        AccountValidationError.SecretInvalid -> "密钥必须是有效的 Base32 格式"
+        AccountValidationError.GroupRequired -> "请选择分组"
+        AccountValidationError.DigitsOutOfRange -> "位数必须在 6 到 8 之间"
+        AccountValidationError.PeriodInvalid -> "周期必须大于 0"
+    }
+
+private fun localizedGroup(value: String): String {
+    return when (value) {
+        "Default" -> "默认"
+        "Personal" -> "个人"
+        "Work" -> "工作"
+        else -> value
+    }
+}
