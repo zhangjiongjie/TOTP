@@ -71,6 +71,17 @@ class VaultRepository(
         }
     }
 
+    fun saveWithVaultKey(vault: LocalVault, vaultKey: ByteArray): EncryptedVaultEnvelope {
+        val existingEnvelope = preferences.getString(KEY_ENCRYPTED_VAULT, null)
+            ?.let { VaultEnvelopeJson.decodeEnvelope(it) }
+            ?: throw VaultNotFoundException()
+        val envelope = vaultCipher.encryptWithVaultKey(vault, existingEnvelope, vaultKey)
+        preferences.edit()
+            .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(envelope))
+            .apply()
+        return envelope
+    }
+
     fun save(vault: LocalVault, password: String): EncryptedVaultEnvelope {
         val existingEnvelope = preferences.getString(KEY_ENCRYPTED_VAULT, null)
             ?.let { runCatching { VaultEnvelopeJson.decodeEnvelope(it) }.getOrNull() }

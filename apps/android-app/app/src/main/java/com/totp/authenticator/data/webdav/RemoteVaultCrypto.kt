@@ -110,6 +110,38 @@ class RemoteVaultCrypto(
         return vault
     }
 
+    fun decryptWithVaultKey(blob: EncryptedRemoteVaultBlobDto, vaultKey: ByteArray): LocalVault {
+        require(blob.formatVersion == REMOTE_FORMAT_VERSION) { "Unsupported WebDAV vault format" }
+        require(blob.vaultEncryption.cipher == CIPHER_NAME) { "Unsupported WebDAV cipher" }
+        val plaintext = decryptAesGcm(
+            SecretKeySpec(vaultKey, AES),
+            unbase64(blob.vaultEncryption.iv),
+            unbase64(blob.vaultEncryption.ciphertext)
+        ).toString(Charsets.UTF_8)
+        return json.decodeFromString<RemoteVaultDto>(plaintext).toDomain()
+    }
+
+    fun encryptWithVaultKey(
+        vault: LocalVault,
+        existingBlob: EncryptedRemoteVaultBlobDto,
+        vaultKey: ByteArray
+    ): EncryptedRemoteVaultBlobDto {
+        require(existingBlob.formatVersion == REMOTE_FORMAT_VERSION) { "Unsupported WebDAV vault format" }
+        val vaultIv = randomIv()
+        val encryptedVault = encryptAesGcm(
+            SecretKeySpec(vaultKey, AES),
+            vaultIv,
+            json.encodeToString(RemoteVaultDto.fromDomain(vault)).toByteArray(Charsets.UTF_8)
+        )
+        return existingBlob.copy(
+            vaultEncryption = RemoteAesGcmDto(
+                cipher = CIPHER_NAME,
+                iv = base64(vaultIv),
+                ciphertext = base64(encryptedVault)
+            )
+        )
+    }
+
     private fun randomIv(): ByteArray = ByteArray(IV_SIZE_BYTES).also(secureRandom::nextBytes)
 
     private fun deriveKeyBytes(password: String, salt: ByteArray, iterations: Int): ByteArray {

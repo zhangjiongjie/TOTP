@@ -57,9 +57,8 @@ class BiometricVaultUnlockStore(context: Context) {
         }
     }
 
-    fun saveCredential(cipher: Cipher, password: String, vaultKey: ByteArray) {
+    fun saveCredential(cipher: Cipher, vaultKey: ByteArray) {
         val payload = BiometricCredentialPayloadDto(
-            masterPassword = password,
             vaultKey = base64(vaultKey)
         )
         val ciphertext = cipher.doFinal(json.encodeToString(payload).toByteArray(Charsets.UTF_8))
@@ -77,7 +76,6 @@ class BiometricVaultUnlockStore(context: Context) {
         val plaintext = cipher.doFinal(unbase64(record.ciphertext)).toString(Charsets.UTF_8)
         val payload = json.decodeFromString<BiometricCredentialPayloadDto>(plaintext)
         return BiometricVaultCredential(
-            masterPassword = payload.masterPassword,
             vaultKey = unbase64(payload.vaultKey)
         )
     }
@@ -150,7 +148,6 @@ class BiometricVaultUnlockStore(context: Context) {
 }
 
 data class BiometricVaultCredential(
-    val masterPassword: String,
     val vaultKey: ByteArray
 )
 
@@ -171,7 +168,6 @@ private data class BiometricCredentialRecordDto(
 
 @Serializable
 private data class BiometricCredentialPayloadDto(
-    val version: Int = 1,
-    val masterPassword: String,
+    val version: Int = 2,
     val vaultKey: String
 )

@@ -57,6 +57,24 @@ class WebDavSyncService(
         }
     }
 
+    fun syncNowWithVaultKey(vault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+        return try {
+            syncNowWithVaultKeyChecked(vault, vaultKey)
+        } catch (error: Exception) {
+            saveFailure(error.message ?: "WebDAV sync failed")
+            throw error
+        }
+    }
+
+    fun syncLocalChangeWithVaultKey(vault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+        return try {
+            syncLocalChangeWithVaultKeyChecked(vault, vaultKey)
+        } catch (error: Exception) {
+            saveFailure(error.message ?: "WebDAV sync failed")
+            throw error
+        }
+    }
+
     private fun syncNowChecked(localVault: LocalVault, password: String): WebDavSyncResult {
         val startedAt = System.currentTimeMillis()
         val settings = settingsStore.loadSettings()
@@ -164,6 +182,80 @@ class WebDavSyncService(
         }
     }
 
+    private fun syncNowWithVaultKeyChecked(localVault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+        val settings = settingsStore.loadSettings()
+        if (!settings.enabled) {
+            return saveResult("disabled", "WebDAV sync is disabled")
+        }
+        validateSettings(settings)
+        val metadata = settingsStore.loadMetadata().let {
+            if (it.syncProfileKey == profileKey(settings)) it else WebDavSyncMetadata()
+        }
+        val remote = client.download(settings)
+            ?: return saveResult("blocked", "远端保管库尚未初始化，请输入主密码后再同步。")
+        val remoteVault = runCatching {
+            crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)
+        }.getOrElse {
+            return saveResult("blocked", "远端保管库需要主密码验证后才能继续同步。")
+        }
+        val localFingerprint = fingerprint(localVault)
+        val remoteFingerprint = fingerprint(remoteVault)
+        if (localFingerprint == remoteFingerprint) {
+            saveMetadata(settings, localVault, localFingerprint, remote.revision, remote.etag, "synced", "")
+            return WebDavSyncResult("synced", "Local and WebDAV vaults are already in sync")
+        }
+        if (metadata.baseFingerprint.isBlank()) {
+            return if (localVault.accounts.isEmpty() && remoteVault.accounts.isNotEmpty()) {
+                pullRemoteWithVaultKey(settings, remoteVault, vaultKey, remoteFingerprint, remote.revision, remote.etag)
+            } else {
+                saveConflict("首次绑定时本地和远端都有数据，请先使用主密码完成同步。")
+            }
+        }
+        val localChanged = localFingerprint != metadata.baseFingerprint
+        val remoteChanged = remoteFingerprint != metadata.baseFingerprint
+        return when {
+            localChanged && !remoteChanged -> pushLocalWithVaultKey(settings, localVault, vaultKey, remote.vaultEnvelope.encryptedVault, remote.etag, "Local changes synced to WebDAV")
+            !localChanged && remoteChanged -> pullRemoteWithVaultKey(settings, remoteVault, vaultKey, remoteFingerprint, remote.revision, remote.etag)
+            !localChanged && !remoteChanged -> {
+                saveMetadata(settings, localVault, localFingerprint, remote.revision, remote.etag, "synced", "")
+                WebDavSyncResult("synced", "Sync baseline refreshed")
+            }
+            else -> {
+                val mergedVault = WebDavAccountMerge.merge(metadata, localVault, remoteVault)
+                if (mergedVault != null) {
+                    repository.saveWithVaultKey(mergedVault, vaultKey)
+                    pushLocalWithVaultKey(settings, mergedVault, vaultKey, remote.vaultEnvelope.encryptedVault, remote.etag, "本地和远端修改已自动合并并同步到 WebDAV。")
+                        .copy(vaultChanged = true)
+                } else {
+                    saveConflict("本地和远端都发生了变化，请在首页选择保留本地或使用远端。")
+                }
+            }
+        }
+    }
+
+    private fun syncLocalChangeWithVaultKeyChecked(localVault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+        val settings = settingsStore.loadSettings()
+        if (!settings.enabled) {
+            return saveResult("disabled", "未启用 WebDAV，同步仅保留在本机。")
+        }
+        validateSettings(settings)
+        val metadata = settingsStore.loadMetadata().let {
+            if (it.syncProfileKey == profileKey(settings)) it else WebDavSyncMetadata()
+        }
+        return if (metadata.remoteEtag.isNotBlank()) {
+            val remote = client.download(settings)
+                ?: return saveResult("blocked", "远端保管库尚未初始化，请输入主密码后再同步。")
+            runCatching {
+                crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)
+            }.getOrElse {
+                return saveResult("blocked", "远端保管库需要主密码验证后才能继续同步。")
+            }
+            pushLocalWithVaultKey(settings, localVault, vaultKey, remote.vaultEnvelope.encryptedVault, remote.etag, "本地修改已同步到 WebDAV。")
+        } else {
+            syncNowWithVaultKeyChecked(localVault, vaultKey)
+        }
+    }
+
     private fun pushLocal(
         settings: WebDavSettings,
         vault: LocalVault,
@@ -202,6 +294,40 @@ class WebDavSyncService(
         message: String = "WebDAV vault restored locally"
     ): WebDavSyncResult {
         repository.save(remoteVault, password)
+        saveMetadata(settings, remoteVault, remoteFingerprint, remoteRevision, remoteEtag, "synced", "")
+        return WebDavSyncResult("pulled", message, vaultChanged = true)
+    }
+
+    private fun pushLocalWithVaultKey(
+        settings: WebDavSettings,
+        vault: LocalVault,
+        vaultKey: ByteArray,
+        previousEncryptedVault: EncryptedRemoteVaultBlobDto,
+        previousEtag: String,
+        message: String
+    ): WebDavSyncResult {
+        val localFingerprint = fingerprint(vault)
+        val revision = "android:${System.currentTimeMillis()}:$localFingerprint"
+        val envelope = WebDavRemoteEnvelopeDto(
+            revision = revision,
+            updatedAt = Instant.now().toString(),
+            encryptedVault = crypto.encryptWithVaultKey(vault, previousEncryptedVault, vaultKey)
+        )
+        val upload = client.upload(settings, envelope, previousEtag)
+        saveMetadata(settings, vault, localFingerprint, upload.revision, upload.etag, "synced", "")
+        return WebDavSyncResult("pushed", message)
+    }
+
+    private fun pullRemoteWithVaultKey(
+        settings: WebDavSettings,
+        remoteVault: LocalVault,
+        vaultKey: ByteArray,
+        remoteFingerprint: String,
+        remoteRevision: String,
+        remoteEtag: String,
+        message: String = "WebDAV vault restored locally"
+    ): WebDavSyncResult {
+        repository.saveWithVaultKey(remoteVault, vaultKey)
         saveMetadata(settings, remoteVault, remoteFingerprint, remoteRevision, remoteEtag, "synced", "")
         return WebDavSyncResult("pulled", message, vaultChanged = true)
     }
