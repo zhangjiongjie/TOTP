@@ -182,14 +182,27 @@ apps/harmony-app/README.md
 - Jetpack Compose
 - Material 3
 - Android Keystore
+- Android Biometric / Device Credential
+- CameraX / ML Kit
+- WebDAV HTTP 同步
 
-第一阶段已覆盖：
+当前已覆盖：
 
-- 主密码创建和解锁。
+- 主密码创建、主密码解锁和系统凭据 / 生物识别快速解锁。
 - 本地加密 vault。
-- 账号添加、编辑和删除。
-- TOTP 验证码、倒计时和复制。
-- `otpauth://` 粘贴解析。
+- 账号添加、编辑、删除、品牌图标、TOTP 验证码、倒计时和复制。
+- `otpauth://` 粘贴解析、扫码解析和图片二维码解析。
+- WebDAV 设置、测试连接、手动同步、自动同步、账号级合并和冲突提示。
+- WebDAV remote key cache：使用 Android Keystore 保护持久缓存，减少冷启动同步时重复 PBKDF2。
+- 加密备份导入 / 导出，兼容旧版明文 JSON 导入。
+- 浅色 / 深色模式，状态栏和 Title 栏跟随 Android 当前主题色。
+
+Android 端的差异化设计：
+
+- 使用带 Title 栏的 Android Activity / Compose `Scaffold`，底部导航采用 Material 3 `NavigationBarItem`，文案为「首页 / 添加 / 设置」。
+- 快速解锁优先使用 Android 系统凭据和生物识别；不支持生物识别但已设置系统锁屏的设备，仍可使用系统凭证解锁。
+- 导入 / 导出调用系统文件管理器时不会按普通退后台锁定，返回 App 后保持当前解锁态。
+- 品牌图标统一使用从 `packages/totp-core` 生成的 PNG 资源，规避 Android 对复杂 SVG 的渲染差异。
 
 常用命令：
 
@@ -198,6 +211,12 @@ cd apps/android-app
 .\gradlew.bat :app:testDebugUnitTest
 .\gradlew.bat :app:assembleDebug
 android run --apks .\app\build\outputs\apk\debug\app-debug.apk
+```
+
+子工程文档见：
+
+```text
+apps/android-app/README.md
 ```
 
 ## 开发环境

@@ -18,7 +18,7 @@ class AccountFormState(existing: TotpAccount? = null) {
     var digits by mutableStateOf((existing?.digits ?: 6).toString())
     var period by mutableStateOf((existing?.period ?: 30).toString())
     var algorithm by mutableStateOf(existing?.algorithm ?: TotpAlgorithm.SHA1)
-    var group by mutableStateOf(existing?.group ?: "Default")
+    var group by mutableStateOf(localizedGroup(existing?.group ?: "默认"))
     var errors by mutableStateOf<List<String>>(emptyList())
         private set
 
@@ -34,7 +34,7 @@ class AccountFormState(existing: TotpAccount? = null) {
                 errors = emptyList()
             }
             .onFailure {
-                errors = listOf("Invalid otpauth URI")
+                errors = listOf("otpauth 链接无效")
             }
             .isSuccess
     }
@@ -74,7 +74,7 @@ class AccountFormState(existing: TotpAccount? = null) {
                 algorithm = algorithm
             )
         }.onFailure {
-            errors = listOf("Unable to generate TOTP code")
+            errors = listOf("无法生成验证码")
             return null
         }
 
@@ -96,11 +96,20 @@ class AccountFormState(existing: TotpAccount? = null) {
 
 private val AccountValidationError.message: String
     get() = when (this) {
-        AccountValidationError.IssuerRequired -> "Issuer is required"
-        AccountValidationError.AccountNameRequired -> "Account name is required"
-        AccountValidationError.SecretRequired -> "Secret is required"
-        AccountValidationError.SecretInvalid -> "Secret must be valid Base32"
-        AccountValidationError.GroupRequired -> "Group is required"
-        AccountValidationError.DigitsOutOfRange -> "Digits must be between 6 and 8"
-        AccountValidationError.PeriodInvalid -> "Period must be greater than 0"
+        AccountValidationError.IssuerRequired -> "请输入发行方"
+        AccountValidationError.AccountNameRequired -> "请输入账号"
+        AccountValidationError.SecretRequired -> "请输入密钥"
+        AccountValidationError.SecretInvalid -> "密钥必须是有效的 Base32 格式"
+        AccountValidationError.GroupRequired -> "请选择分组"
+        AccountValidationError.DigitsOutOfRange -> "位数必须在 6 到 8 之间"
+        AccountValidationError.PeriodInvalid -> "周期必须大于 0"
     }
+
+private fun localizedGroup(value: String): String {
+    return when (value) {
+        "Default" -> "默认"
+        "Personal" -> "个人"
+        "Work" -> "工作"
+        else -> value
+    }
+}

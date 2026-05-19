@@ -13,6 +13,9 @@ class PasswordKeyDeriver(
     val keySizeBits: Int = 256
     val saltSizeBytes: Int = 16
     val kdfLabel: String = "PBKDF2WithHmacSHA256:$iterations:$keySizeBits"
+    private val keyFactory: SecretKeyFactory by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+    }
 
     fun generateSalt(): ByteArray {
         return ByteArray(saltSizeBytes).also(secureRandom::nextBytes)
@@ -21,7 +24,7 @@ class PasswordKeyDeriver(
     fun deriveKey(password: String, salt: ByteArray, iterations: Int = this.iterations): SecretKey {
         val spec = PBEKeySpec(password.toCharArray(), salt, iterations, keySizeBits)
         return try {
-            val bytes = secretKeyFactory()
+            val bytes = keyFactory
                 .generateSecret(spec)
                 .encoded
             SecretKeySpec(bytes, "AES")
@@ -31,11 +34,7 @@ class PasswordKeyDeriver(
     }
 
     fun warmUp() {
-        secretKeyFactory()
+        keyFactory
         secureRandom.nextBytes(ByteArray(1))
-    }
-
-    private fun secretKeyFactory(): SecretKeyFactory {
-        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
     }
 }

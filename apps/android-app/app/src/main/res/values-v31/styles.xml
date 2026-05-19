@@ -1,0 +1,15 @@
+<resources>
+    <style name="Theme.TotpAndroid" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:colorAccent">@color/totp_primary</item>
+        <item name="android:statusBarColor">@color/totp_primary</item>
+        <item name="android:navigationBarColor">@color/totp_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowBackground">@color/totp_background</item>
+        <item name="android:windowSplashScreenBackground">@color/totp_primary</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/app_icon_foreground_vector</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/totp_primary</item>
+    </style>
+</resources>

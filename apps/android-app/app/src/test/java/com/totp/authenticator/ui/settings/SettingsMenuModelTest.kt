@@ -10,9 +10,7 @@ class SettingsMenuModelTest {
             listOf(
                 "Biometric unlock",
                 "WebDAV sync",
-                "Import / Export",
-                "Clear local vault",
-                "Lock vault"
+                "Import / Export"
             ),
             settingsMenuItems().map { it.title }
         )

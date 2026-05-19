@@ -6,6 +6,6 @@ import org.junit.Test
 class TotpMainScaffoldTest {
     @Test
     fun mainDestinationsKeepCrossClientOrder() {
-        assertEquals(listOf("Home", "Add", "Settings"), mainDestinationLabels())
+        assertEquals(listOf("首页", "添加", "设置"), mainDestinationLabels())
     }
 }

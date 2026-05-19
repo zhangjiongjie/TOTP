@@ -29,6 +29,40 @@ class VaultCipherTest {
         assertEquals(vault, decrypted)
     }
 
+    @Test
+    fun decryptsVaultWithExportedVaultKey() {
+        val vault = sampleVault()
+        val envelope = cipher.encrypt(vault, "correct horse battery staple")
+        val vaultKey = cipher.deriveVaultKey(envelope, "correct horse battery staple")
+
+        val decrypted = cipher.decryptWithVaultKey(envelope, vaultKey.encoded)
+
+        assertEquals(vault, decrypted)
+    }
+
+    @Test
+    fun reEncryptsUpdatedVaultWithExistingVaultKey() {
+        val vault = sampleVault()
+        val envelope = cipher.encrypt(vault, "correct horse battery staple")
+        val vaultKey = cipher.deriveVaultKey(envelope, "correct horse battery staple")
+        val updatedVault = vault.copy(accounts = emptyList(), updatedAt = vault.updatedAt + 1)
+
+        val updatedEnvelope = cipher.encryptWithVaultKey(updatedVault, envelope, vaultKey.encoded)
+        val decrypted = cipher.decryptWithVaultKey(updatedEnvelope, vaultKey.encoded)
+
+        assertEquals(updatedVault, decrypted)
+        assertEquals(envelope.kdf, updatedEnvelope.kdf)
+        assertEquals(envelope.salt, updatedEnvelope.salt)
+        assertEquals(envelope.wrappedVaultKey, updatedEnvelope.wrappedVaultKey)
+    }
+
+    @Test(expected = VaultDecryptException::class)
+    fun rejectsWrongExportedVaultKey() {
+        val envelope = cipher.encrypt(sampleVault(), "correct horse battery staple")
+
+        cipher.decryptWithVaultKey(envelope, ByteArray(32) { 9 })
+    }
+
     @Test(expected = VaultDecryptException::class)
     fun rejectsWrongPassword() {
         val envelope = cipher.encrypt(sampleVault(), "correct horse battery staple")

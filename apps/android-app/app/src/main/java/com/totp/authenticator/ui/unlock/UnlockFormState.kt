@@ -14,15 +14,15 @@ class UnlockFormState(
     val showsConfirmation: Boolean = false
 
     val actionLabel: String
-        get() = if (hasExistingVault) "Unlock" else "Create vault"
+        get() = "解锁"
 
     fun busyLabel(isBusy: Boolean): String {
         return if (!isBusy) {
             actionLabel
         } else if (hasExistingVault) {
-            "Unlocking..."
+            "解锁中..."
         } else {
-            "Creating..."
+            "初始化中..."
         }
     }
 
@@ -30,7 +30,7 @@ class UnlockFormState(
         val normalizedPassword = password.trim()
         return when {
             normalizedPassword.isEmpty() -> {
-                localError = "Password is required"
+                localError = "请输入主密码后再解锁。"
                 UnlockFormSubmission.Invalid(localError.orEmpty())
             }
             hasExistingVault -> UnlockFormSubmission.Unlock(normalizedPassword)

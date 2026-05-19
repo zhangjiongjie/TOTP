@@ -7,6 +7,7 @@ import java.util.Base64 as JvmBase64
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 class VaultDecryptException(
     message: String,
@@ -46,11 +47,7 @@ class VaultCipher(
 
     fun decrypt(envelope: EncryptedVaultEnvelope, password: String): LocalVault {
         return try {
-            val vaultKey = keyDeriver.deriveKey(
-                password,
-                unbase64(envelope.salt),
-                iterations = iterationsFromKdfLabel(envelope.kdf)
-            )
+            val vaultKey = deriveVaultKey(envelope, password)
             val plaintext = decryptAesGcm(
                 vaultKey,
                 unbase64(envelope.nonce),
@@ -62,6 +59,45 @@ class VaultCipher(
         } catch (error: GeneralSecurityException) {
             throw VaultDecryptException("Unable to decrypt vault", error)
         }
+    }
+
+    fun deriveVaultKey(envelope: EncryptedVaultEnvelope, password: String): SecretKey {
+        return keyDeriver.deriveKey(
+            password,
+            unbase64(envelope.salt),
+            iterations = iterationsFromKdfLabel(envelope.kdf)
+        )
+    }
+
+    fun decryptWithVaultKey(envelope: EncryptedVaultEnvelope, vaultKeyBytes: ByteArray): LocalVault {
+        return try {
+            val plaintext = decryptAesGcm(
+                SecretKeySpec(vaultKeyBytes, "AES"),
+                unbase64(envelope.nonce),
+                unbase64(envelope.ciphertext)
+            )
+            VaultEnvelopeJson.decodeVault(plaintext.toString(Charsets.UTF_8))
+        } catch (error: IllegalArgumentException) {
+            throw VaultDecryptException("Unable to decrypt vault", error)
+        } catch (error: GeneralSecurityException) {
+            throw VaultDecryptException("Unable to decrypt vault", error)
+        }
+    }
+
+    fun encryptWithVaultKey(
+        vault: LocalVault,
+        existingEnvelope: EncryptedVaultEnvelope,
+        vaultKeyBytes: ByteArray
+    ): EncryptedVaultEnvelope {
+        val vaultNonce = randomNonce()
+        val vaultJson = VaultEnvelopeJson.encodeVault(vault).toByteArray(Charsets.UTF_8)
+        val ciphertext = encryptAesGcm(SecretKeySpec(vaultKeyBytes, "AES"), vaultNonce, vaultJson)
+        return existingEnvelope.copy(
+            schemaVersion = vault.schemaVersion,
+            nonce = base64(vaultNonce),
+            ciphertext = base64(ciphertext),
+            updatedAt = vault.updatedAt
+        )
     }
 
     fun warmUp() {

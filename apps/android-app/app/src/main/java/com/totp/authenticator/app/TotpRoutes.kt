@@ -4,6 +4,7 @@ sealed interface TotpRoute {
     data object Unlock : TotpRoute
     data object Home : TotpRoute
     data object Add : TotpRoute
+    data object Scan : TotpRoute
     data class Edit(val accountId: String) : TotpRoute
     data object Settings : TotpRoute
 }

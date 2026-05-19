@@ -26,12 +26,12 @@ class UnlockFormStateTest {
     fun emptyPasswordShowsValidationError() {
         val state = UnlockFormState(hasExistingVault = false)
 
-        assertEquals(UnlockFormSubmission.Invalid("Password is required"), state.submit())
+        assertEquals(UnlockFormSubmission.Invalid("请输入主密码后再解锁。"), state.submit())
     }
 
     @Test
     fun exposesBusyLabelsForLongRunningVaultWork() {
-        assertEquals("Creating...", UnlockFormState(hasExistingVault = false).busyLabel(true))
-        assertEquals("Unlocking...", UnlockFormState(hasExistingVault = true).busyLabel(true))
+        assertEquals("初始化中...", UnlockFormState(hasExistingVault = false).busyLabel(true))
+        assertEquals("解锁中...", UnlockFormState(hasExistingVault = true).busyLabel(true))
     }
 }
