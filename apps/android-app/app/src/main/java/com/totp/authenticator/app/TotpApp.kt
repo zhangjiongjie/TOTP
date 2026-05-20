@@ -206,6 +206,8 @@ fun TotpApp() {
             ?: throw IllegalStateException("无法写入备份文件。")
     }
 
+    val backupActionsRef = remember { arrayOfNulls<BackupActionCoordinator>(1) }
+
     val backupExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -230,54 +232,6 @@ fun TotpApp() {
         )
     }
 
-    val exportBackupWithPassword: (String) -> Unit = exportBackupWithPassword@{ password ->
-        val vault = state.vault
-        if (vault == null) {
-            backupState.showError("保管库未解锁。")
-            return@exportBackupWithPassword
-        }
-        backupState.launchTask(
-            finishBusyOnSuccess = false,
-            task = {
-                withContext(Dispatchers.IO) {
-                    backupFlowCoordinator.createExportWithPassword(vault, password)
-                }
-            },
-            onSuccess = { payload ->
-                backupState.prepareExport(payload)
-                backupExportLauncher.launch(payload.filename)
-            },
-            onFailure = { error ->
-                backupState.showError(error.message ?: "导出备份失败，请稍后重试。")
-            }
-        )
-    }
-
-    val exportBackupWithVaultKey: (ByteArray) -> Unit = exportBackupWithVaultKey@{ vaultKey ->
-        val vault = state.vault
-        if (vault == null) {
-            backupState.showError("保管库未解锁。")
-            return@exportBackupWithVaultKey
-        }
-        backupState.launchTask(
-            finishBusyOnSuccess = false,
-            task = {
-                withContext(Dispatchers.IO) {
-                    backupFlowCoordinator.createExportWithVaultKey(vault, vaultKey)
-                }
-            },
-            onSuccess = { payload ->
-                backupState.prepareExport(payload)
-                backupExportLauncher.launch(payload.filename)
-            },
-            onFailure = { error ->
-                backupState.showError(error.message ?: "导出备份失败，请稍后重试。")
-            }
-        )
-    }
-
-    lateinit var importBackupFromContent: (String, String) -> Unit
-
     val backupImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -298,7 +252,7 @@ fun TotpApp() {
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
         }
-        importBackupFromContent(content, password)
+        backupActionsRef[0]?.importContent(content, password)
     }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -396,31 +350,6 @@ fun TotpApp() {
         }
     }
 
-    fun startBackupExport() {
-        val vault = state.vault
-        val password = state.activePassword
-        val vaultKey = state.activeVaultKey
-        if (vault == null || (password == null && vaultKey == null)) {
-            backupState.showError("保管库未解锁。")
-            return
-        }
-        if (password == null) {
-            exportBackupWithVaultKey(vaultKey!!)
-            return
-        }
-        exportBackupWithPassword(password)
-    }
-
-    fun startBackupImport() {
-        if (state.vault == null || (state.activePassword == null && state.activeVaultKey == null)) {
-            backupState.showError("保管库未解锁。")
-            return
-        }
-        backupState.updateBusy(true)
-        backupState.markExternalPickerActive(true)
-        backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-    }
-
     fun authenticateQuickUnlock(
         title: String,
         subtitle: String,
@@ -466,7 +395,17 @@ fun TotpApp() {
         }
     }
 
-    lateinit var quickUnlockActions: QuickUnlockActionCoordinator
+    val quickUnlockMessage: (String) -> Unit = { message ->
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+    val quickUnlockCredentialRefresher = remember {
+        QuickUnlockCredentialRefresher(
+            quickUnlockState = quickUnlockState,
+            quickUnlockCoordinator = quickUnlockCoordinator,
+            onPrompt = ::authenticateQuickUnlock,
+            onMessage = quickUnlockMessage
+        )
+    }
     val homeSyncActions = remember {
         HomeSyncActionCoordinator(
             appState = state,
@@ -474,10 +413,10 @@ fun TotpApp() {
             backupState = backupState,
             webDavFlowCoordinator = webDavFlowCoordinator,
             webDavSyncService = webDavSyncService,
-            quickUnlockActions = { quickUnlockActions }
+            onRefreshQuickUnlockCredentialIfNeeded = quickUnlockCredentialRefresher::refreshIfNeeded
         )
     }
-    quickUnlockActions = remember {
+    val quickUnlockActions = remember {
         QuickUnlockActionCoordinator(
             appState = state,
             quickUnlockState = quickUnlockState,
@@ -485,7 +424,7 @@ fun TotpApp() {
             quickUnlockCoordinator = quickUnlockCoordinator,
             onRefreshAvailability = ::refreshQuickUnlockAvailability,
             onPrompt = ::authenticateQuickUnlock,
-            onSystemCredentialSetupRequired = {
+            onOpenSystemCredentialSettings = {
                 val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Intent(Settings.ACTION_BIOMETRIC_ENROLL).putExtra(
                         Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
@@ -497,30 +436,23 @@ fun TotpApp() {
                 Toast.makeText(context, "请先设置系统锁屏密码。", Toast.LENGTH_SHORT).show()
                 activityContext.startActivity(intent)
             },
-            onMessage = { message ->
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            },
+            onMessage = quickUnlockMessage,
             onSyncAfterUnlock = homeSyncActions::syncAfterUnlock
         )
     }
-
-    importBackupFromContent = { content, password ->
-        backupState.launchTask(
-            task = {
-                withContext(Dispatchers.IO) {
-                    backupFlowCoordinator.importBackup(content, password)
-                }
+    val backupActions = remember {
+        BackupActionCoordinator(
+            appState = state,
+            backupState = backupState,
+            backupFlowCoordinator = backupFlowCoordinator,
+            onLaunchExportDocument = backupExportLauncher::launch,
+            onLaunchImportDocument = {
+                backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
             },
-            onSuccess = { result ->
-                state.updateUnlockedVault(result.vault, password, result.vaultKey)
-                backupState.showSuccess("已导入 ${result.vault.accounts.size} 个账号。")
-                homeSyncActions.syncAfterLocalChange(result.vault, password, result.vaultKey)
-            },
-            onFailure = { error ->
-                backupState.showError(error.message ?: "导入备份失败，请稍后重试。")
-            }
+            onLocalChange = homeSyncActions::syncAfterLocalChange
         )
     }
+    backupActionsRef[0] = backupActions
 
     fun isRemotePasswordError(message: String): Boolean {
         return message.contains("远端保管库") ||
@@ -572,10 +504,10 @@ fun TotpApp() {
             onConfirm = { password ->
                 val request = backupState.consumePasswordRequest()
                 when (request?.action) {
-                    BackupPasswordAction.Export -> exportBackupWithPassword(password)
+                    BackupPasswordAction.Export -> backupActions.exportWithPassword(password)
                     BackupPasswordAction.Import -> {
                         if (request.importContent != null) {
-                            importBackupFromContent(request.importContent, password)
+                            backupActions.importContent(request.importContent, password)
                         } else {
                             backupState.showError("未选择导入文件。")
                         }
@@ -639,7 +571,7 @@ fun TotpApp() {
                         onSuccess = { (vault, vaultKey) ->
                             hasExistingVault = true
                             state.applyUnlockedVault(vault, password, vaultKey)
-                            homeSyncActions.syncAfterUnlock(vault, password, vaultKey)
+                            homeSyncActions.syncAfterUnlock(password, vaultKey)
                         },
                         onFailure = {
                             unlockState.showError("Could not create vault")
@@ -658,7 +590,7 @@ fun TotpApp() {
                         },
                         onSuccess = { (vault, vaultKey) ->
                             state.applyUnlockedVault(vault, password, vaultKey)
-                            homeSyncActions.syncAfterUnlock(vault, password, vaultKey)
+                            homeSyncActions.syncAfterUnlock(password, vaultKey)
                         },
                         onFailure = {
                             unlockState.showError("Could not unlock vault")
@@ -827,11 +759,11 @@ fun TotpApp() {
                         quickUnlockCoordinator.disable()
                         quickUnlockState.updateEnabled(false)
                     },
-                    onRefreshQuickUnlockCredentialIfNeeded = quickUnlockActions::refreshCredentialIfNeeded,
+                    onRefreshQuickUnlockCredentialIfNeeded = quickUnlockCredentialRefresher::refreshIfNeeded,
                     onRemotePasswordNeeded = backupState::requestRemotePassword,
                     onVaultLocked = { Toast.makeText(context, "保管库未解锁", Toast.LENGTH_SHORT).show() },
-                    onExportBackup = ::startBackupExport,
-                    onImportBackup = ::startBackupImport
+                    onExportBackup = backupActions::startExport,
+                    onImportBackup = backupActions::startImport
                 ).buildActions()
             }
             SettingsScreen(

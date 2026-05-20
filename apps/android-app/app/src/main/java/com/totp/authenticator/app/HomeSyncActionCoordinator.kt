@@ -11,7 +11,7 @@ class HomeSyncActionCoordinator(
     private val backupState: BackupViewModel,
     private val webDavFlowCoordinator: WebDavFlowCoordinator,
     private val webDavSyncService: WebDavSyncService,
-    private val quickUnlockActions: () -> QuickUnlockActionCoordinator
+    private val onRefreshQuickUnlockCredentialIfNeeded: (ByteArray?, ByteArray) -> Unit
 ) {
     fun syncWithPassword(password: String) {
         val vault = appState.vault
@@ -35,7 +35,7 @@ class HomeSyncActionCoordinator(
                     val previousVaultKey = appState.activeVaultKey
                     appState.updateUnlockedVault(flowResult.refreshedVault ?: vault, password, flowResult.vaultKey)
                     if (flowResult.syncResult.vaultKey != null && flowResult.vaultKey != null) {
-                        quickUnlockActions().refreshCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
+                        onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
                     }
                     syncState.showHomeCopy(syncMessage)
                 }
@@ -47,11 +47,7 @@ class HomeSyncActionCoordinator(
         )
     }
 
-    fun syncAfterUnlock(
-        @Suppress("UNUSED_PARAMETER") vault: LocalVault,
-        password: String?,
-        vaultKey: ByteArray?
-    ) {
+    fun syncAfterUnlock(password: String?, vaultKey: ByteArray?) {
         val settings = webDavSyncService.loadSettings()
         if (syncState.hasSyncedAfterUnlock || !settings.enabled || !settings.isConfigured) {
             return
@@ -99,7 +95,7 @@ class HomeSyncActionCoordinator(
                     val previousVaultKey = appState.activeVaultKey
                     if (password != null) {
                         appState.updateUnlockedVault(vault, password, nextVaultKey)
-                        quickUnlockActions().refreshCredentialIfNeeded(previousVaultKey, nextVaultKey)
+                        onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
                     } else {
                         appState.updateUnlockedVaultWithKey(vault, nextVaultKey)
                     }
@@ -162,7 +158,7 @@ class HomeSyncActionCoordinator(
             val previousVaultKey = appState.activeVaultKey
             appState.updateUnlockedVault(flowResult.refreshedVault, password, flowResult.vaultKey)
             if (flowResult.syncResult.vaultKey != null) {
-                quickUnlockActions().refreshCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
+                onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
             }
         } else if (flowResult.vaultKey != null) {
             appState.updateUnlockedVaultWithKey(flowResult.refreshedVault, flowResult.vaultKey)

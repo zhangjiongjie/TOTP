@@ -14,6 +14,7 @@ class TotpAppCoordinatorBoundaryTest {
             "fun exportBackupWithPassword(",
             "fun exportBackupWithVaultKey(",
             "fun importBackupFromUri(",
+            "fun importBackupFromContent(",
             "fun syncWebDavWithPassword(",
             "fun syncWebDavAfterUnlock(",
             "fun syncWebDavAfterLocalChange(",
@@ -25,6 +26,10 @@ class TotpAppCoordinatorBoundaryTest {
             "fun saveAccount(",
             "fun deleteAccount(",
             "val syncWebDavWithPassword:",
+            "val exportBackupWithPassword:",
+            "val exportBackupWithVaultKey:",
+            "lateinit var importBackupFromContent",
+            "lateinit var quickUnlockActions",
             "val syncWebDavAfterUnlock:",
             "val syncWebDavAfterLocalChange:",
             "val syncWebDavFromHome:",
@@ -54,9 +59,11 @@ class TotpAppCoordinatorBoundaryTest {
         val appDir = File("src/main/java/com/totp/authenticator/app")
 
         assertTrue(File(appDir, "BackupFlowCoordinator.kt").exists())
+        assertTrue(File(appDir, "BackupActionCoordinator.kt").exists())
         assertTrue(File(appDir, "WebDavFlowCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockActionCoordinator.kt").exists())
+        assertTrue(File(appDir, "QuickUnlockCredentialRefresher.kt").exists())
         assertTrue(File(appDir, "HomeSyncActionCoordinator.kt").exists())
         assertTrue(File(appDir, "VaultAccountActionCoordinator.kt").exists())
         assertTrue(File(appDir, "BackupViewModel.kt").exists())

@@ -1,6 +1,5 @@
 package com.totp.authenticator.app
 
-import com.totp.authenticator.data.vault.LocalVault
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -16,14 +15,14 @@ class QuickUnlockActionCoordinator(
         onAuthenticated: () -> Unit,
         onError: (String) -> Unit
     ) -> Unit,
-    private val onSystemCredentialSetupRequired: () -> Unit,
+    private val onOpenSystemCredentialSettings: () -> Unit,
     private val onMessage: (String) -> Unit,
-    private val onSyncAfterUnlock: (LocalVault, String?, ByteArray?) -> Unit
+    private val onSyncAfterUnlock: (String?, ByteArray?) -> Unit
 ) {
     fun enable(vaultKey: ByteArray) {
         onRefreshAvailability()
         if (quickUnlockState.setupRequired) {
-            onSystemCredentialSetupRequired()
+            onOpenSystemCredentialSettings()
             return
         }
         if (!quickUnlockState.available) {
@@ -61,36 +60,6 @@ class QuickUnlockActionCoordinator(
         onMessage("快速解锁已关闭")
     }
 
-    fun refreshCredentialIfNeeded(previousVaultKey: ByteArray?, nextVaultKey: ByteArray) {
-        if (!quickUnlockCoordinator.shouldRefreshCredential(quickUnlockState.enabled, previousVaultKey, nextVaultKey)) {
-            return
-        }
-        quickUnlockState.updateBusy(true)
-        onPrompt(
-            "更新快速解锁",
-            "同步密钥已切换为远端权威源，请确认后更新本机快速解锁凭据。",
-            {
-                quickUnlockState.launchCredentialTask(
-                    task = {
-                        withContext(Dispatchers.IO) {
-                            val authenticatedCipher = quickUnlockCoordinator.createSetupCipher()
-                            quickUnlockCoordinator.saveCredential(authenticatedCipher, nextVaultKey)
-                        }
-                    },
-                    onSuccess = {
-                        onMessage("快速解锁凭据已更新")
-                    },
-                    onFailure = { error ->
-                        onMessage(error.message ?: "快速解锁凭据更新失败，请重新开启快速解锁。")
-                    }
-                )
-            },
-            { message ->
-                onMessage(message.ifBlank { "快速解锁凭据未更新，请重新开启快速解锁。" })
-            }
-        )
-    }
-
     fun startUnlock() {
         quickUnlockState.updateBusy(false)
         quickUnlockState.markAutoAttempted()
@@ -114,7 +83,7 @@ class QuickUnlockActionCoordinator(
                     onSuccess = { result ->
                         unlockState.clearError()
                         appState.applyUnlockedVaultWithKey(result.vault, result.vaultKey)
-                        onSyncAfterUnlock(result.vault, null, result.vaultKey)
+                        onSyncAfterUnlock(null, result.vaultKey)
                     },
                     onFailure = { error ->
                         unlockState.showError(error.message ?: "快速解锁失败，请使用主密码。")
