@@ -48,6 +48,7 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(File(appDir, "SyncViewModel.kt").exists())
         assertTrue(File(appDir, "QuickUnlockViewModel.kt").exists())
         assertTrue(File(appDir, "SettingsViewModel.kt").exists())
+        assertTrue(File(appDir, "SettingsActionCoordinator.kt").exists())
         assertTrue(File(appDir, "PasswordChangeViewModel.kt").exists())
         assertTrue(File(appDir, "UnlockViewModel.kt").exists())
     }
@@ -136,6 +137,25 @@ class TotpAppCoordinatorBoundaryTest {
             "onImportBackup:"
         ).forEach { parameter ->
             assertFalse("$parameter should be part of SettingsScreenState or SettingsScreenActions", signature.contains(parameter))
+        }
+    }
+
+    @Test
+    fun settingsActionsLiveOutsideTotpApp() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+
+        assertFalse(
+            "SettingsScreenActions should be built by SettingsActionCoordinator",
+            source.contains("SettingsScreenActions(")
+        )
+        listOf(
+            "onSaveWebDavSettings = {",
+            "onTestWebDav = {",
+            "onSyncWebDav =",
+            "onBiometricUnlockChanged = {",
+            "onChangeMasterPassword = {"
+        ).forEach { inlineAction ->
+            assertFalse("$inlineAction should live outside TotpApp", source.contains(inlineAction))
         }
     }
 
