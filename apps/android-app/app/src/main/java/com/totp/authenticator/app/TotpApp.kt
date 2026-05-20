@@ -298,7 +298,7 @@ fun TotpApp() {
                     val importedVault = backupService.parseImport(readTextFromUri(uri), password)
                     repository.save(importedVault, password)
                     if (webDavSyncService.loadSettings().enabled) {
-                        webDavSyncService.syncLocalChange(importedVault, password)
+                        webDavSyncService.syncLocalChange(password)
                     }
                     importedVault to vaultKey
                 }
@@ -619,7 +619,7 @@ fun TotpApp() {
             webDavBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val result = webDavSyncService.syncNow(vault, password)
+                    val result = webDavSyncService.syncNow(password)
                     val vaultKey = result.vaultKey ?: repository.exportVaultKey(password)
                     val refreshedVault = if (result.vaultChanged) repository.unlockWithVaultKey(vaultKey) else vault
                     Triple(result, refreshedVault, vaultKey)
@@ -659,9 +659,9 @@ fun TotpApp() {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val result = if (canUseFastWebDavSync(vaultKey)) {
-                        webDavSyncService.syncNowWithVaultKey(vault, vaultKey!!)
+                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
                     } else if (password != null) {
-                        webDavSyncService.syncNow(vault, password)
+                        webDavSyncService.syncNow(password)
                     } else {
                         throw IllegalStateException("保管库未解锁。")
                     }
@@ -747,9 +747,9 @@ fun TotpApp() {
             runCatching {
                 withContext(Dispatchers.IO) {
                     if (canUseFastWebDavSync(vaultKey)) {
-                        webDavSyncService.syncLocalChangeWithVaultKey(vault, vaultKey!!)
+                        webDavSyncService.syncLocalChangeWithVaultKey(vaultKey!!)
                     } else if (password != null) {
-                        webDavSyncService.syncLocalChange(vault, password)
+                        webDavSyncService.syncLocalChange(password)
                     } else {
                         throw IllegalStateException("保管库未解锁。")
                     }
@@ -827,9 +827,9 @@ fun TotpApp() {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val result = if (canUseFastWebDavSync(vaultKey)) {
-                        webDavSyncService.syncNowWithVaultKey(vault, vaultKey!!)
+                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
                     } else if (password != null) {
-                        webDavSyncService.syncNow(vault, password)
+                        webDavSyncService.syncNow(password)
                     } else {
                         throw IllegalStateException("保管库未解锁。")
                     }
@@ -869,32 +869,33 @@ fun TotpApp() {
     }
 
     fun saveAccount(account: TotpAccount, replaceExisting: Boolean) {
-        val vault = state.vault
         val password = state.activePassword
         val vaultKey = state.activeVaultKey
-        if (vault == null || (password == null && vaultKey == null)) {
+        if (password == null && vaultKey == null) {
             showPersistenceError("Vault is not unlocked")
             return
         }
 
-        val accounts = if (replaceExisting) {
-            vault.accounts.map { existing ->
-                if (existing.id == account.id) account else existing
-            }
-        } else {
-            vault.accounts + account
-        }
-        val updatedVault = vault.copy(accounts = accounts, updatedAt = account.updatedAt)
         appScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
+                    val transform: (LocalVault) -> LocalVault = { vault ->
+                        val accounts = if (replaceExisting) {
+                            vault.accounts.map { existing ->
+                                if (existing.id == account.id) account else existing
+                            }
+                        } else {
+                            vault.accounts + account
+                        }
+                        vault.copy(accounts = accounts, updatedAt = account.updatedAt)
+                    }
                     if (password != null) {
-                        repository.save(updatedVault, password)
+                        repository.update(password, transform)
                     } else {
-                        repository.saveWithVaultKey(updatedVault, vaultKey!!)
+                        repository.updateWithVaultKey(vaultKey!!, transform)
                     }
                 }
-            }.onSuccess {
+            }.onSuccess { updatedVault ->
                 hasExistingVault = true
                 errorMessage = null
                 if (password != null) {
@@ -911,29 +912,29 @@ fun TotpApp() {
     }
 
     fun deleteAccount(accountId: String) {
-        val vault = state.vault
         val password = state.activePassword
         val vaultKey = state.activeVaultKey
-        if (vault == null || (password == null && vaultKey == null)) {
+        if (password == null && vaultKey == null) {
             showPersistenceError("Vault is not unlocked")
             return
         }
 
-        val now = System.currentTimeMillis()
-        val updatedVault = vault.copy(
-            accounts = vault.accounts.filterNot { it.id == accountId },
-            updatedAt = now
-        )
         appScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
+                    val transform: (LocalVault) -> LocalVault = { vault ->
+                        vault.copy(
+                            accounts = vault.accounts.filterNot { it.id == accountId },
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    }
                     if (password != null) {
-                        repository.save(updatedVault, password)
+                        repository.update(password, transform)
                     } else {
-                        repository.saveWithVaultKey(updatedVault, vaultKey!!)
+                        repository.updateWithVaultKey(vaultKey!!, transform)
                     }
                 }
-            }.onSuccess {
+            }.onSuccess { updatedVault ->
                 hasExistingVault = true
                 errorMessage = null
                 if (password != null) {
@@ -1220,11 +1221,11 @@ fun TotpApp() {
                                 val vaultKey = state.activeVaultKey
                                 val syncResult = if (saved.enabled && vault != null && (password != null || vaultKey != null)) {
                                     if (password != null) {
-                                        webDavSyncService.syncNow(vault, password)
+                                        webDavSyncService.syncNow(password)
                                     } else if (canUseFastWebDavSync(vaultKey)) {
-                                        webDavSyncService.syncNowWithVaultKey(vault, vaultKey!!)
+                                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
                                     } else {
-                                        webDavSyncService.syncNowWithVaultKey(vault, vaultKey!!)
+                                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
                                     }
                                 } else {
                                     null
@@ -1314,11 +1315,11 @@ fun TotpApp() {
                         runCatching {
                             withContext(Dispatchers.IO) {
                                 val result = if (canUseFastWebDavSync(vaultKey)) {
-                                    webDavSyncService.syncNowWithVaultKey(vault, vaultKey!!)
+                                    webDavSyncService.syncNowWithVaultKey(vaultKey!!)
                                 } else if (password != null) {
-                                    webDavSyncService.syncNow(vault, password)
+                                    webDavSyncService.syncNow(password)
                                 } else {
-                                    webDavSyncService.syncNowWithVaultKey(vault, vaultKey!!)
+                                    webDavSyncService.syncNowWithVaultKey(vaultKey!!)
                                 }
                                 val nextVaultKey = result.vaultKey ?: vaultKey
                                 val refreshedVault = if (result.vaultChanged) {
@@ -1395,7 +1396,7 @@ fun TotpApp() {
                                 }
                                 val currentVault = state.vault ?: repository.unlock(currentPassword)
                                 val syncResult = if (currentWebDavSettings.enabled) {
-                                    webDavSyncService.syncPasswordChange(currentVault, currentPassword, nextPassword)
+                                    webDavSyncService.syncPasswordChange(currentPassword, nextPassword)
                                 } else {
                                     repository.changePassword(currentPassword, nextPassword)
                                     null
@@ -1555,7 +1556,7 @@ private fun MissingAccountEffect(accountId: String, onMissingAccount: () -> Unit
     }
 }
 
-private fun VaultRepository.create(password: String, now: Long): LocalVault {
+private suspend fun VaultRepository.create(password: String, now: Long): LocalVault {
     val vault = LocalVault(
         schemaVersion = 1,
         accounts = emptyList(),

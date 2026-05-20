@@ -7,6 +7,8 @@ import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultEnvelopeJson
 import com.totp.authenticator.data.vault.VaultKdf
 import com.totp.authenticator.data.vault.VaultRepository
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 
 class WebDavSyncService(
@@ -15,6 +17,8 @@ class WebDavSyncService(
     private val client: WebDavClient = WebDavClient(),
     private val crypto: RemoteVaultCrypto = RemoteVaultCrypto()
 ) {
+    private val syncMutex = Mutex()
+
     fun loadSettings(): WebDavSettings = settingsStore.loadSettings()
 
     fun loadMetadata(): WebDavSyncMetadata = settingsStore.loadMetadata()
@@ -42,52 +46,52 @@ class WebDavSyncService(
         client.testConnection(settings)
     }
 
-    fun syncNow(vault: LocalVault, password: String): WebDavSyncResult {
+    suspend fun syncNow(password: String): WebDavSyncResult = syncMutex.withLock {
         return try {
-            syncNowChecked(vault, password)
+            syncNowChecked(repository.unlock(password), password)
         } catch (error: Exception) {
             saveFailure(error.message ?: "WebDAV sync failed")
             throw error
         }
     }
 
-    fun syncLocalChange(vault: LocalVault, password: String): WebDavSyncResult {
+    suspend fun syncLocalChange(password: String): WebDavSyncResult = syncMutex.withLock {
         return try {
-            syncLocalChangeChecked(vault, password)
+            syncLocalChangeChecked(repository.unlock(password), password)
         } catch (error: Exception) {
             saveFailure(error.message ?: "WebDAV sync failed")
             throw error
         }
     }
 
-    fun syncNowWithVaultKey(vault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+    suspend fun syncNowWithVaultKey(vaultKey: ByteArray): WebDavSyncResult = syncMutex.withLock {
         return try {
-            syncNowWithVaultKeyChecked(vault, vaultKey)
+            syncNowWithVaultKeyChecked(repository.unlockWithVaultKey(vaultKey), vaultKey)
         } catch (error: Exception) {
             saveFailure(error.message ?: "WebDAV sync failed")
             throw error
         }
     }
 
-    fun syncLocalChangeWithVaultKey(vault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+    suspend fun syncLocalChangeWithVaultKey(vaultKey: ByteArray): WebDavSyncResult = syncMutex.withLock {
         return try {
-            syncLocalChangeWithVaultKeyChecked(vault, vaultKey)
+            syncLocalChangeWithVaultKeyChecked(repository.unlockWithVaultKey(vaultKey), vaultKey)
         } catch (error: Exception) {
             saveFailure(error.message ?: "WebDAV sync failed")
             throw error
         }
     }
 
-    fun syncPasswordChange(vault: LocalVault, currentPassword: String, nextPassword: String): WebDavSyncResult {
+    suspend fun syncPasswordChange(currentPassword: String, nextPassword: String): WebDavSyncResult = syncMutex.withLock {
         return try {
-            syncPasswordChangeChecked(vault, currentPassword, nextPassword)
+            syncPasswordChangeChecked(repository.unlock(currentPassword), currentPassword, nextPassword)
         } catch (error: Exception) {
             saveFailure(error.message ?: "WebDAV sync failed")
             throw error
         }
     }
 
-    private fun syncNowChecked(localVault: LocalVault, password: String): WebDavSyncResult {
+    private suspend fun syncNowChecked(localVault: LocalVault, password: String): WebDavSyncResult {
         val startedAt = System.currentTimeMillis()
         val settings = settingsStore.loadSettings()
         if (!settings.enabled) {
@@ -182,7 +186,7 @@ class WebDavSyncService(
         }
     }
 
-    private fun syncLocalChangeChecked(localVault: LocalVault, password: String): WebDavSyncResult {
+    private suspend fun syncLocalChangeChecked(localVault: LocalVault, password: String): WebDavSyncResult {
         val startedAt = System.currentTimeMillis()
         val settings = settingsStore.loadSettings()
         if (!settings.enabled) {
@@ -206,7 +210,7 @@ class WebDavSyncService(
         }
     }
 
-    private fun syncPasswordChangeChecked(localVault: LocalVault, currentPassword: String, nextPassword: String): WebDavSyncResult {
+    private suspend fun syncPasswordChangeChecked(localVault: LocalVault, currentPassword: String, nextPassword: String): WebDavSyncResult {
         val settings = settingsStore.loadSettings()
         if (!settings.enabled) {
             return saveResult("disabled", "未启用 WebDAV，同步仅保留在本机。")
@@ -272,7 +276,7 @@ class WebDavSyncService(
         return WebDavSyncResult("pushed", "主密码已修改并同步到 WebDAV。", vaultChanged = true, vaultKey = remoteVaultKey)
     }
 
-    private fun syncNowWithVaultKeyChecked(localVault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+    private suspend fun syncNowWithVaultKeyChecked(localVault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
         val settings = settingsStore.loadSettings()
         if (!settings.enabled) {
             return saveResult("disabled", "WebDAV sync is disabled")
@@ -326,7 +330,7 @@ class WebDavSyncService(
         }
     }
 
-    private fun syncLocalChangeWithVaultKeyChecked(localVault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
+    private suspend fun syncLocalChangeWithVaultKeyChecked(localVault: LocalVault, vaultKey: ByteArray): WebDavSyncResult {
         val settings = settingsStore.loadSettings()
         if (!settings.enabled) {
             return saveResult("disabled", "未启用 WebDAV，同步仅保留在本机。")
@@ -352,7 +356,7 @@ class WebDavSyncService(
         }
     }
 
-    private fun pushLocal(
+    private suspend fun pushLocal(
         settings: WebDavSettings,
         vault: LocalVault,
         password: String,
@@ -362,7 +366,7 @@ class WebDavSyncService(
         return pushLocalWithPasswordVaultKey(settings, vault, password, repository.exportVaultKey(password), previousEtag, message)
     }
 
-    private fun pushLocalWithPasswordVaultKey(
+    private suspend fun pushLocalWithPasswordVaultKey(
         settings: WebDavSettings,
         vault: LocalVault,
         password: String,
@@ -391,7 +395,7 @@ class WebDavSyncService(
         return WebDavSyncResult("pushed", message)
     }
 
-    private fun pullRemote(
+    private suspend fun pullRemote(
         settings: WebDavSettings,
         remoteVault: LocalVault,
         password: String,
@@ -405,7 +409,7 @@ class WebDavSyncService(
         return WebDavSyncResult("pulled", message, vaultChanged = true)
     }
 
-    private fun pushLocalWithVaultKey(
+    private suspend fun pushLocalWithVaultKey(
         settings: WebDavSettings,
         vault: LocalVault,
         vaultKey: ByteArray,
@@ -425,7 +429,7 @@ class WebDavSyncService(
         return WebDavSyncResult("pushed", message, vaultKey = vaultKey)
     }
 
-    private fun pullRemoteWithVaultKey(
+    private suspend fun pullRemoteWithVaultKey(
         settings: WebDavSettings,
         remoteVault: LocalVault,
         remoteEnvelope: EncryptedRemoteVaultBlobDto,
@@ -492,7 +496,7 @@ class WebDavSyncService(
         return WebDavSyncResult("conflict", message)
     }
 
-    private fun remoteKeyEnvelopeMatchesLocal(remote: EncryptedRemoteVaultBlobDto): Boolean {
+    private suspend fun remoteKeyEnvelopeMatchesLocal(remote: EncryptedRemoteVaultBlobDto): Boolean {
         val local = runCatching { repository.exportEncryptedEnvelope() }.getOrNull() ?: return false
         return local.vaultId == remote.vaultId &&
             local.kdf.name == remote.kdf.name &&
@@ -522,13 +526,28 @@ class WebDavSyncService(
         return fingerprintText("${settings.serverUrl}|${settings.filePath}|${settings.username}|${settings.password}")
     }
 
-    private fun resolveLocalSnapshotIfNeeded(
+    private suspend fun resolveLocalSnapshotIfNeeded(
         localVault: LocalVault,
         password: String,
         metadata: WebDavSyncMetadata,
         remoteVault: LocalVault?
     ): ResolvedLocalVault {
         val localFingerprint = fingerprint(localVault)
+        val persistedVault = runCatching { repository.unlock(password) }.getOrNull()
+        if (persistedVault != null) {
+            val persistedFingerprint = fingerprint(persistedVault)
+            val localLooksLikeStaleEmptySnapshot = localVault.accounts.isEmpty() && persistedVault.accounts.isNotEmpty()
+            val persistedMatchesBaseline = metadata.baseFingerprint.isNotBlank() && persistedFingerprint == metadata.baseFingerprint
+            val localDiffersFromBaseline = metadata.baseFingerprint.isNotBlank() && localFingerprint != metadata.baseFingerprint
+            val persistedIsNewer = persistedVault.updatedAt > localVault.updatedAt && persistedFingerprint != localFingerprint
+            if (localLooksLikeStaleEmptySnapshot || (persistedMatchesBaseline && localDiffersFromBaseline) || persistedIsNewer) {
+                Log.w(
+                    "TotpWebDavSync",
+                    "Ignoring stale in-memory vault during WebDAV sync. localAccounts=${localVault.accounts.size} persistedAccounts=${persistedVault.accounts.size}"
+                )
+                return ResolvedLocalVault(persistedVault, replaced = true)
+            }
+        }
         val localLooksSafeForFastPath = localVault.accounts.isNotEmpty() &&
             (localFingerprint == metadata.baseFingerprint || remoteVault?.let { localFingerprint == fingerprint(it) } == true)
         if (localLooksSafeForFastPath) {
@@ -539,19 +558,6 @@ class WebDavSyncService(
         }
         if (localVault.accounts.isNotEmpty() && remoteVault == null) {
             return ResolvedLocalVault(localVault)
-        }
-        val persistedVault = runCatching { repository.unlock(password) }.getOrNull() ?: return ResolvedLocalVault(localVault)
-        val persistedFingerprint = fingerprint(persistedVault)
-        val localLooksLikeStaleEmptySnapshot = localVault.accounts.isEmpty() && persistedVault.accounts.isNotEmpty()
-        val persistedMatchesBaseline = metadata.baseFingerprint.isNotBlank() && persistedFingerprint == metadata.baseFingerprint
-        val localDiffersFromBaseline = metadata.baseFingerprint.isNotBlank() && localFingerprint != metadata.baseFingerprint
-        val persistedIsNewer = persistedVault.updatedAt > localVault.updatedAt && persistedFingerprint != localFingerprint
-        if (localLooksLikeStaleEmptySnapshot || (persistedMatchesBaseline && localDiffersFromBaseline) || persistedIsNewer) {
-            Log.w(
-                "TotpWebDavSync",
-                "Ignoring stale in-memory vault during WebDAV sync. localAccounts=${localVault.accounts.size} persistedAccounts=${persistedVault.accounts.size}"
-            )
-            return ResolvedLocalVault(persistedVault, replaced = true)
         }
         return ResolvedLocalVault(localVault)
     }
