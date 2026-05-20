@@ -4,6 +4,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { buffer, util } from '@kit.ArkTS';
 import { LocalVault, createEmptyLocalVault, createLocalVaultFromJson } from '../model/LocalVault';
+import { EncryptedRemoteVaultBlob } from '../services/RemoteVaultCryptoService';
 import { UnlockService } from '../services/UnlockService';
 
 const STORE_NAME: string = 'totp_local_vault';
@@ -85,8 +86,7 @@ export class LocalVaultStore {
       try {
         return createLocalVaultFromJson(this.decryptPayload(payload));
       } catch (error) {
-        this.backupCorruptSnapshot(store, payload, this.readErrorMessage(error));
-        return createEmptyLocalVault();
+        throw new Error(this.readErrorMessage(error));
       }
     } catch (error) {
       throw new Error(`load local vault failed: ${this.readErrorMessage(error)}`);
@@ -103,6 +103,56 @@ export class LocalVaultStore {
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
       throw new Error(`save local vault failed: ${businessError.message}`);
+    }
+  }
+
+  saveWithRemoteKey(context: common.UIAbilityContext, vault: LocalVault, remoteEnvelope: EncryptedRemoteVaultBlob, vaultKeyBytes: Uint8Array): LocalVault {
+    try {
+      let store: preferences.Preferences = this.getStore(context);
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let vaultIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(IV_SIZE).data;
+      let encryptedVault: Uint8Array = this.encryptGcm(vaultKey, vaultIv, this.encodeUtf8(JSON.stringify(vault.toRecord())));
+      let record: EncryptedVaultRecord = new EncryptedVaultRecord(
+        remoteEnvelope.formatVersion,
+        remoteEnvelope.vaultId,
+        new KdfRecord(remoteEnvelope.kdf.name, remoteEnvelope.kdf.iterations, remoteEnvelope.kdf.hash, remoteEnvelope.kdf.salt),
+        new AesGcmRecord(remoteEnvelope.keyEncryption.cipher, remoteEnvelope.keyEncryption.iv, remoteEnvelope.keyEncryption.ciphertext),
+        new AesGcmRecord(CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault)),
+        new Date().toISOString()
+      );
+      store.putSync(SNAPSHOT_KEY, JSON.stringify(record));
+      store.flushSync();
+      return vault;
+    } catch (error) {
+      let businessError: BusinessError = error as BusinessError;
+      throw new Error(`save local vault failed: ${businessError.message}`);
+    }
+  }
+
+  rewrapMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): void {
+    try {
+      let store: preferences.Preferences = this.getStore(context);
+      let payload: string = store.getSync(SNAPSHOT_KEY, '') as string;
+      if (payload.length === 0) {
+        return;
+      }
+      let existing: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
+      let vaultKeyBytes: Uint8Array = this.unwrapVaultKeyWithPassword(existing, currentPassword);
+      let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(SALT_SIZE).data;
+      let keyIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(IV_SIZE).data;
+      let wrappingKey: cryptoFramework.SymKey = this.createAesKey(nextPassword, salt, KDF_ITERATIONS);
+      let updated: EncryptedVaultRecord = new EncryptedVaultRecord(
+        existing.formatVersion,
+        existing.vaultId,
+        new KdfRecord(KDF_NAME, KDF_ITERATIONS, KDF_HASH, this.encodeBase64(salt)),
+        new AesGcmRecord(CIPHER, this.encodeBase64(keyIv), this.encodeBase64(this.encryptGcm(wrappingKey, keyIv, vaultKeyBytes))),
+        existing.vaultEncryption,
+        new Date().toISOString()
+      );
+      store.putSync(SNAPSHOT_KEY, JSON.stringify(updated));
+      store.flushSync();
+    } catch (error) {
+      throw new Error(`修改本地主密码失败：${this.readErrorMessage(error)}`);
     }
   }
 
@@ -179,6 +229,10 @@ export class LocalVaultStore {
   }
 
   private unwrapVaultKey(record: EncryptedVaultRecord, password: string): Uint8Array {
+    return this.unwrapVaultKeyWithPassword(record, password);
+  }
+
+  private unwrapVaultKeyWithPassword(record: EncryptedVaultRecord, password: string): Uint8Array {
     let wrappingKey: cryptoFramework.SymKey = this.createAesKey(password, this.decodeBase64(record.kdf.salt), record.kdf.iterations);
     return this.decryptGcm(
       wrappingKey,
@@ -205,21 +259,29 @@ export class LocalVaultStore {
   }
 
   private encryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, plaintext: Uint8Array): Uint8Array {
-    let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(AES_CIPHER);
-    cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, this.createGcmParams(iv, new Uint8Array(TAG_SIZE)));
-    return cipher.doFinalSync({ data: plaintext }).data;
+    try {
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, this.createGcmParams(iv, new Uint8Array(TAG_SIZE)));
+      return cipher.doFinalSync({ data: plaintext }).data;
+    } catch (error) {
+      throw new Error(`本地 AES-GCM 加密失败：${this.readErrorMessage(error)}`);
+    }
   }
 
   private decryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, encryptedWithTag: Uint8Array): Uint8Array {
-    if (encryptedWithTag.length < TAG_SIZE) {
-      throw new Error('本地保管库密文缺少认证标签。');
+    try {
+      if (encryptedWithTag.length < TAG_SIZE) {
+        throw new Error('本地保管库密文缺少认证标签。');
+      }
+      let splitIndex: number = encryptedWithTag.length - TAG_SIZE;
+      let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
+      let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, this.createGcmParams(iv, authTag));
+      return cipher.doFinalSync({ data: ciphertext }).data;
+    } catch (error) {
+      throw new Error(`本地 AES-GCM 解密失败：${this.readErrorMessage(error)}`);
     }
-    let splitIndex: number = encryptedWithTag.length - TAG_SIZE;
-    let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
-    let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
-    let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(AES_CIPHER);
-    cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, this.createGcmParams(iv, authTag));
-    return cipher.doFinalSync({ data: ciphertext }).data;
   }
 
   private createGcmParams(iv: Uint8Array, authTag: Uint8Array): cryptoFramework.GcmParamsSpec {
@@ -298,19 +360,35 @@ export class LocalVaultStore {
   }
 
   private encodeUtf8(value: string): Uint8Array {
-    return new Uint8Array(buffer.from(value, 'utf-8').buffer);
+    try {
+      return new Uint8Array(buffer.from(value, 'utf-8').buffer);
+    } catch (error) {
+      throw new Error(`UTF-8 编码失败：${this.readErrorMessage(error)}`);
+    }
   }
 
   private decodeUtf8(value: Uint8Array): string {
-    return buffer.from(this.sliceBytes(value, 0, value.length).buffer).toString('utf-8');
+    try {
+      return buffer.from(this.sliceBytes(value, 0, value.length).buffer).toString('utf-8');
+    } catch (error) {
+      throw new Error(`UTF-8 解码失败：${this.readErrorMessage(error)}`);
+    }
   }
 
   private encodeBase64(bytes: Uint8Array): string {
-    return new util.Base64Helper().encodeToStringSync(bytes, util.Type.BASIC);
+    try {
+      return new util.Base64Helper().encodeToStringSync(bytes, util.Type.BASIC);
+    } catch (error) {
+      throw new Error(`Base64 编码失败：${this.readErrorMessage(error)}`);
+    }
   }
 
   private decodeBase64(value: string): Uint8Array {
-    return new util.Base64Helper().decodeSync(value, util.Type.BASIC);
+    try {
+      return new util.Base64Helper().decodeSync(value, util.Type.BASIC);
+    } catch (error) {
+      throw new Error(`Base64 解码失败：${this.readErrorMessage(error)}`);
+    }
   }
 
   private sliceBytes(bytes: Uint8Array, start: number, end: number): Uint8Array {

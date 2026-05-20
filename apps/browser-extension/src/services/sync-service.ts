@@ -3,6 +3,7 @@ import {
   decryptVault,
   encryptVaultWithKey,
   unlockVault,
+  VaultAuthenticationError,
   type EncryptedVaultBlob,
   type VaultPayload
 } from '@totp/core';
@@ -109,16 +110,25 @@ async function createRuntimeVaultFingerprint(
   try {
     const decryptedVault = await decryptVault(encryptedVault, masterPassword);
     return hashString(JSON.stringify(normalizeVaultForFingerprint(decryptedVault)));
-  } catch {
+  } catch (error) {
+    if (isVaultAuthenticationError(error)) {
+      throw error;
+    }
+
     return createBlobFingerprint(encryptedVault);
   }
+}
+
+function isVaultAuthenticationError(error: unknown): boolean {
+  return error instanceof VaultAuthenticationError ||
+    (error instanceof Error && error.name === 'VaultAuthenticationError');
 }
 
 async function createBlobFingerprint(encryptedVault: EncryptedVaultBlob) {
   return hashString(JSON.stringify(encryptedVault));
 }
 
-async function hashString(value: string) {
+export async function hashString(value: string) {
   const encoded = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', encoded);
 
@@ -127,7 +137,7 @@ async function hashString(value: string) {
     .join('');
 }
 
-function normalizeVaultForFingerprint(vault: {
+export function normalizeVaultForFingerprint(vault: {
   version: number;
   accounts: Array<{
     id: string;
@@ -222,7 +232,7 @@ async function shouldPreferRemoteOnFirstSync(
   return local.fingerprint === emptyVaultFingerprint;
 }
 
-function mergeAccountRecords(
+export function mergeAccountRecords(
   baseAccounts: VaultPayload['accounts'],
   localAccounts: VaultPayload['accounts'],
   remoteAccounts: VaultPayload['accounts']

@@ -27,7 +27,8 @@ data class WebDavSyncMetadata(
 data class WebDavSyncResult(
     val status: String,
     val message: String,
-    val vaultChanged: Boolean = false
+    val vaultChanged: Boolean = false,
+    val vaultKey: ByteArray? = null
 )
 
 const val DEFAULT_WEBDAV_FILE_PATH = "/totp/vault.json"

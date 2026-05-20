@@ -2,6 +2,7 @@ package com.totp.authenticator.ui.settings
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,6 +55,10 @@ fun SettingsScreen(
     webDavSettings: WebDavSettings,
     webDavMetadata: WebDavSyncMetadata,
     isWebDavBusy: Boolean,
+    webDavStatusMessage: String,
+    webDavStatusIsError: Boolean,
+    isPasswordChangeBusy: Boolean,
+    masterPasswordErrorMessage: String,
     backupStatusMessage: String,
     backupErrorMessage: String,
     isBackupBusy: Boolean,
@@ -68,6 +73,8 @@ fun SettingsScreen(
 ) {
     var showWebDavDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
+    var showBlockedPasswordDialog by remember { mutableStateOf(false) }
+    val isRemotePasswordBlocked = webDavSettings.enabled && webDavMetadata.lastStatus == "blocked"
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -131,8 +138,18 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        InlineMessage(masterPasswordErrorMessage, isError = true)
                     }
-                    TextButton(onClick = { showChangePasswordDialog = true }) {
+                    TextButton(
+                        enabled = !isPasswordChangeBusy,
+                        onClick = {
+                            if (isRemotePasswordBlocked) {
+                                showBlockedPasswordDialog = true
+                            } else {
+                                showChangePasswordDialog = true
+                            }
+                        }
+                    ) {
                         Text("修改")
                     }
                 }
@@ -167,6 +184,13 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        WebDavStatusText(
+                            metadata = webDavMetadata,
+                            enabled = webDavSettings.enabled,
+                            busy = isWebDavBusy,
+                            transientMessage = webDavStatusMessage,
+                            transientIsError = webDavStatusIsError
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(
                                 enabled = !isWebDavBusy,
@@ -267,6 +291,19 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showBlockedPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showBlockedPasswordDialog = false },
+            title = { Text("暂不能修改主密码") },
+            text = { Text("远端保管库需要主密码验证后才能继续同步。请先在首页完成远端主密码验证，再修改主密码。") },
+            confirmButton = {
+                TextButton(onClick = { showBlockedPasswordDialog = false }) {
+                    Text("知道了")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -293,6 +330,107 @@ private fun InlineMessage(message: String, isError: Boolean) {
         style = MaterialTheme.typography.bodySmall,
         color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
     )
+}
+
+@Composable
+private fun WebDavStatusText(
+    metadata: WebDavSyncMetadata,
+    enabled: Boolean,
+    busy: Boolean,
+    transientMessage: String,
+    transientIsError: Boolean
+) {
+    val colors = webStatusColors()
+    val status = resolveWebDavStatus(
+        metadata = metadata,
+        enabled = enabled,
+        busy = busy,
+        transientMessage = transientMessage,
+        transientIsError = transientIsError
+    )
+    Text(
+        text = status.message,
+        modifier = Modifier.fillMaxWidth(),
+        style = MaterialTheme.typography.bodySmall,
+        color = when (status.tone) {
+            WebDavStatusTone.Success -> colors.success
+            WebDavStatusTone.Error -> colors.danger
+            WebDavStatusTone.Idle -> colors.inkSoft
+        },
+        lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+    )
+}
+
+private fun resolveWebDavStatus(
+    metadata: WebDavSyncMetadata,
+    enabled: Boolean,
+    busy: Boolean,
+    transientMessage: String,
+    transientIsError: Boolean
+): WebDavStatus {
+    if (!enabled) {
+        return WebDavStatus("WebDAV 同步未开启，本地模式。", WebDavStatusTone.Idle)
+    }
+    if (transientMessage.isNotBlank()) {
+        return WebDavStatus(
+            transientMessage,
+            if (transientIsError) WebDavStatusTone.Error else WebDavStatusTone.Success
+        )
+    }
+    if (busy) {
+        return WebDavStatus("同步中...", WebDavStatusTone.Idle)
+    }
+    if (metadata.lastStatus == "blocked") {
+        return WebDavStatus("远端保管库需要主密码验证后才能继续同步。", WebDavStatusTone.Error)
+    }
+    val error = metadata.lastError
+    if (error.isNotBlank()) {
+        return WebDavStatus(
+            if (metadata.lastStatus == "conflict") "同步冲突：$error" else "同步失败：$error",
+            WebDavStatusTone.Error
+        )
+    }
+    return when (metadata.lastStatus) {
+        "pushed" -> WebDavStatus("同步完成，已推送本地最新数据。", WebDavStatusTone.Success)
+        "pulled" -> WebDavStatus("同步完成，已拉取远端最新数据。", WebDavStatusTone.Success)
+        "synced", "noop" -> WebDavStatus("同步完成，当前数据已经是最新。", WebDavStatusTone.Success)
+        "conflict" -> WebDavStatus("检测到同步冲突，请前往设置页处理。", WebDavStatusTone.Error)
+        else -> WebDavStatus("本地与 WebDAV 已经是最新版本。", WebDavStatusTone.Idle)
+    }
+}
+
+@Composable
+private fun webStatusColors(): WebStatusColors {
+    return if (isSystemInDarkTheme()) {
+        WebStatusColors(
+            inkSoft = Color(0xFFA0A4AD),
+            success = Color(0xFF58C18F),
+            danger = Color(0xFFFF6B6B)
+        )
+    } else {
+        WebStatusColors(
+            inkSoft = Color(0xFF61738A),
+            success = Color(0xFF2D7A59),
+            danger = Color(0xFFC53D3D)
+        )
+    }
+}
+
+private data class WebDavStatus(
+    val message: String,
+    val tone: WebDavStatusTone
+)
+
+private data class WebStatusColors(
+    val inkSoft: Color,
+    val success: Color,
+    val danger: Color
+)
+
+private enum class WebDavStatusTone {
+    Idle,
+    Success,
+    Error
 }
 
 @Composable

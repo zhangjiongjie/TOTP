@@ -8,6 +8,7 @@ import com.totp.authenticator.data.vault.LocalVault
 import java.security.SecureRandom
 import java.time.Instant
 import java.util.UUID
+import java.util.Base64 as JvmBase64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -17,7 +18,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class RemoteVaultCrypto(
-    @Suppress("UNUSED_PARAMETER")
     private val persistentKeyCacheStore: RemoteVaultKeyCacheStore? = null,
     private val secureRandom: SecureRandom = SecureRandom()
 ) {
@@ -29,13 +29,26 @@ class RemoteVaultCrypto(
 
     fun clearPersistentCache() {
         cachedKey = null
+        persistentKeyCacheStore?.clear()
     }
 
     fun encrypt(vault: LocalVault, password: String, cacheProfileKey: String? = null): EncryptedRemoteVaultBlobDto {
+        val vaultKey = ByteArray(KEY_SIZE_BYTES).also(secureRandom::nextBytes)
+        return encrypt(vault, password, vaultKey, cacheProfileKey)
+    }
+
+    fun encrypt(
+        vault: LocalVault,
+        password: String,
+        vaultKey: ByteArray,
+        cacheProfileKey: String? = null
+    ): EncryptedRemoteVaultBlobDto {
         val startedAt = System.currentTimeMillis()
-        val cached = cachedKey?.takeIf { it.matches(password, REMOTE_KDF_ITERATIONS) }
+        require(vaultKey.size == KEY_SIZE_BYTES) { "Invalid WebDAV vault key" }
+        val cached = cachedKey?.takeIf {
+            it.matches(password, REMOTE_KDF_ITERATIONS) && it.keyBytes.contentEquals(vaultKey)
+        }
         val salt = cached?.salt ?: ByteArray(SALT_SIZE_BYTES).also(secureRandom::nextBytes)
-        val vaultKey = cached?.keyBytes ?: ByteArray(KEY_SIZE_BYTES).also(secureRandom::nextBytes)
         val keyIv = randomIv()
         val vaultIv = randomIv()
         val randomAt = System.currentTimeMillis()
@@ -51,8 +64,9 @@ class RemoteVaultCrypto(
         val encryptedAt = System.currentTimeMillis()
         val vaultId = cached?.vaultId ?: UUID.randomUUID().toString()
         cachedKey = RemoteKeyCache(password, REMOTE_KDF_ITERATIONS, salt.copyOf(), vaultKey.copyOf(), vaultId)
+        savePersistentCache(cacheProfileKey, base64(salt), REMOTE_KDF_ITERATIONS, vaultId, vaultKey)
 
-        Log.d(
+        logDebug(
             "TotpWebDavPerf",
             "remote encrypt total=${encryptedAt - startedAt}ms random=${randomAt - startedAt}ms kdf=${keyAt - randomAt}ms aes=${encryptedAt - keyAt}ms cached=${cached != null} accounts=${vault.accounts.size}"
         )
@@ -79,6 +93,10 @@ class RemoteVaultCrypto(
     }
 
     fun decrypt(blob: EncryptedRemoteVaultBlobDto, password: String, cacheProfileKey: String? = null): LocalVault {
+        return decryptWithKey(blob, password, cacheProfileKey).vault
+    }
+
+    fun decryptWithKey(blob: EncryptedRemoteVaultBlobDto, password: String, cacheProfileKey: String? = null): RemoteVaultDecryption {
         val startedAt = System.currentTimeMillis()
         require(blob.formatVersion == REMOTE_FORMAT_VERSION) { "Unsupported WebDAV vault format" }
         require(blob.kdf.name == KDF_NAME && blob.kdf.hash == KDF_HASH) { "Unsupported WebDAV KDF" }
@@ -86,13 +104,21 @@ class RemoteVaultCrypto(
         val salt = unbase64(blob.kdf.salt)
         val decodedAt = System.currentTimeMillis()
         val cached = cachedKey?.takeIf { it.matches(password, blob.kdf.iterations, salt, blob.vaultId) }
-        val wrappingKeyBytes = deriveKeyBytes(password, salt, blob.kdf.iterations)
-        val vaultKey = cached?.keyBytes ?: decryptAesGcm(
-            SecretKeySpec(wrappingKeyBytes, AES),
-            unbase64(blob.keyEncryption.iv),
-            unbase64(blob.keyEncryption.ciphertext)
-        )
+        val persistent = if (cached == null) {
+            loadPersistentCache(cacheProfileKey, blob.kdf.iterations, blob.kdf.salt, blob.vaultId)
+        } else {
+            null
+        }
+        val vaultKey = cached?.keyBytes ?: persistent?.keyBytes ?: run {
+            val wrappingKeyBytes = deriveKeyBytes(password, salt, blob.kdf.iterations)
+            decryptAesGcm(
+                SecretKeySpec(wrappingKeyBytes, AES),
+                unbase64(blob.keyEncryption.iv),
+                unbase64(blob.keyEncryption.ciphertext)
+            )
+        }
         cachedKey = RemoteKeyCache(password, blob.kdf.iterations, salt.copyOf(), vaultKey.copyOf(), blob.vaultId)
+        savePersistentCache(cacheProfileKey, blob.kdf.salt, blob.kdf.iterations, blob.vaultId, vaultKey)
         val keyAt = System.currentTimeMillis()
 
         val plaintext = decryptAesGcm(
@@ -103,11 +129,11 @@ class RemoteVaultCrypto(
         val decryptedAt = System.currentTimeMillis()
         val vault = json.decodeFromString<RemoteVaultDto>(plaintext).toDomain()
         val finishedAt = System.currentTimeMillis()
-        Log.d(
+        logDebug(
             "TotpWebDavPerf",
-            "remote decrypt total=${finishedAt - startedAt}ms decode=${decodedAt - startedAt}ms kdf=${keyAt - decodedAt}ms aes=${decryptedAt - keyAt}ms json=${finishedAt - decryptedAt}ms cached=${cached != null} accounts=${vault.accounts.size}"
+            "remote decrypt total=${finishedAt - startedAt}ms decode=${decodedAt - startedAt}ms kdf=${keyAt - decodedAt}ms aes=${decryptedAt - keyAt}ms json=${finishedAt - decryptedAt}ms cached=${cached != null || persistent != null} accounts=${vault.accounts.size}"
         )
-        return vault
+        return RemoteVaultDecryption(vault = vault, vaultKey = vaultKey.copyOf())
     }
 
     fun decryptWithVaultKey(blob: EncryptedRemoteVaultBlobDto, vaultKey: ByteArray): LocalVault {
@@ -142,6 +168,78 @@ class RemoteVaultCrypto(
         )
     }
 
+    fun rewrapKeyEncryption(
+        existingBlob: EncryptedRemoteVaultBlobDto,
+        password: String,
+        vaultKey: ByteArray,
+        cacheProfileKey: String? = null
+    ): EncryptedRemoteVaultBlobDto {
+        require(existingBlob.formatVersion == REMOTE_FORMAT_VERSION) { "Unsupported WebDAV vault format" }
+        require(vaultKey.size == KEY_SIZE_BYTES) { "Invalid WebDAV vault key" }
+        val salt = ByteArray(SALT_SIZE_BYTES).also(secureRandom::nextBytes)
+        val keyIv = randomIv()
+        val wrappingKeyBytes = deriveKeyBytes(password, salt, REMOTE_KDF_ITERATIONS)
+        val encryptedVaultKey = encryptAesGcm(SecretKeySpec(wrappingKeyBytes, AES), keyIv, vaultKey)
+        cachedKey = RemoteKeyCache(password, REMOTE_KDF_ITERATIONS, salt.copyOf(), vaultKey.copyOf(), existingBlob.vaultId)
+        savePersistentCache(cacheProfileKey, base64(salt), REMOTE_KDF_ITERATIONS, existingBlob.vaultId, vaultKey)
+        return existingBlob.copy(
+            kdf = RemoteKdfDto(
+                name = KDF_NAME,
+                iterations = REMOTE_KDF_ITERATIONS,
+                hash = KDF_HASH,
+                salt = base64(salt)
+            ),
+            keyEncryption = RemoteAesGcmDto(
+                cipher = CIPHER_NAME,
+                iv = base64(keyIv),
+                ciphertext = base64(encryptedVaultKey)
+            )
+        )
+    }
+
+    fun encryptWithPasswordAndVaultKey(
+        vault: LocalVault,
+        existingBlob: EncryptedRemoteVaultBlobDto,
+        password: String,
+        vaultKey: ByteArray,
+        cacheProfileKey: String? = null
+    ): EncryptedRemoteVaultBlobDto {
+        val rewrappedBlob = rewrapKeyEncryption(existingBlob, password, vaultKey, cacheProfileKey)
+        return encryptWithVaultKey(vault, rewrappedBlob, vaultKey)
+    }
+
+    fun canDecryptWithVaultKey(blob: EncryptedRemoteVaultBlobDto, vaultKey: ByteArray): Boolean {
+        return runCatching { decryptWithVaultKey(blob, vaultKey) }.isSuccess
+    }
+
+    private fun loadPersistentCache(
+        cacheProfileKey: String?,
+        iterations: Int,
+        salt: String,
+        vaultId: String
+    ): RemoteVaultPersistentKey? {
+        return cacheProfileKey?.let {
+            persistentKeyCacheStore?.load(
+                profileKey = it,
+                iterations = iterations,
+                salt = salt,
+                passwordVerifier = vaultId
+            )
+        }
+    }
+
+    private fun savePersistentCache(
+        cacheProfileKey: String?,
+        salt: String,
+        iterations: Int,
+        vaultId: String,
+        vaultKey: ByteArray
+    ) {
+        if (cacheProfileKey != null) {
+            persistentKeyCacheStore?.save(cacheProfileKey, salt, iterations, vaultId, vaultKey)
+        }
+    }
+
     private fun randomIv(): ByteArray = ByteArray(IV_SIZE_BYTES).also(secureRandom::nextBytes)
 
     private fun deriveKeyBytes(password: String, salt: ByteArray, iterations: Int): ByteArray {
@@ -165,9 +263,33 @@ class RemoteVaultCrypto(
         return cipher.doFinal(ciphertext)
     }
 
-    private fun base64(bytes: ByteArray): String = Base64.encodeToString(bytes, Base64.NO_WRAP)
+    private fun base64(bytes: ByteArray): String {
+        return try {
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (error: RuntimeException) {
+            if (error.message?.contains("not mocked") == true) {
+                JvmBase64.getEncoder().encodeToString(bytes)
+            } else {
+                throw error
+            }
+        }
+    }
 
-    private fun unbase64(value: String): ByteArray = Base64.decode(value, Base64.NO_WRAP)
+    private fun unbase64(value: String): ByteArray {
+        return try {
+            Base64.decode(value, Base64.NO_WRAP)
+        } catch (error: RuntimeException) {
+            if (error.message?.contains("not mocked") == true) {
+                JvmBase64.getDecoder().decode(value)
+            } else {
+                throw error
+            }
+        }
+    }
+
+    private fun logDebug(tag: String, message: String) {
+        runCatching { Log.d(tag, message) }
+    }
 
     private companion object {
         const val REMOTE_FORMAT_VERSION = 2
@@ -240,6 +362,11 @@ data class WebDavRemoteEnvelopeDto(
     val revision: String,
     val updatedAt: String,
     val encryptedVault: EncryptedRemoteVaultBlobDto
+)
+
+data class RemoteVaultDecryption(
+    val vault: LocalVault,
+    val vaultKey: ByteArray
 )
 
 @Serializable

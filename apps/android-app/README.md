@@ -32,6 +32,14 @@ android run --apks .\app\build\outputs\apk\debug\app-debug.apk
 gradle wrapper --gradle-version 9.4.1
 ```
 
+当前工程在 `gradle.properties` 中固定了 Gradle JDK：
+
+```properties
+org.gradle.java.home=C:/Program Files/Android/Android Studio/jbr
+```
+
+这是为了避免 Android Studio 或 Gradle 误用 DevEco Studio 的 JBR。DevEco JBR 缺少 Android Gradle Plugin 构建 `androidJdkImage` 时需要的 `jlink.exe`，会导致 `:app:compileDebugJavaWithJavac` 失败。迁移到其他机器时，如果 Android Studio 安装路径不同，需要同步调整该值，或在 Android Studio 的 Gradle JDK 设置中选择完整 JDK。
+
 APK 输出位置：
 
 ```text
@@ -47,6 +55,7 @@ apps/android-app/app/build/outputs/apk/debug/app-debug.apk
 - 设置页 WebDAV 配置、测试连接、手动同步和启用状态。
 - WebDAV 自动同步、v2 远端 key envelope、账号级合并和冲突提示。
 - 设置页支持修改主密码；WebDAV 已启用时修改后会立刻同步到远端。
+- 远端主密码验证弹框、`BlockedRemotePassword` 状态处理和远端 vault key 权威源切换。
 - 加密备份导入 / 导出，兼容旧版明文 JSON 导入。
 - 浅色 / 深色模式，状态栏和 Title 栏跟随当前主题色。
 - PNG 品牌图标资源，避免 Android 对复杂 SVG 渲染不一致。
@@ -100,6 +109,10 @@ masterPassword + kdf salt
 
 修改账号时复用同一个 `vaultKey`，只重写账号数据密文。修改主密码时只重新包裹 `vaultKey`，账号数据密钥保持不变。
 
+WebDAV 开启后，远端 `vaultKey` 是权威源。Android 客户端接入已有远端、自动合并或验证远端主密码成功后，会采用远端 envelope 和 `vaultKey` 更新本地保管库；本地账号数据仍按正常同步逻辑和远端做账号级合并，不能因为本地为空或本地 key 不一致直接覆盖远端。
+
+如果其他端修改了主密码，Android 下次同步会进入 `BlockedRemotePassword`。此时不允许直接修改本地主密码覆盖远端；用户需要先在远端主密码验证弹框中输入新的远端主密码。验证成功后，客户端会解锁远端、合并账号数据，并把本地主密码状态更新到新的远端主密码。
+
 ### 文件选择器生命周期
 
 Android 导入 / 导出需要调用系统文件管理器。系统文件面板会让当前 Activity 进入 `ON_STOP`，如果直接按退出后台处理，会导致用户完成或取消导入导出后回到 App 需要重新解锁。
@@ -126,6 +139,7 @@ Android 端保持和其他端一致的数据语义：
 - WebDAV 同步使用本地、远端和同步基线进行判断。
 - 两端独立修改时优先账号级合并；同一账号字段冲突进入冲突状态。
 - 导入备份当前语义是恢复备份，会覆盖本地 vault；导入后如果 WebDAV 已启用，会按当前本地 vault 推动同步。
+- 如果导入的是其他端导出的 v2 加密备份，备份主密码必须能解开该备份。导入后本地会采用备份中的 `vaultKey`；重新开启或继续使用 WebDAV 时，客户端会先下载远端并以远端 `vaultKey` 为权威源重新对齐。
 
 ## 导入导出
 

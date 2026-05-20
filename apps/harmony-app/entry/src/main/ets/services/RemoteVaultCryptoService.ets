@@ -67,6 +67,16 @@ export class EncryptedRemoteVaultBlob {
   }
 }
 
+export class RemoteVaultDecryption {
+  vault: LocalVault;
+  vaultKey: Uint8Array;
+
+  constructor(vault: LocalVault, vaultKey: Uint8Array) {
+    this.vault = vault;
+    this.vaultKey = vaultKey;
+  }
+}
+
 interface RemoteAccountRecord {
   id: string;
   issuer: string;
@@ -112,9 +122,17 @@ export class RemoteVaultCryptoService {
   }
 
   decrypt(blob: EncryptedRemoteVaultBlob): LocalVault {
+    return this.decryptWithKey(blob).vault;
+  }
+
+  decryptWithKey(blob: EncryptedRemoteVaultBlob): RemoteVaultDecryption {
+    let password: string = UnlockService.getInstance().requireVaultPassword();
+    return this.decryptWithPassword(blob, password);
+  }
+
+  decryptWithPassword(blob: EncryptedRemoteVaultBlob, password: string): RemoteVaultDecryption {
     try {
       this.assertSupportedBlob(blob);
-      let password: string = UnlockService.getInstance().requireVaultPassword();
       let salt: Uint8Array = this.decodeBase64(blob.kdf.salt);
       let wrappingKey: cryptoFramework.SymKey = this.createAesKey(password, salt, blob.kdf.iterations);
       let vaultKeyBytes: Uint8Array = this.decryptGcm(
@@ -128,9 +146,46 @@ export class RemoteVaultCryptoService {
         this.decodeBase64(blob.vaultEncryption.iv),
         this.decodeBase64(blob.vaultEncryption.ciphertext)
       );
-      return this.createLocalVaultFromRemotePayload(this.decodeUtf8(plaintext));
+      return new RemoteVaultDecryption(this.createLocalVaultFromRemotePayload(this.decodeUtf8(plaintext)), vaultKeyBytes);
     } catch (error) {
       throw new Error(`解密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  rewrapKeyEncryption(existingBlob: EncryptedRemoteVaultBlob, nextPassword: string, vaultKeyBytes: Uint8Array): EncryptedRemoteVaultBlob {
+    try {
+      this.assertSupportedBlob(existingBlob);
+      let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_SALT_SIZE).data;
+      let keyIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
+      let wrappingKey: cryptoFramework.SymKey = this.createAesKey(nextPassword, salt, REMOTE_KDF_ITERATIONS);
+      let encryptedVaultKey: Uint8Array = this.encryptGcm(wrappingKey, keyIv, vaultKeyBytes);
+      return new EncryptedRemoteVaultBlob(
+        existingBlob.formatVersion,
+        existingBlob.vaultId,
+        new RemoteKdfRecord(REMOTE_KDF_NAME, REMOTE_KDF_ITERATIONS, REMOTE_KDF_HASH, this.encodeBase64(salt)),
+        new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(keyIv), this.encodeBase64(encryptedVaultKey)),
+        existingBlob.vaultEncryption
+      );
+    } catch (error) {
+      throw new Error(`重新保护 WebDAV 保管库密钥失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  encryptWithVaultKey(vault: LocalVault, existingBlob: EncryptedRemoteVaultBlob, vaultKeyBytes: Uint8Array): EncryptedRemoteVaultBlob {
+    try {
+      this.assertSupportedBlob(existingBlob);
+      let vaultIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(REMOTE_AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let encryptedVault: Uint8Array = this.encryptGcm(vaultKey, vaultIv, this.encodeUtf8(this.createRemoteVaultPayload(vault)));
+      return new EncryptedRemoteVaultBlob(
+        existingBlob.formatVersion,
+        existingBlob.vaultId,
+        existingBlob.kdf,
+        existingBlob.keyEncryption,
+        new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault))
+      );
+    } catch (error) {
+      throw new Error(`使用远端密钥加密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
     }
   }
 
@@ -258,23 +313,31 @@ export class RemoteVaultCryptoService {
   }
 
   private encryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, plaintext: Uint8Array): Uint8Array {
-    let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, new Uint8Array(REMOTE_TAG_SIZE));
-    let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
-    cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, params);
-    return cipher.doFinalSync({ data: plaintext }).data;
+    try {
+      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, new Uint8Array(REMOTE_TAG_SIZE));
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, params);
+      return cipher.doFinalSync({ data: plaintext }).data;
+    } catch (error) {
+      throw new Error(`WebDAV AES-GCM 加密失败：${this.readErrorMessage(error)}`);
+    }
   }
 
   private decryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, encryptedWithTag: Uint8Array): Uint8Array {
-    if (encryptedWithTag.length < REMOTE_TAG_SIZE) {
-      throw new Error('远端保管库密文缺少认证标签。');
+    try {
+      if (encryptedWithTag.length < REMOTE_TAG_SIZE) {
+        throw new Error('远端保管库密文缺少认证标签。');
+      }
+      let splitIndex: number = encryptedWithTag.length - REMOTE_TAG_SIZE;
+      let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
+      let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
+      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, authTag);
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, params);
+      return cipher.doFinalSync({ data: ciphertext }).data;
+    } catch (error) {
+      throw new Error(`WebDAV AES-GCM 解密失败：${this.readErrorMessage(error)}`);
     }
-    let splitIndex: number = encryptedWithTag.length - REMOTE_TAG_SIZE;
-    let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
-    let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
-    let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, authTag);
-    let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
-    cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, params);
-    return cipher.doFinalSync({ data: ciphertext }).data;
   }
 
   private parseAesGcmRecord(value: Object | undefined): RemoteAesGcmRecord {

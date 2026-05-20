@@ -126,7 +126,7 @@ export function WebDavForm({
       </div>
       <div style={statusCardStyle}>
         <p style={statusLineStyle}>{formatSyncStatus(syncStatus.lastStatus)}</p>
-        {syncStatus.lastError ? (
+        {shouldShowSyncError(syncStatus.lastStatus, syncStatus.lastError) ? (
           <p style={{ ...statusLineStyle, color: 'var(--color-danger)' }}>{syncStatus.lastError}</p>
         ) : null}
         {syncStatus.pendingConflict ? (
@@ -141,6 +141,21 @@ export function WebDavForm({
 
 function formatSavedLabel(value: string | null) {
   return value ? `已保存 ${formatDateLabel(value)}` : '';
+}
+
+function shouldShowSyncError(status: string | null, error: string | null) {
+  if (!error) {
+    return false;
+  }
+
+  return !isSuccessfulSyncStatus(status);
+}
+
+function isSuccessfulSyncStatus(status: string | null) {
+  return status === 'noop' ||
+    status === 'local-cache' ||
+    status === 'pulled' ||
+    status === 'pushed';
 }
 
 function formatSyncStatus(status: string | null) {

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -55,10 +56,14 @@ fun HomeScreen(
                 lastSyncLabel = lastSyncLabel
             )
             if (syncStatusMessage.isNotBlank() || copyStatusMessage.isNotBlank() || errorMessage.isNotBlank()) {
-                HomeStatusCard(
+                val banner = resolveHomeBanner(
                     syncStatusMessage = syncStatusMessage,
                     copyStatusMessage = copyStatusMessage,
                     errorMessage = errorMessage
+                )
+                HomeStatusCard(
+                    message = banner.message,
+                    tone = banner.tone
                 )
             }
 
@@ -156,35 +161,73 @@ private fun HomeMetaLine(
 
 @Composable
 private fun HomeStatusCard(
-    syncStatusMessage: String,
-    copyStatusMessage: String,
-    errorMessage: String
+    message: String,
+    tone: HomeBannerTone
 ) {
+    val colors = webBannerColors()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f),
         tonalElevation = 1.dp
     ) {
-        Column(
+        Text(
+            text = message,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatusText(syncStatusMessage, MaterialTheme.colorScheme.onSurfaceVariant)
-            StatusText(copyStatusMessage, Color(0xFF2D7A59))
-            StatusText(errorMessage, MaterialTheme.colorScheme.error)
-        }
+            style = MaterialTheme.typography.bodySmall,
+            color = when (tone) {
+                HomeBannerTone.Success -> colors.success
+                HomeBannerTone.Error -> colors.danger
+                HomeBannerTone.Idle -> colors.inkSoft
+            },
+            lineHeight = MaterialTheme.typography.bodySmall.lineHeight
+        )
     }
 }
 
-@Composable
-private fun StatusText(message: String, color: Color) {
-    if (message.isBlank()) {
-        return
+private fun resolveHomeBanner(
+    syncStatusMessage: String,
+    copyStatusMessage: String,
+    errorMessage: String
+): HomeBanner {
+    return when {
+        errorMessage.isNotBlank() -> HomeBanner(errorMessage, HomeBannerTone.Error)
+        copyStatusMessage.isNotBlank() -> HomeBanner(copyStatusMessage, HomeBannerTone.Success)
+        syncStatusMessage.contains("远端保管库需要主密码") -> HomeBanner(syncStatusMessage, HomeBannerTone.Error)
+        else -> HomeBanner(syncStatusMessage, HomeBannerTone.Idle)
     }
-    Text(
-        text = message,
-        style = MaterialTheme.typography.bodySmall,
-        color = color
-    )
 }
+
+private data class HomeBanner(
+    val message: String,
+    val tone: HomeBannerTone
+)
+
+private enum class HomeBannerTone {
+    Idle,
+    Success,
+    Error
+}
+
+@Composable
+private fun webBannerColors(): WebBannerColors {
+    return if (isSystemInDarkTheme()) {
+        WebBannerColors(
+            inkSoft = Color(0xFFA0A4AD),
+            success = Color(0xFF58C18F),
+            danger = Color(0xFFFF6B6B)
+        )
+    } else {
+        WebBannerColors(
+            inkSoft = Color(0xFF61738A),
+            success = Color(0xFF2D7A59),
+            danger = Color(0xFFC53D3D)
+        )
+    }
+}
+
+private data class WebBannerColors(
+    val inkSoft: Color,
+    val success: Color,
+    val danger: Color
+)

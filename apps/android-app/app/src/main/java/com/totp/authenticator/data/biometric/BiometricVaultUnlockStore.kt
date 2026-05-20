@@ -52,7 +52,6 @@ class BiometricVaultUnlockStore(context: Context) {
                 init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_SIZE_BITS, unbase64(record.iv)))
             }
         } catch (error: KeyPermanentlyInvalidatedException) {
-            disable()
             null
         }
     }

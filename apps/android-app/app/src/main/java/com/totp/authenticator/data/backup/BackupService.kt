@@ -3,7 +3,10 @@ package com.totp.authenticator.data.backup
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.core.totp.TotpAlgorithm
 import com.totp.authenticator.data.webdav.EncryptedRemoteVaultBlobDto
+import com.totp.authenticator.data.webdav.RemoteAesGcmDto
+import com.totp.authenticator.data.webdav.RemoteKdfDto
 import com.totp.authenticator.data.webdav.RemoteVaultCrypto
+import com.totp.authenticator.data.vault.EncryptedVaultEnvelope
 import com.totp.authenticator.data.vault.LocalVault
 import java.time.Instant
 import java.time.ZoneId
@@ -19,6 +22,14 @@ class BackupService(
         return json.encodeToString(
             EncryptedExportBundleDto(
                 encryptedVault = crypto.encrypt(vault, password)
+            )
+        )
+    }
+
+    fun createEncryptedExport(vault: LocalVault, existingEnvelope: EncryptedVaultEnvelope, vaultKey: ByteArray): String {
+        return json.encodeToString(
+            EncryptedExportBundleDto(
+                encryptedVault = crypto.encryptWithVaultKey(vault, existingEnvelope.toRemoteDto(), vaultKey)
             )
         )
     }
@@ -54,6 +65,29 @@ class BackupService(
             prettyPrint = true
         }
     }
+}
+
+private fun EncryptedVaultEnvelope.toRemoteDto(): EncryptedRemoteVaultBlobDto {
+    return EncryptedRemoteVaultBlobDto(
+        formatVersion = formatVersion,
+        vaultId = vaultId,
+        kdf = RemoteKdfDto(
+            name = kdf.name,
+            iterations = kdf.iterations,
+            hash = kdf.hash,
+            salt = kdf.salt
+        ),
+        keyEncryption = RemoteAesGcmDto(
+            cipher = keyEncryption.cipher,
+            iv = keyEncryption.iv,
+            ciphertext = keyEncryption.ciphertext
+        ),
+        vaultEncryption = RemoteAesGcmDto(
+            cipher = vaultEncryption.cipher,
+            iv = vaultEncryption.iv,
+            ciphertext = vaultEncryption.ciphertext
+        )
+    )
 }
 
 @Serializable

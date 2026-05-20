@@ -536,6 +536,7 @@ function toSyncResultStatus(status: string | null): SyncRunResult['status'] | nu
     case 'pushed':
     case 'noop':
     case 'conflict':
+    case 'blocked':
     case 'download-error':
     case 'upload-error':
     case 'validation-error':
@@ -766,7 +767,9 @@ async function persistAccountsToStoredVault(
     storedVault,
     currentVaultKey
   );
+  const unlocked = await unlockVault(encryptedVault, masterPassword);
   await saveEncryptedVault(encryptedVault, vaultStorage);
+  currentVaultKey = unlocked.vaultKey;
   await decryptVaultWithKey(encryptedVault, currentVaultKey);
 }
 
@@ -819,6 +822,24 @@ export async function refreshAppSyncSnapshot() {
     }
   };
   emit();
+}
+
+export async function reloadStoredVaultAfterRemotePasswordVerified(password: string) {
+  const storedVault = await loadEncryptedVault(vaultStorage);
+
+  if (!storedVault) {
+    return;
+  }
+
+  const unlocked = await unlockVault(storedVault, password);
+  currentVaultKey = unlocked.vaultKey;
+  isApplyingRemoteSyncUpdate = true;
+
+  try {
+    await accountService.replaceAllAccounts(unlocked.vault.accounts);
+  } finally {
+    isApplyingRemoteSyncUpdate = false;
+  }
 }
 
 function formatWebAuthnUnlockError(error: unknown) {

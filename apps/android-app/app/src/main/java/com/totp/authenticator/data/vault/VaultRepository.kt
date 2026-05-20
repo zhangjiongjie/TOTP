@@ -55,6 +55,12 @@ class VaultRepository(
         return vaultCipher.deriveVaultKey(envelope, password).encoded
     }
 
+    fun exportEncryptedEnvelope(): EncryptedVaultEnvelope {
+        val encoded = preferences.getString(KEY_ENCRYPTED_VAULT, null)
+            ?: throw VaultNotFoundException()
+        return VaultEnvelopeJson.decodeEnvelope(encoded)
+    }
+
     fun unlockWithVaultKey(vaultKey: ByteArray): LocalVault {
         val startedAt = SystemClock.elapsedRealtime()
         val encoded = preferences.getString(KEY_ENCRYPTED_VAULT, null)
@@ -76,6 +82,18 @@ class VaultRepository(
             ?.let { VaultEnvelopeJson.decodeEnvelope(it) }
             ?: throw VaultNotFoundException()
         val envelope = vaultCipher.encryptWithVaultKey(vault, existingEnvelope, vaultKey)
+        preferences.edit()
+            .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(envelope))
+            .apply()
+        return envelope
+    }
+
+    fun saveWithVaultKeyEnvelope(
+        vault: LocalVault,
+        keyEnvelope: EncryptedVaultEnvelope,
+        vaultKey: ByteArray
+    ): EncryptedVaultEnvelope {
+        val envelope = vaultCipher.encryptWithVaultKey(vault, keyEnvelope, vaultKey)
         preferences.edit()
             .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(envelope))
             .apply()

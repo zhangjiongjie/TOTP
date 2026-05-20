@@ -3,6 +3,22 @@
     {
       "name": "start_window_background",
       "value": "#000000"
+    },
+    {
+      "name": "dialog_surface",
+      "value": "#242632"
+    },
+    {
+      "name": "dialog_overlay",
+      "value": "#B3000000"
+    },
+    {
+      "name": "dialog_accent_text",
+      "value": "#8CC7FF"
+    },
+    {
+      "name": "dialog_border",
+      "value": "#343849"
     }
   ]
 }

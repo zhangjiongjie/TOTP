@@ -29,6 +29,7 @@ export type SyncResultStatus =
   | 'pulled'
   | 'pushed'
   | 'conflict'
+  | 'blocked'
   | 'download-error'
   | 'upload-error'
   | 'validation-error';
@@ -280,7 +281,17 @@ async function performSync(
     updatedAt: remoteSnapshot!.updatedAt,
     source: 'remote',
     fingerprintVault
+  }).catch((error) => {
+    if (isRemotePasswordBlockedError(error)) {
+      return null;
+    }
+
+    throw error;
   });
+
+  if (!remote) {
+    return handleRemotePasswordBlocked(context, syncStore);
+  }
   const local = context.localSnapshot!;
   const decision = detectVaultConflict({
     baseRevision: context.metadata.baseRevision,
@@ -767,6 +778,43 @@ function normalizeSyncError(
     retryable: true,
     statusCode: null
   };
+}
+
+async function handleRemotePasswordBlocked(
+  context: SyncContext,
+  syncStore: SyncMetadataStore
+): Promise<SyncRunResult> {
+  const message = '远端保管库需要主密码验证后才能继续同步。';
+
+  await syncStore.save({
+    lastStatus: 'blocked',
+    lastError: message
+  });
+
+  return {
+    status: 'blocked',
+    source: context.localVault ? 'local-cache' : 'none',
+    localRevision: context.localSnapshot?.revision ?? context.metadata.localRevision,
+    remoteRevision: context.metadata.remoteRevision,
+    localVault: context.localVault,
+    pendingConflict: context.metadata.pendingConflict,
+    error: {
+      kind: 'validation',
+      message,
+      retryable: false,
+      statusCode: null
+    }
+  };
+}
+
+function isRemotePasswordBlockedError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.name === 'VaultAuthenticationError' ||
+    error.message.includes('Master password is incorrect') ||
+    error.message.includes('主密码');
 }
 
 async function handleValidationFailure(

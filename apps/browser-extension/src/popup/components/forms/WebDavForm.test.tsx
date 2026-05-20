@@ -47,4 +47,22 @@ describe('WebDavForm', () => {
       color: 'var(--color-ink-soft)'
     });
   });
+
+  it('hides stale remote password errors after sync succeeds', () => {
+    render(
+      <WebDavForm
+        profile={baseProfile}
+        syncStatus={{
+          lastStatus: 'pushed',
+          lastSyncedAt: '2026-05-20T01:29:56.051Z',
+          lastError: '远端保管库需要主密码验证后才能继续同步。',
+          pendingConflict: null
+        }}
+        onSubmit={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('已同步')).toBeInTheDocument();
+    expect(screen.queryByText('远端保管库需要主密码验证后才能继续同步。')).not.toBeInTheDocument();
+  });
 });
