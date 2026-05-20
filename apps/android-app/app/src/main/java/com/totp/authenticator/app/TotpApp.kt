@@ -56,7 +56,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.fragment.app.FragmentActivity
 import com.totp.authenticator.R
-import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.data.backup.BackupService
 import com.totp.authenticator.data.biometric.BiometricVaultUnlockStore
 import com.totp.authenticator.data.vault.LocalVault
@@ -552,86 +551,16 @@ fun TotpApp() {
         return "最新同步：$formatted"
     }
 
-    fun saveAccount(account: TotpAccount, replaceExisting: Boolean) {
-        val password = state.activePassword
-        val vaultKey = state.activeVaultKey
-        if (password == null && vaultKey == null) {
-            showPersistenceError("Vault is not unlocked")
-            return
-        }
-
-        appScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val transform: (LocalVault) -> LocalVault = { vault ->
-                        val accounts = if (replaceExisting) {
-                            vault.accounts.map { existing ->
-                                if (existing.id == account.id) account else existing
-                            }
-                        } else {
-                            vault.accounts + account
-                        }
-                        vault.copy(accounts = accounts, updatedAt = account.updatedAt)
-                    }
-                    if (password != null) {
-                        repository.update(password, transform)
-                    } else {
-                        repository.updateWithVaultKey(vaultKey!!, transform)
-                    }
-                }
-            }.onSuccess { updatedVault ->
-                hasExistingVault = true
-                unlockState.clearError()
-                if (password != null) {
-                    state.applyUnlockedVault(updatedVault, password, vaultKey)
-                } else {
-                    state.applyUnlockedVaultWithKey(updatedVault, vaultKey!!)
-                }
-                state.navigate(TotpRoute.Home)
-                homeSyncActions.syncAfterLocalChange(updatedVault, password, vaultKey)
-            }.onFailure {
-                showPersistenceError("Could not save vault")
-            }
-        }
-    }
-
-    fun deleteAccount(accountId: String) {
-        val password = state.activePassword
-        val vaultKey = state.activeVaultKey
-        if (password == null && vaultKey == null) {
-            showPersistenceError("Vault is not unlocked")
-            return
-        }
-
-        appScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val transform: (LocalVault) -> LocalVault = { vault ->
-                        vault.copy(
-                            accounts = vault.accounts.filterNot { it.id == accountId },
-                            updatedAt = System.currentTimeMillis()
-                        )
-                    }
-                    if (password != null) {
-                        repository.update(password, transform)
-                    } else {
-                        repository.updateWithVaultKey(vaultKey!!, transform)
-                    }
-                }
-            }.onSuccess { updatedVault ->
-                hasExistingVault = true
-                unlockState.clearError()
-                if (password != null) {
-                    state.applyUnlockedVault(updatedVault, password, vaultKey)
-                } else {
-                    state.applyUnlockedVaultWithKey(updatedVault, vaultKey!!)
-                }
-                state.navigate(TotpRoute.Home)
-                homeSyncActions.syncAfterLocalChange(updatedVault, password, vaultKey)
-            }.onFailure {
-                showPersistenceError("Could not save vault")
-            }
-        }
+    val accountActions = remember {
+        VaultAccountActionCoordinator(
+            appState = state,
+            repository = repository,
+            unlockState = unlockState,
+            appScope = appScope,
+            onVaultExists = { hasExistingVault = true },
+            onPersistenceError = ::showPersistenceError,
+            onLocalChange = homeSyncActions::syncAfterLocalChange
+        )
     }
 
     if (backupState.pendingPasswordAction != null) {
@@ -803,7 +732,7 @@ fun TotpApp() {
             AccountEditorScreen(
                 title = "添加账号",
                 existingAccount = null,
-                onSave = { account -> saveAccount(account, replaceExisting = false) },
+                onSave = { account -> accountActions.saveAccount(account, replaceExisting = false) },
                 onDelete = null,
                 modifier = Modifier.padding(padding),
                 showTitle = false,
@@ -832,8 +761,8 @@ fun TotpApp() {
                     AccountEditorScreen(
                         title = "编辑账号",
                         existingAccount = account,
-                        onSave = { updatedAccount -> saveAccount(updatedAccount, replaceExisting = true) },
-                        onDelete = { accountId -> deleteAccount(accountId) },
+                        onSave = { updatedAccount -> accountActions.saveAccount(updatedAccount, replaceExisting = true) },
+                        onDelete = accountActions::deleteAccount,
                         modifier = Modifier.padding(padding),
                         showTitle = false
                     )

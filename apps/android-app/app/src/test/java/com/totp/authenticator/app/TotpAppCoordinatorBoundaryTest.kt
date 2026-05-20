@@ -22,6 +22,8 @@ class TotpAppCoordinatorBoundaryTest {
             "fun enableBiometricUnlock(",
             "fun disableBiometricUnlock(",
             "fun refreshQuickUnlockCredentialIfNeeded(",
+            "fun saveAccount(",
+            "fun deleteAccount(",
             "val syncWebDavWithPassword:",
             "val syncWebDavAfterUnlock:",
             "val syncWebDavAfterLocalChange:",
@@ -39,7 +41,9 @@ class TotpAppCoordinatorBoundaryTest {
             "webDavSyncService.testConnection(",
             "webDavSyncService.syncPasswordChange(",
             "repository.changePassword(",
-            "repository.exportVaultKey(nextPassword)"
+            "repository.exportVaultKey(nextPassword)",
+            "repository.update(",
+            "repository.updateWithVaultKey("
         ).forEach { businessCall ->
             assertFalse("$businessCall should live in a coordinator", source.contains(businessCall))
         }
@@ -54,6 +58,7 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(File(appDir, "QuickUnlockCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockActionCoordinator.kt").exists())
         assertTrue(File(appDir, "HomeSyncActionCoordinator.kt").exists())
+        assertTrue(File(appDir, "VaultAccountActionCoordinator.kt").exists())
         assertTrue(File(appDir, "BackupViewModel.kt").exists())
         assertTrue(File(appDir, "SyncViewModel.kt").exists())
         assertTrue(File(appDir, "QuickUnlockViewModel.kt").exists())
