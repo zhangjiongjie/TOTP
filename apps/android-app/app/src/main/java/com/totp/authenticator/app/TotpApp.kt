@@ -92,7 +92,7 @@ fun TotpApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = activityContext.applicationContext
     val repository = remember { VaultRepository(context) }
-    val qrImportService = remember(activityContext) { QrImportService(activityContext) }
+    val qrImportService = remember(context) { QrImportService(context.applicationContext) }
     val backupService = remember { BackupService() }
     val webDavSettingsStore = remember { WebDavSettingsStore(context) }
     val remoteKeyCacheStore = remember { RemoteVaultKeyCacheStore(context) }

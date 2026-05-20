@@ -38,6 +38,26 @@ class OtpAuthParserTest {
     }
 
     @Test
+    fun acceptsUnescapedSpacesInLabel() {
+        val parsed = OtpAuthParser.parse(
+            "otpauth://totp/GitHub:alice smith?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"
+        )
+
+        assertEquals("GitHub", parsed.issuer)
+        assertEquals("alice smith", parsed.accountName)
+    }
+
+    @Test
+    fun keepsAlreadyEncodedSpacesInLabel() {
+        val parsed = OtpAuthParser.parse(
+            "otpauth://totp/GitHub:alice%20smith?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"
+        )
+
+        assertEquals("GitHub", parsed.issuer)
+        assertEquals("alice smith", parsed.accountName)
+    }
+
+    @Test
     fun rejectsInvalidUris() {
         val invalidUris = listOf(
             "otpauth://totp/GitHub:alice?secret=JBSWY3DPEHPK3PXP&digits=abc",

@@ -52,9 +52,23 @@ object OtpAuthParser {
 
     private fun parseUri(value: String): URI {
         return try {
-            URI(value)
+            URI(encodeRawWhitespace(value))
         } catch (exception: URISyntaxException) {
             throw InvalidOtpAuthUriException("Invalid otpauth URI", exception)
+        }
+    }
+
+    private fun encodeRawWhitespace(value: String): String {
+        return buildString(value.length) {
+            value.forEach { char ->
+                when (char) {
+                    ' ' -> append("%20")
+                    '\t' -> append("%09")
+                    '\n' -> append("%0A")
+                    '\r' -> append("%0D")
+                    else -> append(char)
+                }
+            }
         }
     }
 

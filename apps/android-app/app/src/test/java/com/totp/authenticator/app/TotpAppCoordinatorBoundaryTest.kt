@@ -117,4 +117,18 @@ class TotpAppCoordinatorBoundaryTest {
             assertFalse("Backup import should return a sync request instead of calling $syncCall directly", source.contains(syncCall))
         }
     }
+
+    @Test
+    fun qrImportServiceUsesApplicationContext() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+
+        assertFalse(
+            "QrImportService should not retain Activity context",
+            source.contains("QrImportService(activityContext)")
+        )
+        assertTrue(
+            "QrImportService should be created with applicationContext",
+            source.contains("QrImportService(context.applicationContext)")
+        )
+    }
 }
