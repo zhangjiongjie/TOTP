@@ -164,7 +164,7 @@ fun TotpApp() {
                     if (state.currentRoute == TotpRoute.Unlock) {
                         quickUnlockState.resetUnlockAttempt()
                     }
-                    if (state.isUnlocked && !isConfigurationChange && !backupState.documentPickerActive) {
+                    if (state.isUnlocked && !isConfigurationChange && !backupState.externalPickerActive) {
                         webDavSyncService.clearCryptoCache()
                         quickUnlockState.resetUnlockAttempt()
                         syncState.resetSyncedAfterUnlock()
@@ -211,7 +211,7 @@ fun TotpApp() {
     val backupExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        backupState.markDocumentPickerActive(false)
+        backupState.markExternalPickerActive(false)
         val content = backupState.consumePendingExportContent()
         if (uri == null || content == null) {
             backupState.updateBusy(false)
@@ -278,31 +278,39 @@ fun TotpApp() {
         )
     }
 
-    lateinit var importBackupFromUri: (Uri, String) -> Unit
+    lateinit var importBackupFromContent: (String, String) -> Unit
 
     val backupImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        backupState.markDocumentPickerActive(false)
+        backupState.markExternalPickerActive(false)
         if (uri == null) {
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
         }
         val password = state.activePassword
+        val content = runCatching { readTextFromUri(uri) }
+            .onFailure { error ->
+                backupState.showError(error.message ?: "导入备份失败，请稍后重试。")
+                backupState.updateBusy(false)
+            }
+            .getOrNull() ?: return@rememberLauncherForActivityResult
         if (password == null) {
-            backupState.requestImportPassword(uri)
+            backupState.requestImportPassword(content)
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
         }
-        importBackupFromUri(uri, password)
+        importBackupFromContent(content, password)
     }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri == null) {
+            backupState.markExternalPickerActive(false)
             return@rememberLauncherForActivityResult
         }
+        backupState.markExternalPickerActive(false)
         appScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -376,6 +384,7 @@ fun TotpApp() {
     }
 
     fun startQrImageImport() {
+        backupState.markExternalPickerActive(true)
         imagePickerLauncher.launch(
             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
         )
@@ -410,7 +419,7 @@ fun TotpApp() {
             return
         }
         backupState.updateBusy(true)
-        backupState.markDocumentPickerActive(true)
+        backupState.markExternalPickerActive(true)
         backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
     }
 
@@ -701,11 +710,11 @@ fun TotpApp() {
         )
     }
 
-    importBackupFromUri = { uri, password ->
+    importBackupFromContent = { content, password ->
         backupState.launchTask(
             task = {
                 withContext(Dispatchers.IO) {
-                    backupFlowCoordinator.importBackup(readTextFromUri(uri), password)
+                    backupFlowCoordinator.importBackup(content, password)
                 }
             },
             onSuccess = { result ->
@@ -887,8 +896,8 @@ fun TotpApp() {
                 when (request?.action) {
                     BackupPasswordAction.Export -> exportBackupWithPassword(password)
                     BackupPasswordAction.Import -> {
-                        if (request.importUri != null) {
-                            importBackupFromUri(request.importUri, password)
+                        if (request.importContent != null) {
+                            importBackupFromContent(request.importContent, password)
                         } else {
                             backupState.showError("未选择导入文件。")
                         }

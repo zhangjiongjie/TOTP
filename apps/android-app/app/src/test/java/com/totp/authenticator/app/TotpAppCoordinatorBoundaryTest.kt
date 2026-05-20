@@ -97,10 +97,20 @@ class TotpAppCoordinatorBoundaryTest {
             "var pendingExportContent",
             "var pendingImportUri",
             "var pendingBackupPasswordAction",
-            "var documentPickerActive"
+            "var documentPickerActive",
+            "var externalPickerActive"
         ).forEach { stateDeclaration ->
             assertFalse("$stateDeclaration should live in a dedicated ViewModel", source.contains(stateDeclaration))
         }
+    }
+
+    @Test
+    fun backupViewModelDoesNotHoldPendingImportUri() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupViewModel.kt").readText()
+
+        assertFalse("BackupViewModel should cache import content instead of a temporary Uri", source.contains("android.net.Uri"))
+        assertFalse("BackupViewModel should not keep pending import Uri state", source.contains("pendingImportUri"))
+        assertTrue(source.contains("pendingImportContent"))
     }
 
     @Test

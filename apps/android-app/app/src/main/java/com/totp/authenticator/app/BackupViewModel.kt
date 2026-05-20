@@ -1,6 +1,5 @@
 package com.totp.authenticator.app
 
-import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,13 +23,13 @@ class BackupViewModel : ViewModel() {
     var pendingExportFilename: String? by mutableStateOf(null)
         private set
 
-    var pendingImportUri: Uri? by mutableStateOf(null)
+    var pendingImportContent: String? by mutableStateOf(null)
         private set
 
     var pendingPasswordAction: BackupPasswordAction? by mutableStateOf(null)
         private set
 
-    var documentPickerActive: Boolean by mutableStateOf(false)
+    var externalPickerActive: Boolean by mutableStateOf(false)
         private set
 
     fun updateBusy(busy: Boolean) {
@@ -49,7 +48,7 @@ class BackupViewModel : ViewModel() {
     fun prepareExport(payload: BackupExportPayload) {
         pendingExportContent = payload.content
         pendingExportFilename = payload.filename
-        documentPickerActive = true
+        externalPickerActive = true
     }
 
     fun consumePendingExportContent(): String? {
@@ -59,16 +58,16 @@ class BackupViewModel : ViewModel() {
         return content
     }
 
-    fun markDocumentPickerActive(active: Boolean) {
-        documentPickerActive = active
+    fun markExternalPickerActive(active: Boolean) {
+        externalPickerActive = active
     }
 
     fun requestExportPassword() {
         pendingPasswordAction = BackupPasswordAction.Export
     }
 
-    fun requestImportPassword(uri: Uri?) {
-        pendingImportUri = uri
+    fun requestImportPassword(content: String) {
+        pendingImportContent = content
         pendingPasswordAction = BackupPasswordAction.Import
     }
 
@@ -78,15 +77,15 @@ class BackupViewModel : ViewModel() {
 
     fun dismissPasswordPrompt() {
         pendingPasswordAction = null
-        pendingImportUri = null
+        pendingImportContent = null
         updateBusy(false)
     }
 
     fun consumePasswordRequest(): BackupPasswordRequest? {
         val action = pendingPasswordAction ?: return null
-        val request = BackupPasswordRequest(action, pendingImportUri)
+        val request = BackupPasswordRequest(action, pendingImportContent)
         pendingPasswordAction = null
-        pendingImportUri = null
+        pendingImportContent = null
         return request
     }
 
@@ -115,7 +114,7 @@ class BackupViewModel : ViewModel() {
 
 data class BackupPasswordRequest(
     val action: BackupPasswordAction,
-    val importUri: Uri?
+    val importContent: String?
 )
 
 enum class BackupPasswordAction {

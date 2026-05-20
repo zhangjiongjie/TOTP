@@ -92,25 +92,25 @@ class BackupViewModelTest {
 
         viewModel.prepareExport(BackupExportPayload(content = """{"encrypted":true}""", filename = "totp.json"))
 
-        assertTrue(viewModel.documentPickerActive)
+        assertTrue(viewModel.externalPickerActive)
         assertEquals("totp.json", viewModel.pendingExportFilename)
         assertEquals("""{"encrypted":true}""", viewModel.consumePendingExportContent())
         assertNull(viewModel.consumePendingExportContent())
     }
 
     @Test
-    fun tracksImportPasswordPromptAndDismissal() {
+    fun tracksImportContentPasswordPromptAndDismissal() {
         val viewModel = BackupViewModel()
 
-        viewModel.requestImportPassword(null)
+        viewModel.requestImportPassword("""{"accounts":[]}""")
 
         assertEquals(BackupPasswordAction.Import, viewModel.pendingPasswordAction)
-        assertNull(viewModel.pendingImportUri)
+        assertEquals("""{"accounts":[]}""", viewModel.pendingImportContent)
 
         viewModel.dismissPasswordPrompt()
 
         assertNull(viewModel.pendingPasswordAction)
-        assertNull(viewModel.pendingImportUri)
+        assertNull(viewModel.pendingImportContent)
         assertFalse(viewModel.isBusy)
     }
 
@@ -118,14 +118,14 @@ class BackupViewModelTest {
     fun consumesPasswordPromptOnce() {
         val viewModel = BackupViewModel()
 
-        viewModel.requestImportPassword(null)
+        viewModel.requestImportPassword("""{"accounts":[]}""")
 
         val request = viewModel.consumePasswordRequest()
 
         assertEquals(BackupPasswordAction.Import, request?.action)
-        assertNull(request?.importUri)
+        assertEquals("""{"accounts":[]}""", request?.importContent)
         assertNull(viewModel.pendingPasswordAction)
-        assertNull(viewModel.pendingImportUri)
+        assertNull(viewModel.pendingImportContent)
         assertNull(viewModel.consumePasswordRequest())
     }
 }
