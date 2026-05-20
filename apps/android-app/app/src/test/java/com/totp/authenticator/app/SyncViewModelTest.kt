@@ -1,0 +1,125 @@
+package com.totp.authenticator.app
+
+import com.totp.authenticator.data.webdav.WebDavSettings
+import com.totp.authenticator.data.webdav.WebDavSyncMetadata
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class SyncViewModelTest {
+    private val dispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun busyRemainsTrueUntilAllOperationsFinish() {
+        val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
+
+        viewModel.beginOperation()
+        viewModel.beginOperation()
+        viewModel.endOperation()
+
+        assertTrue(viewModel.isBusy)
+
+        viewModel.endOperation()
+
+        assertFalse(viewModel.isBusy)
+    }
+
+    @Test
+    fun ignoresExtraEndOperation() {
+        val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
+
+        viewModel.endOperation()
+
+        assertFalse(viewModel.isBusy)
+    }
+
+    @Test
+    fun storesHomeAndSettingsMessagesSeparately() {
+        val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
+
+        viewModel.showHomeCopy("同步完成")
+        viewModel.showSettingsError("连接失败")
+
+        assertEquals("同步完成", viewModel.homeCopyStatusMessage)
+        assertEquals("", viewModel.homeErrorStatusMessage)
+        assertEquals("连接失败", viewModel.webDavStatusMessage)
+        assertTrue(viewModel.webDavStatusIsError)
+    }
+
+    @Test
+    fun launchExclusiveSyncCancelsPreviousOperation() = runTest {
+        val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
+        var firstCancelled = false
+        var secondRan = false
+
+        viewModel.launchExclusiveSync {
+            try {
+                awaitCancellation()
+            } finally {
+                firstCancelled = true
+            }
+        }
+        dispatcher.scheduler.runCurrent()
+
+        assertTrue(viewModel.isBusy)
+
+        viewModel.launchExclusiveSync {
+            secondRan = true
+        }
+        dispatcher.scheduler.runCurrent()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(firstCancelled)
+        assertTrue(secondRan)
+        assertFalse(viewModel.isBusy)
+    }
+
+    @Test
+    fun launchExclusiveSyncTaskRoutesSuccessAndFailure() = runTest {
+        val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
+        var successValue = 0
+        var errorMessage = ""
+
+        viewModel.launchExclusiveSyncTask(
+            task = { 42 },
+            onSuccess = { successValue = it },
+            onFailure = { errorMessage = it.message.orEmpty() }
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(42, successValue)
+        assertEquals("", errorMessage)
+        assertFalse(viewModel.isBusy)
+
+        viewModel.launchExclusiveSyncTask(
+            task = { error("boom") },
+            onSuccess = { successValue = it },
+            onFailure = { errorMessage = it.message.orEmpty() }
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("boom", errorMessage)
+        assertFalse(viewModel.isBusy)
+    }
+}

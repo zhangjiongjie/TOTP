@@ -3,13 +3,10 @@ package com.totp.authenticator.app
 import com.totp.authenticator.data.backup.BackupService
 import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultRepository
-import com.totp.authenticator.data.webdav.WebDavSyncMetadata
-import com.totp.authenticator.data.webdav.WebDavSyncService
 
 class BackupFlowCoordinator(
     private val repository: VaultRepository,
-    private val backupService: BackupService,
-    private val webDavSyncService: WebDavSyncService
+    private val backupService: BackupService
 ) {
     suspend fun createExportWithPassword(vault: LocalVault, password: String): BackupExportPayload {
         repository.exportVaultKey(password)
@@ -31,13 +28,9 @@ class BackupFlowCoordinator(
         val vaultKey = repository.exportVaultKey(password)
         val importedVault = backupService.parseImport(raw, password)
         repository.save(importedVault, password)
-        if (webDavSyncService.loadSettings().enabled) {
-            webDavSyncService.syncLocalChange(password)
-        }
         return BackupImportResult(
             vault = importedVault,
-            vaultKey = vaultKey,
-            webDavMetadata = webDavSyncService.loadMetadata()
+            vaultKey = vaultKey
         )
     }
 }
@@ -49,6 +42,5 @@ data class BackupExportPayload(
 
 data class BackupImportResult(
     val vault: LocalVault,
-    val vaultKey: ByteArray,
-    val webDavMetadata: WebDavSyncMetadata
+    val vaultKey: ByteArray
 )

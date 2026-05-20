@@ -38,30 +38,17 @@ import androidx.compose.ui.unit.dp
 import com.totp.authenticator.R
 import com.totp.authenticator.data.webdav.DEFAULT_WEBDAV_FILE_PATH
 import com.totp.authenticator.data.webdav.WebDavSettings
-import com.totp.authenticator.data.webdav.WebDavSyncMetadata
 import com.totp.authenticator.ui.common.PasswordVisibilityIcon
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun SettingsScreen(
     accountCount: Int,
     biometricUnlockEnabled: Boolean,
-    biometricUnlockAvailable: Boolean,
-    quickUnlockSetupRequired: Boolean,
-    quickUnlockTitle: String,
-    isBiometricBusy: Boolean,
     webDavSettings: WebDavSettings,
-    webDavMetadata: WebDavSyncMetadata,
     isWebDavBusy: Boolean,
-    webDavStatusMessage: String,
-    webDavStatusIsError: Boolean,
+    settingsUiModel: SettingsUiModel,
     isPasswordChangeBusy: Boolean,
     masterPasswordErrorMessage: String,
-    backupStatusMessage: String,
-    backupErrorMessage: String,
-    isBackupBusy: Boolean,
     onSaveWebDavSettings: (WebDavSettings) -> Unit,
     onTestWebDav: (WebDavSettings) -> Unit,
     onSyncWebDav: () -> Unit,
@@ -74,7 +61,6 @@ fun SettingsScreen(
     var showWebDavDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showBlockedPasswordDialog by remember { mutableStateOf(false) }
-    val isRemotePasswordBlocked = webDavSettings.enabled && webDavMetadata.lastStatus == "blocked"
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -97,23 +83,19 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = quickUnlockTitle,
+                            text = settingsUiModel.quickUnlockTitle,
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = biometricSummary(
-                                enabled = biometricUnlockEnabled,
-                                available = biometricUnlockAvailable,
-                                setupRequired = quickUnlockSetupRequired
-                            ),
+                            text = settingsUiModel.quickUnlockSummary,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Checkbox(
                         checked = biometricUnlockEnabled,
-                        enabled = !isBiometricBusy && (biometricUnlockAvailable || quickUnlockSetupRequired),
+                        enabled = settingsUiModel.quickUnlockToggleEnabled,
                         onCheckedChange = onBiometricUnlockChanged
                     )
                 }
@@ -143,7 +125,7 @@ fun SettingsScreen(
                     TextButton(
                         enabled = !isPasswordChangeBusy,
                         onClick = {
-                            if (isRemotePasswordBlocked) {
+                            if (settingsUiModel.isRemotePasswordBlocked) {
                                 showBlockedPasswordDialog = true
                             } else {
                                 showChangePasswordDialog = true
@@ -169,7 +151,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        val webDavStatusText = webDavSummary(webDavSettings)
+                        val webDavStatusText = settingsUiModel.webDavSavedSummary
                         if (webDavStatusText.isNotBlank()) {
                             Text(
                                 text = webDavStatusText,
@@ -177,7 +159,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (!webDavSettings.enabled) {
+                        if (settingsUiModel.showWebDavEnableHint) {
                             Text(
                                 text = "勾选后立即保存并启用同步。",
                                 style = MaterialTheme.typography.bodySmall,
@@ -185,18 +167,14 @@ fun SettingsScreen(
                             )
                         }
                         WebDavStatusText(
-                            metadata = webDavMetadata,
-                            enabled = webDavSettings.enabled,
-                            busy = isWebDavBusy,
-                            transientMessage = webDavStatusMessage,
-                            transientIsError = webDavStatusIsError
+                            status = settingsUiModel.webDavStatus
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(
                                 enabled = !isWebDavBusy,
                                 onClick = { showWebDavDialog = true }
                             ) {
-                                Text(if (webDavSettings.enabled) "编辑设置" else "设置同步")
+                                Text(settingsUiModel.webDavActionLabel)
                             }
                             TextButton(
                                 enabled = !isWebDavBusy && webDavSettings.enabled,
@@ -218,7 +196,7 @@ fun SettingsScreen(
                             }
                         )
                         Text(
-                            text = if (webDavSettings.enabled) "已启用" else "未启用",
+                            text = settingsUiModel.webDavEnabledLabel,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -240,9 +218,9 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        InlineMessage(backupStatusMessage, isError = false)
-                        InlineMessage(backupErrorMessage, isError = true)
-                        if (backupStatusMessage.isBlank() && backupErrorMessage.isBlank()) {
+                        InlineMessage(settingsUiModel.backupStatusMessage, isError = false)
+                        InlineMessage(settingsUiModel.backupErrorMessage, isError = true)
+                        if (settingsUiModel.showBackupDefaultHint) {
                             Text(
                                 text = "备份文件会使用当前主密码加密。",
                                 style = MaterialTheme.typography.bodySmall,
@@ -254,13 +232,13 @@ fun SettingsScreen(
                         BackupIconButton(
                             iconRes = R.drawable.action_export,
                             contentDescription = "导出",
-                            enabled = !isBackupBusy,
+                            enabled = settingsUiModel.backupActionsEnabled,
                             onClick = onExportBackup
                         )
                         BackupIconButton(
                             iconRes = R.drawable.action_import,
                             contentDescription = "导入",
-                            enabled = !isBackupBusy,
+                            enabled = settingsUiModel.backupActionsEnabled,
                             onClick = onImportBackup
                         )
                     }
@@ -334,69 +312,20 @@ private fun InlineMessage(message: String, isError: Boolean) {
 
 @Composable
 private fun WebDavStatusText(
-    metadata: WebDavSyncMetadata,
-    enabled: Boolean,
-    busy: Boolean,
-    transientMessage: String,
-    transientIsError: Boolean
+    status: SettingsStatus
 ) {
     val colors = webStatusColors()
-    val status = resolveWebDavStatus(
-        metadata = metadata,
-        enabled = enabled,
-        busy = busy,
-        transientMessage = transientMessage,
-        transientIsError = transientIsError
-    )
     Text(
         text = status.message,
         modifier = Modifier.fillMaxWidth(),
         style = MaterialTheme.typography.bodySmall,
         color = when (status.tone) {
-            WebDavStatusTone.Success -> colors.success
-            WebDavStatusTone.Error -> colors.danger
-            WebDavStatusTone.Idle -> colors.inkSoft
+            SettingsStatusTone.Success -> colors.success
+            SettingsStatusTone.Error -> colors.danger
+            SettingsStatusTone.Idle -> colors.inkSoft
         },
         lineHeight = MaterialTheme.typography.bodySmall.lineHeight
     )
-}
-
-private fun resolveWebDavStatus(
-    metadata: WebDavSyncMetadata,
-    enabled: Boolean,
-    busy: Boolean,
-    transientMessage: String,
-    transientIsError: Boolean
-): WebDavStatus {
-    if (!enabled) {
-        return WebDavStatus("WebDAV 同步未开启，本地模式。", WebDavStatusTone.Idle)
-    }
-    if (transientMessage.isNotBlank()) {
-        return WebDavStatus(
-            transientMessage,
-            if (transientIsError) WebDavStatusTone.Error else WebDavStatusTone.Success
-        )
-    }
-    if (busy) {
-        return WebDavStatus("同步中...", WebDavStatusTone.Idle)
-    }
-    if (metadata.lastStatus == "blocked") {
-        return WebDavStatus("远端保管库需要主密码验证后才能继续同步。", WebDavStatusTone.Error)
-    }
-    val error = metadata.lastError
-    if (error.isNotBlank()) {
-        return WebDavStatus(
-            if (metadata.lastStatus == "conflict") "同步冲突：$error" else "同步失败：$error",
-            WebDavStatusTone.Error
-        )
-    }
-    return when (metadata.lastStatus) {
-        "pushed" -> WebDavStatus("同步完成，已推送本地最新数据。", WebDavStatusTone.Success)
-        "pulled" -> WebDavStatus("同步完成，已拉取远端最新数据。", WebDavStatusTone.Success)
-        "synced", "noop" -> WebDavStatus("同步完成，当前数据已经是最新。", WebDavStatusTone.Success)
-        "conflict" -> WebDavStatus("检测到同步冲突，请前往设置页处理。", WebDavStatusTone.Error)
-        else -> WebDavStatus("本地与 WebDAV 已经是最新版本。", WebDavStatusTone.Idle)
-    }
 }
 
 @Composable
@@ -416,22 +345,11 @@ private fun webStatusColors(): WebStatusColors {
     }
 }
 
-private data class WebDavStatus(
-    val message: String,
-    val tone: WebDavStatusTone
-)
-
 private data class WebStatusColors(
     val inkSoft: Color,
     val success: Color,
     val danger: Color
 )
-
-private enum class WebDavStatusTone {
-    Idle,
-    Success,
-    Error
-}
 
 @Composable
 private fun BackupIconButton(
@@ -637,20 +555,3 @@ private fun ChangeMasterPasswordDialog(
     )
 }
 
-private fun webDavSummary(settings: WebDavSettings): String {
-    if (settings.updatedAt <= 0L) {
-        return ""
-    }
-    val formatted = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(settings.updatedAt))
-    return "已保存 $formatted"
-}
-
-private fun biometricSummary(enabled: Boolean, available: Boolean, setupRequired: Boolean): String {
-    if (setupRequired) {
-        return "未设置系统锁屏，点击后前往系统设置。"
-    }
-    if (!available) {
-        return "当前设备不支持快速解锁。"
-    }
-    return if (enabled) "开启后可用系统凭据解锁。" else "开启后可用系统凭据解锁。"
-}
