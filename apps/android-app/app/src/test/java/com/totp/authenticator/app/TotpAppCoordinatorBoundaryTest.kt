@@ -48,6 +48,8 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(File(appDir, "SyncViewModel.kt").exists())
         assertTrue(File(appDir, "QuickUnlockViewModel.kt").exists())
         assertTrue(File(appDir, "SettingsViewModel.kt").exists())
+        assertTrue(File(appDir, "PasswordChangeViewModel.kt").exists())
+        assertTrue(File(appDir, "UnlockViewModel.kt").exists())
     }
 
     @Test
@@ -83,7 +85,14 @@ class TotpAppCoordinatorBoundaryTest {
             "var biometricUnlockAvailable",
             "var hasStrongBiometric",
             "var biometricBusy",
-            "var autoQuickUnlockAttempted"
+            "var autoQuickUnlockAttempted",
+            "var passwordChangeDialogVisible",
+            "var passwordChangeInProgress",
+            "var passwordChangeDialogMessage",
+            "var passwordChangeDialogIsError",
+            "var masterPasswordErrorMessage",
+            "var errorMessage",
+            "var unlockBusy"
         ).forEach { stateDeclaration ->
             assertFalse("$stateDeclaration should live in a dedicated ViewModel", source.contains(stateDeclaration))
         }

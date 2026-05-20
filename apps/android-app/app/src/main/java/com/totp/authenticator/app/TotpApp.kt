@@ -84,7 +84,6 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import javax.crypto.AEADBadTagException
 
 @Composable
 fun TotpApp() {
@@ -131,6 +130,8 @@ fun TotpApp() {
     )
     val backupState: BackupViewModel = viewModel(key = "backup")
     val settingsState: SettingsViewModel = viewModel(key = "settings")
+    val passwordChangeState: PasswordChangeViewModel = viewModel(key = "passwordChange")
+    val unlockState: UnlockViewModel = viewModel(key = "unlock")
     val quickUnlockState: QuickUnlockViewModel = viewModel(
         key = "quickUnlock",
         factory = object : ViewModelProvider.Factory {
@@ -141,15 +142,8 @@ fun TotpApp() {
         }
     )
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var unlockBusy by remember { mutableStateOf(false) }
     var importedOtpAuthUri by remember { mutableStateOf<String?>(null) }
     var foregroundUnlockTick by remember { mutableStateOf(0) }
-    var passwordChangeDialogVisible by remember { mutableStateOf(false) }
-    var passwordChangeInProgress by remember { mutableStateOf(false) }
-    var passwordChangeDialogMessage by remember { mutableStateOf("") }
-    var passwordChangeDialogIsError by remember { mutableStateOf(false) }
-    var masterPasswordErrorMessage by remember { mutableStateOf("") }
     var pendingExportContent by remember { mutableStateOf<String?>(null) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var pendingBackupPasswordAction by remember { mutableStateOf<BackupPasswordAction?>(null) }
@@ -385,7 +379,7 @@ fun TotpApp() {
     }
 
     fun showPersistenceError(message: String) {
-        errorMessage = message
+        unlockState.showError(message)
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
@@ -568,18 +562,6 @@ fun TotpApp() {
         return if (hasStrongBiometric) "生物识别解锁" else "系统凭证解锁"
     }
 
-    fun userFacingMasterPasswordError(error: Throwable): String {
-        val message = error.message.orEmpty()
-        return when {
-            error is AEADBadTagException -> "当前主密码错误"
-            message.contains("Tag mismatch", ignoreCase = true) -> "当前主密码错误"
-            message.contains("mac check", ignoreCase = true) -> "当前主密码错误"
-            message.contains("unable to decrypt", ignoreCase = true) -> "当前主密码错误"
-            message.contains("Could not unlock", ignoreCase = true) -> "当前主密码错误"
-            else -> message.ifBlank { "主密码修改失败" }
-        }
-    }
-
     val syncWebDavWithPassword: (String) -> Unit = syncWebDavWithPassword@{ password ->
         val vault = state.vault
         if (vault == null) {
@@ -659,7 +641,7 @@ fun TotpApp() {
         quickUnlockState.updateBusy(false)
         quickUnlockState.markAutoAttempted()
         if (!quickUnlockState.enabled) {
-            errorMessage = "快速解锁未开启，请使用主密码。"
+            unlockState.showError("快速解锁未开启，请使用主密码。")
             return@startBiometricUnlock
         }
         quickUnlockState.updateBusy(true)
@@ -676,17 +658,17 @@ fun TotpApp() {
                         }
                     },
                     onSuccess = { result ->
-                        errorMessage = null
+                        unlockState.clearError()
                         state.applyUnlockedVaultWithKey(result.vault, result.vaultKey)
                         syncWebDavAfterUnlock(result.vault, null, result.vaultKey)
                     },
                     onFailure = { error ->
-                        errorMessage = error.message ?: "快速解锁失败，请使用主密码。"
+                        unlockState.showError(error.message ?: "快速解锁失败，请使用主密码。")
                     }
                 )
             },
             onError = { message ->
-                errorMessage = message.ifBlank { "快速解锁已取消，请使用主密码。" }
+                unlockState.showError(message.ifBlank { "快速解锁已取消，请使用主密码。" })
             }
         )
     }
@@ -849,7 +831,7 @@ fun TotpApp() {
                 }
             }.onSuccess { updatedVault ->
                 hasExistingVault = true
-                errorMessage = null
+                unlockState.clearError()
                 if (password != null) {
                     state.applyUnlockedVault(updatedVault, password, vaultKey)
                 } else {
@@ -888,7 +870,7 @@ fun TotpApp() {
                 }
             }.onSuccess { updatedVault ->
                 hasExistingVault = true
-                errorMessage = null
+                unlockState.clearError()
                 if (password != null) {
                     state.applyUnlockedVault(updatedVault, password, vaultKey)
                 } else {
@@ -931,11 +913,11 @@ fun TotpApp() {
         )
     }
 
-    if (passwordChangeDialogVisible) {
+    if (passwordChangeState.dialogVisible) {
         BlockingProgressDialog(
-            inProgress = passwordChangeInProgress,
-            message = passwordChangeDialogMessage,
-            isError = passwordChangeDialogIsError
+            inProgress = passwordChangeState.inProgress,
+            message = passwordChangeState.dialogMessage,
+            isError = passwordChangeState.dialogIsError
         )
     }
 
@@ -966,50 +948,48 @@ fun TotpApp() {
             }
             UnlockScreen(
                 hasExistingVault = hasExistingVault,
-                errorMessage = errorMessage,
-                isBusy = unlockBusy,
+                errorMessage = unlockState.errorMessage,
+                isBusy = unlockState.isBusy,
                 biometricUnlockEnabled = hasExistingVault && quickUnlockState.enabled && quickUnlockState.available,
                 isBiometricBusy = quickUnlockState.isBusy,
                 modifier = Modifier.padding(padding),
                 onCreatePassword = { password ->
-                    appScope.launch {
-                        unlockBusy = true
-                        runCatching {
+                    unlockState.launchTask(
+                        task = {
                             withContext(Dispatchers.IO) {
                                 val vault = repository.create(password, now = System.currentTimeMillis())
                                 val vaultKey = repository.exportVaultKey(password)
                                 vault to vaultKey
                             }
-                        }.onSuccess { (vault, vaultKey) ->
+                        },
+                        onSuccess = { (vault, vaultKey) ->
                             hasExistingVault = true
-                            errorMessage = null
                             state.applyUnlockedVault(vault, password, vaultKey)
                             syncWebDavAfterUnlock(vault, password, vaultKey)
-                        }.onFailure {
-                            errorMessage = "Could not create vault"
+                        },
+                        onFailure = {
+                            unlockState.showError("Could not create vault")
                         }
-                        unlockBusy = false
-                    }
+                    )
                 },
                 onBiometricUnlock = startBiometricUnlock,
                 onUnlock = { password ->
-                    appScope.launch {
-                        unlockBusy = true
-                        runCatching {
+                    unlockState.launchTask(
+                        task = {
                             withContext(Dispatchers.IO) {
                                 val vault = repository.unlock(password)
                                 val vaultKey = repository.exportVaultKey(password)
                                 vault to vaultKey
                             }
-                        }.onSuccess { (vault, vaultKey) ->
-                            errorMessage = null
+                        },
+                        onSuccess = { (vault, vaultKey) ->
                             state.applyUnlockedVault(vault, password, vaultKey)
                             syncWebDavAfterUnlock(vault, password, vaultKey)
-                        }.onFailure {
-                            errorMessage = "Could not unlock vault"
+                        },
+                        onFailure = {
+                            unlockState.showError("Could not unlock vault")
                         }
-                        unlockBusy = false
-                    }
+                    )
                 }
             )
         }
@@ -1151,8 +1131,8 @@ fun TotpApp() {
                 webDavSettings = syncState.webDavSettings,
                 isWebDavBusy = syncState.isBusy,
                 settingsUiModel = settingsUiModel,
-                isPasswordChangeBusy = passwordChangeDialogVisible,
-                masterPasswordErrorMessage = masterPasswordErrorMessage,
+                isPasswordChangeBusy = passwordChangeState.dialogVisible,
+                masterPasswordErrorMessage = passwordChangeState.masterPasswordErrorMessage,
                 onSaveWebDavSettings = { settings ->
                     syncState.launchExclusiveSyncTask(
                         task = {
@@ -1289,33 +1269,21 @@ fun TotpApp() {
                 onChangeMasterPassword = { currentPassword, nextPassword ->
                     val shouldSyncPasswordChange = webDavSyncService.loadSettings().enabled
                     val changePassword: suspend () -> Unit = {
-                        passwordChangeDialogVisible = true
-                        passwordChangeInProgress = true
-                        passwordChangeDialogMessage = "正在更新主密码..."
-                        passwordChangeDialogIsError = false
-                        masterPasswordErrorMessage = ""
-                        runCatching {
-                            withContext(Dispatchers.IO) {
-                                webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
-                            }
-                        }.onSuccess { result ->
-                            state.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
-                            syncState.updateMetadata(result.metadata)
-                            quickUnlockCoordinator.disable()
-                            quickUnlockState.updateEnabled(false)
-                            passwordChangeInProgress = false
-                            passwordChangeDialogMessage = "主密码已修改，${quickUnlockTitleForMessage(quickUnlockState.hasStrongBiometric)}需要重新开启。"
-                            passwordChangeDialogIsError = false
-                            delay(1_600)
-                            passwordChangeDialogVisible = false
-                        }.onFailure { error ->
-                            masterPasswordErrorMessage = ""
-                            passwordChangeInProgress = false
-                            passwordChangeDialogMessage = userFacingMasterPasswordError(error)
-                            passwordChangeDialogIsError = true
-                            delay(1_600)
-                            passwordChangeDialogVisible = false
-                        }
+                        passwordChangeState.runChange(
+                            successMessage = "主密码已修改，${quickUnlockTitleForMessage(quickUnlockState.hasStrongBiometric)}需要重新开启。",
+                            task = {
+                                withContext(Dispatchers.IO) {
+                                    webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
+                                }
+                            },
+                            onSuccess = { result ->
+                                state.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
+                                syncState.updateMetadata(result.metadata)
+                                quickUnlockCoordinator.disable()
+                                quickUnlockState.updateEnabled(false)
+                            },
+                            onFailure = {}
+                        )
                     }
                     if (shouldSyncPasswordChange) {
                         syncState.launchExclusiveSync(changePassword)
