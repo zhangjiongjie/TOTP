@@ -3,29 +3,25 @@ package com.totp.authenticator.app
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultRepository
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class VaultAccountActionCoordinator(
     private val appState: TotpApplicationState,
     private val repository: VaultRepository,
     private val unlockState: UnlockViewModel,
-    private val appScope: CoroutineScope,
-    private val onVaultExists: () -> Unit,
-    private val onPersistenceError: (String) -> Unit,
-    private val onLocalChange: (LocalVault, String?, ByteArray?) -> Unit
+    private val accountState: VaultAccountViewModel,
+    private val callbacks: VaultAccountCallbacks
 ) {
     fun saveAccount(account: TotpAccount, replaceExisting: Boolean) {
         val password = appState.activePassword
         val vaultKey = appState.activeVaultKey
         if (password == null && vaultKey == null) {
-            onPersistenceError("Vault is not unlocked")
+            callbacks.onPersistenceError("Vault is not unlocked")
             return
         }
 
-        appScope.launch {
+        accountState.launchMutation {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val transform: (LocalVault) -> LocalVault = { vault ->
@@ -45,7 +41,7 @@ class VaultAccountActionCoordinator(
                     }
                 }
             }.onSuccess { updatedVault ->
-                onVaultExists()
+                callbacks.onVaultExists()
                 unlockState.clearError()
                 if (password != null) {
                     appState.applyUnlockedVault(updatedVault, password, vaultKey)
@@ -53,9 +49,9 @@ class VaultAccountActionCoordinator(
                     appState.applyUnlockedVaultWithKey(updatedVault, vaultKey!!)
                 }
                 appState.navigate(TotpRoute.Home)
-                onLocalChange(updatedVault, password, vaultKey)
+                callbacks.onLocalChange(updatedVault, password, vaultKey)
             }.onFailure {
-                onPersistenceError("Could not save vault")
+                callbacks.onPersistenceError("Could not save vault")
             }
         }
     }
@@ -64,14 +60,17 @@ class VaultAccountActionCoordinator(
         val password = appState.activePassword
         val vaultKey = appState.activeVaultKey
         if (password == null && vaultKey == null) {
-            onPersistenceError("Vault is not unlocked")
+            callbacks.onPersistenceError("Vault is not unlocked")
             return
         }
 
-        appScope.launch {
+        accountState.launchMutation {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val transform: (LocalVault) -> LocalVault = { vault ->
+                        if (vault.accounts.none { it.id == accountId }) {
+                            throw MissingAccountException
+                        }
                         vault.copy(
                             accounts = vault.accounts.filterNot { it.id == accountId },
                             updatedAt = System.currentTimeMillis()
@@ -84,7 +83,7 @@ class VaultAccountActionCoordinator(
                     }
                 }
             }.onSuccess { updatedVault ->
-                onVaultExists()
+                callbacks.onVaultExists()
                 unlockState.clearError()
                 if (password != null) {
                     appState.applyUnlockedVault(updatedVault, password, vaultKey)
@@ -92,10 +91,22 @@ class VaultAccountActionCoordinator(
                     appState.applyUnlockedVaultWithKey(updatedVault, vaultKey!!)
                 }
                 appState.navigate(TotpRoute.Home)
-                onLocalChange(updatedVault, password, vaultKey)
-            }.onFailure {
-                onPersistenceError("Could not save vault")
+                callbacks.onLocalChange(updatedVault, password, vaultKey)
+            }.onFailure { error ->
+                if (error is MissingAccountException) {
+                    callbacks.onPersistenceError("Account not found")
+                } else {
+                    callbacks.onPersistenceError("Could not save vault")
+                }
             }
         }
     }
+
+    private object MissingAccountException : IllegalStateException()
 }
+
+data class VaultAccountCallbacks(
+    val onVaultExists: () -> Unit,
+    val onPersistenceError: (String) -> Unit,
+    val onLocalChange: (LocalVault, String?, ByteArray?) -> Unit
+)

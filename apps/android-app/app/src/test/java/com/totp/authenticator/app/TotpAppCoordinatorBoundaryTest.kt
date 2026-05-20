@@ -66,6 +66,7 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(File(appDir, "QuickUnlockCredentialRefresher.kt").exists())
         assertTrue(File(appDir, "HomeSyncActionCoordinator.kt").exists())
         assertTrue(File(appDir, "VaultAccountActionCoordinator.kt").exists())
+        assertTrue(File(appDir, "VaultAccountViewModel.kt").exists())
         assertTrue(File(appDir, "BackupViewModel.kt").exists())
         assertTrue(File(appDir, "SyncViewModel.kt").exists())
         assertTrue(File(appDir, "QuickUnlockViewModel.kt").exists())
@@ -214,6 +215,17 @@ class TotpAppCoordinatorBoundaryTest {
         assertFalse("Settings actions should use ViewModel scopes, not rememberCoroutineScope", source.contains("CoroutineScope"))
         assertFalse("Settings actions should not receive appScope", source.contains("appScope"))
         assertFalse("Settings actions should not launch directly from appScope", source.contains(".launch { changePassword() }"))
+    }
+
+    @Test
+    fun vaultAccountActionsUseViewModelScopeAndValidateDeletes() {
+        val source = File("src/main/java/com/totp/authenticator/app/VaultAccountActionCoordinator.kt").readText()
+
+        assertFalse("Account persistence actions should not use a composable CoroutineScope", source.contains("CoroutineScope"))
+        assertFalse("Account persistence actions should not receive appScope", source.contains("appScope"))
+        assertTrue("Account persistence actions should launch from VaultAccountViewModel", source.contains("VaultAccountViewModel"))
+        assertTrue("Deleting a missing account should be treated as a no-op failure before writing", source.contains("MissingAccountException"))
+        assertTrue("Delete transforms should check account existence before writing", source.contains("none { it.id == accountId }"))
     }
 
     @Test

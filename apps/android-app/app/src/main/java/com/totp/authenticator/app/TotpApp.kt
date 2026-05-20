@@ -130,6 +130,7 @@ fun TotpApp() {
     val settingsState: SettingsViewModel = viewModel(key = "settings")
     val passwordChangeState: PasswordChangeViewModel = viewModel(key = "passwordChange")
     val unlockState: UnlockViewModel = viewModel(key = "unlock")
+    val vaultAccountState: VaultAccountViewModel = viewModel(key = "vaultAccount")
     val quickUnlockState: QuickUnlockViewModel = viewModel(
         key = "quickUnlock",
         factory = object : ViewModelProvider.Factory {
@@ -488,10 +489,12 @@ fun TotpApp() {
             appState = state,
             repository = repository,
             unlockState = unlockState,
-            appScope = appScope,
-            onVaultExists = { hasExistingVault = true },
-            onPersistenceError = ::showPersistenceError,
-            onLocalChange = homeSyncActions::syncAfterLocalChange
+            accountState = vaultAccountState,
+            callbacks = VaultAccountCallbacks(
+                onVaultExists = { hasExistingVault = true },
+                onPersistenceError = ::showPersistenceError,
+                onLocalChange = homeSyncActions::syncAfterLocalChange
+            )
         )
     }
 
