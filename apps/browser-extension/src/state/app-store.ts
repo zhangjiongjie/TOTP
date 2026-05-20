@@ -1,7 +1,14 @@
 import { accountService } from '../services/account-service';
 import { createSyncService } from '../services/sync-service';
-import { decodeBase64 } from '@totp/core';
-import { decryptVault, encryptVault, type EncryptedVaultBlob } from '@totp/core';
+import {
+  decryptVault,
+  decryptVaultWithKey,
+  encryptVault,
+  encryptVaultWithKey,
+  importAesKey,
+  unlockVault,
+  type EncryptedVaultBlob
+} from '@totp/core';
 import {
   createFetchWebDavClient,
   type WebDavClient,
@@ -15,7 +22,6 @@ import {
   saveEncryptedVault,
   type VaultStorageAdapter
 } from '@totp/core';
-import { deriveAesKey } from '@totp/core';
 import type { SyncRunResult } from '@totp/sync';
 import {
   createChromeSyncMetadataStore,
@@ -81,11 +87,13 @@ let pendingAutoSyncRuns = 0;
 let isApplyingRemoteSyncUpdate = false;
 let syncClientOverride: WebDavClient | null = null;
 let localMutationVersion = 0;
+let currentVaultKey: Uint8Array | null = null;
 let appState = createAppState();
 
 subscribeSession((session) => {
   if (!session.isUnlocked) {
     clearCurrentMasterPassword();
+    currentVaultKey = null;
     stopAutomaticSync();
   } else if (hasStoredVault) {
     void refreshAutomaticSync();
@@ -126,8 +134,7 @@ accountService.subscribe(() => {
       }
 
       const accounts = await accountService.listAccounts();
-      const encryptedVault = await encryptVault({ version: 1, accounts }, nextMasterPassword);
-      await saveEncryptedVault(encryptedVault, vaultStorage);
+      await persistAccountsToStoredVault(accounts, nextMasterPassword);
       queueLocalSync();
     });
 });
@@ -209,10 +216,12 @@ export async function submitUnlock(password: string) {
     const accounts = await accountService.listAccounts();
     const encryptedVault = await encryptVault({ version: 1, accounts }, password);
     await saveEncryptedVault(encryptedVault, vaultStorage);
+    const unlocked = await unlockVault(encryptedVault, password);
+    currentVaultKey = unlocked.vaultKey;
     hasStoredVault = true;
     setCurrentMasterPassword(password);
 
-    const keyMaterial = await deriveAesKey(password, decodeBase64(encryptedVault.salt));
+    const keyMaterial = await importAesKey(unlocked.vaultKey);
     unlockSession(keyMaterial);
     await syncRememberedSessionPreference(password);
   } catch (error) {
@@ -234,6 +243,7 @@ export async function __resetForTests() {
   initializePromise = null;
   hasStoredVault = false;
   clearCurrentMasterPassword();
+  currentVaultKey = null;
   persistVaultPromise = Promise.resolve();
   autoSyncQueue = Promise.resolve(null);
   syncClientOverride = null;
@@ -386,13 +396,15 @@ async function restoreRememberedSessionIfPossible() {
       return;
     }
 
-    const decryptedVault = await decryptVault(storedVault, masterPassword);
-    await accountService.replaceAllAccounts(decryptedVault.accounts);
+    const unlocked = await unlockVault(storedVault, masterPassword);
+    await accountService.replaceAllAccounts(unlocked.vault.accounts);
     setCurrentMasterPassword(masterPassword);
-    const keyMaterial = await deriveAesKey(masterPassword, decodeBase64(storedVault.salt));
+    currentVaultKey = unlocked.vaultKey;
+    const keyMaterial = await importAesKey(unlocked.vaultKey);
     unlockSession(keyMaterial);
   } catch {
     clearCurrentMasterPassword();
+    currentVaultKey = null;
     await sessionCredentialsStore.clear();
   }
 }
@@ -424,10 +436,11 @@ async function unlockStoredVaultWithPassword(password: string) {
     return;
   }
 
-  const decryptedVault = await decryptVault(storedVault, password);
-  await accountService.replaceAllAccounts(decryptedVault.accounts);
+  const unlocked = await unlockVault(storedVault, password);
+  await accountService.replaceAllAccounts(unlocked.vault.accounts);
   setCurrentMasterPassword(password);
-  const keyMaterial = await deriveAesKey(password, decodeBase64(storedVault.salt));
+  currentVaultKey = unlocked.vaultKey;
+  const keyMaterial = await importAesKey(unlocked.vaultKey);
   unlockSession(keyMaterial);
   await syncRememberedSessionPreference(password);
 }
@@ -523,6 +536,7 @@ function toSyncResultStatus(status: string | null): SyncRunResult['status'] | nu
     case 'pushed':
     case 'noop':
     case 'conflict':
+    case 'blocked':
     case 'download-error':
     case 'upload-error':
     case 'validation-error':
@@ -712,11 +726,12 @@ async function applyRemoteAccountsIfNeeded(
     return;
   }
 
-  const decryptedVault = await decryptVault(localVault, masterPassword);
+  const unlocked = await unlockVault(localVault, masterPassword);
+  currentVaultKey = unlocked.vaultKey;
   isApplyingRemoteSyncUpdate = true;
 
   try {
-    await accountService.replaceAllAccounts(decryptedVault.accounts);
+    await accountService.replaceAllAccounts(unlocked.vault.accounts);
   } finally {
     isApplyingRemoteSyncUpdate = false;
   }
@@ -730,8 +745,32 @@ async function restoreLatestAccountsToLocalVault() {
   }
 
   const accounts = await accountService.listAccounts();
-  const encryptedVault = await encryptVault({ version: 1, accounts }, masterPassword);
+  await persistAccountsToStoredVault(accounts, masterPassword);
+}
+
+async function persistAccountsToStoredVault(
+  accounts: Awaited<ReturnType<typeof accountService.listAccounts>>,
+  masterPassword: string
+) {
+  const storedVault = await loadEncryptedVault(vaultStorage);
+
+  if (!storedVault || !currentVaultKey) {
+    const encryptedVault = await encryptVault({ version: 1, accounts }, masterPassword);
+    await saveEncryptedVault(encryptedVault, vaultStorage);
+    const unlocked = await unlockVault(encryptedVault, masterPassword);
+    currentVaultKey = unlocked.vaultKey;
+    return;
+  }
+
+  const encryptedVault = await encryptVaultWithKey(
+    { version: 1, accounts },
+    storedVault,
+    currentVaultKey
+  );
+  const unlocked = await unlockVault(encryptedVault, masterPassword);
   await saveEncryptedVault(encryptedVault, vaultStorage);
+  currentVaultKey = unlocked.vaultKey;
+  await decryptVaultWithKey(encryptedVault, currentVaultKey);
 }
 
 async function loadEnabledSyncProfile(): Promise<WebDavProfile | null> {
@@ -783,6 +822,24 @@ export async function refreshAppSyncSnapshot() {
     }
   };
   emit();
+}
+
+export async function reloadStoredVaultAfterRemotePasswordVerified(password: string) {
+  const storedVault = await loadEncryptedVault(vaultStorage);
+
+  if (!storedVault) {
+    return;
+  }
+
+  const unlocked = await unlockVault(storedVault, password);
+  currentVaultKey = unlocked.vaultKey;
+  isApplyingRemoteSyncUpdate = true;
+
+  try {
+    await accountService.replaceAllAccounts(unlocked.vault.accounts);
+  } finally {
+    isApplyingRemoteSyncUpdate = false;
+  }
 }
 
 function formatWebAuthnUnlockError(error: unknown) {

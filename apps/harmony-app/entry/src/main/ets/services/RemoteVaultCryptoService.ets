@@ -6,7 +6,7 @@ import { TotpAccount } from '../model/TotpAccount';
 import { resolveIconKey } from './BrandIconMatcher';
 import { UnlockService } from './UnlockService';
 
-const REMOTE_FORMAT_VERSION: number = 1;
+const REMOTE_FORMAT_VERSION: number = 2;
 const REMOTE_KDF_NAME: string = 'PBKDF2';
 const REMOTE_KDF_HASH: string = 'SHA-256';
 const REMOTE_KDF_ALGORITHM: string = 'PBKDF2|SHA256';
@@ -23,39 +23,57 @@ class RemoteKdfRecord {
   name: string;
   iterations: number;
   hash: string;
+  salt: string;
 
-  constructor(name: string, iterations: number, hash: string) {
+  constructor(name: string, iterations: number, hash: string, salt: string) {
     this.name = name;
     this.iterations = iterations;
     this.hash = hash;
+    this.salt = salt;
+  }
+}
+
+class RemoteAesGcmRecord {
+  cipher: string;
+  iv: string;
+  ciphertext: string;
+
+  constructor(cipher: string, iv: string, ciphertext: string) {
+    this.cipher = cipher;
+    this.iv = iv;
+    this.ciphertext = ciphertext;
   }
 }
 
 export class EncryptedRemoteVaultBlob {
   formatVersion: number;
+  vaultId: string;
   kdf: RemoteKdfRecord;
-  cipher: string;
-  salt: string;
-  iv: string;
-  ciphertext: string;
-  passwordVerifier: string;
+  keyEncryption: RemoteAesGcmRecord;
+  vaultEncryption: RemoteAesGcmRecord;
 
   constructor(
     formatVersion: number,
+    vaultId: string,
     kdf: RemoteKdfRecord,
-    cipher: string,
-    salt: string,
-    iv: string,
-    ciphertext: string,
-    passwordVerifier: string
+    keyEncryption: RemoteAesGcmRecord,
+    vaultEncryption: RemoteAesGcmRecord
   ) {
     this.formatVersion = formatVersion;
+    this.vaultId = vaultId;
     this.kdf = kdf;
-    this.cipher = cipher;
-    this.salt = salt;
-    this.iv = iv;
-    this.ciphertext = ciphertext;
-    this.passwordVerifier = passwordVerifier;
+    this.keyEncryption = keyEncryption;
+    this.vaultEncryption = vaultEncryption;
+  }
+}
+
+export class RemoteVaultDecryption {
+  vault: LocalVault;
+  vaultKey: Uint8Array;
+
+  constructor(vault: LocalVault, vaultKey: Uint8Array) {
+    this.vault = vault;
+    this.vaultKey = vaultKey;
   }
 }
 
@@ -84,20 +102,19 @@ export class RemoteVaultCryptoService {
     try {
       let password: string = UnlockService.getInstance().requireVaultPassword();
       let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_SALT_SIZE).data;
-      let iv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
-      let key: cryptoFramework.SymKey = this.createAesKey(password, salt, REMOTE_KDF_ITERATIONS);
-      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, new Uint8Array(REMOTE_TAG_SIZE));
-      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
-      cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, params);
-      let encryptedWithTag: Uint8Array = cipher.doFinalSync({ data: this.encodeUtf8(this.createRemoteVaultPayload(vault)) }).data;
+      let keyIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
+      let vaultIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
+      let vaultKeyBytes: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_AES_KEY_SIZE).data;
+      let wrappingKey: cryptoFramework.SymKey = this.createAesKey(password, salt, REMOTE_KDF_ITERATIONS);
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(REMOTE_AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let encryptedVaultKey: Uint8Array = this.encryptGcm(wrappingKey, keyIv, vaultKeyBytes);
+      let encryptedVault: Uint8Array = this.encryptGcm(vaultKey, vaultIv, this.encodeUtf8(this.createRemoteVaultPayload(vault)));
       return new EncryptedRemoteVaultBlob(
         REMOTE_FORMAT_VERSION,
-        new RemoteKdfRecord(REMOTE_KDF_NAME, REMOTE_KDF_ITERATIONS, REMOTE_KDF_HASH),
-        REMOTE_CIPHER,
-        this.encodeBase64(salt),
-        this.encodeBase64(iv),
-        this.encodeBase64(encryptedWithTag),
-        this.encodeBase64(this.deriveVerifier(password, salt, REMOTE_KDF_ITERATIONS))
+        this.createVaultId(),
+        new RemoteKdfRecord(REMOTE_KDF_NAME, REMOTE_KDF_ITERATIONS, REMOTE_KDF_HASH, this.encodeBase64(salt)),
+        new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(keyIv), this.encodeBase64(encryptedVaultKey)),
+        new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault))
       );
     } catch (error) {
       throw new Error(`加密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
@@ -105,30 +122,70 @@ export class RemoteVaultCryptoService {
   }
 
   decrypt(blob: EncryptedRemoteVaultBlob): LocalVault {
+    return this.decryptWithKey(blob).vault;
+  }
+
+  decryptWithKey(blob: EncryptedRemoteVaultBlob): RemoteVaultDecryption {
+    let password: string = UnlockService.getInstance().requireVaultPassword();
+    return this.decryptWithPassword(blob, password);
+  }
+
+  decryptWithPassword(blob: EncryptedRemoteVaultBlob, password: string): RemoteVaultDecryption {
     try {
       this.assertSupportedBlob(blob);
-      let password: string = UnlockService.getInstance().requireVaultPassword();
-      let salt: Uint8Array = this.decodeBase64(blob.salt);
-      let expectedVerifier: Uint8Array = this.decodeBase64(blob.passwordVerifier);
-      let actualVerifier: Uint8Array = this.deriveVerifier(password, salt, blob.kdf.iterations);
-      if (!this.bytesEqual(expectedVerifier, actualVerifier)) {
-        throw new Error('远端保管库主密码不匹配。');
-      }
-
-      let encryptedWithTag: Uint8Array = this.decodeBase64(blob.ciphertext);
-      if (encryptedWithTag.length < REMOTE_TAG_SIZE) {
-        throw new Error('远端保管库密文缺少认证标签。');
-      }
-      let splitIndex: number = encryptedWithTag.length - REMOTE_TAG_SIZE;
-      let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
-      let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
-      let key: cryptoFramework.SymKey = this.createAesKey(password, salt, blob.kdf.iterations);
-      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(this.decodeBase64(blob.iv), authTag);
-      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
-      cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, params);
-      return this.createLocalVaultFromRemotePayload(this.decodeUtf8(cipher.doFinalSync({ data: ciphertext }).data));
+      let salt: Uint8Array = this.decodeBase64(blob.kdf.salt);
+      let wrappingKey: cryptoFramework.SymKey = this.createAesKey(password, salt, blob.kdf.iterations);
+      let vaultKeyBytes: Uint8Array = this.decryptGcm(
+        wrappingKey,
+        this.decodeBase64(blob.keyEncryption.iv),
+        this.decodeBase64(blob.keyEncryption.ciphertext)
+      );
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(REMOTE_AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let plaintext: Uint8Array = this.decryptGcm(
+        vaultKey,
+        this.decodeBase64(blob.vaultEncryption.iv),
+        this.decodeBase64(blob.vaultEncryption.ciphertext)
+      );
+      return new RemoteVaultDecryption(this.createLocalVaultFromRemotePayload(this.decodeUtf8(plaintext)), vaultKeyBytes);
     } catch (error) {
       throw new Error(`解密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  rewrapKeyEncryption(existingBlob: EncryptedRemoteVaultBlob, nextPassword: string, vaultKeyBytes: Uint8Array): EncryptedRemoteVaultBlob {
+    try {
+      this.assertSupportedBlob(existingBlob);
+      let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_SALT_SIZE).data;
+      let keyIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
+      let wrappingKey: cryptoFramework.SymKey = this.createAesKey(nextPassword, salt, REMOTE_KDF_ITERATIONS);
+      let encryptedVaultKey: Uint8Array = this.encryptGcm(wrappingKey, keyIv, vaultKeyBytes);
+      return new EncryptedRemoteVaultBlob(
+        existingBlob.formatVersion,
+        existingBlob.vaultId,
+        new RemoteKdfRecord(REMOTE_KDF_NAME, REMOTE_KDF_ITERATIONS, REMOTE_KDF_HASH, this.encodeBase64(salt)),
+        new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(keyIv), this.encodeBase64(encryptedVaultKey)),
+        existingBlob.vaultEncryption
+      );
+    } catch (error) {
+      throw new Error(`重新保护 WebDAV 保管库密钥失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  encryptWithVaultKey(vault: LocalVault, existingBlob: EncryptedRemoteVaultBlob, vaultKeyBytes: Uint8Array): EncryptedRemoteVaultBlob {
+    try {
+      this.assertSupportedBlob(existingBlob);
+      let vaultIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(REMOTE_IV_SIZE).data;
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(REMOTE_AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let encryptedVault: Uint8Array = this.encryptGcm(vaultKey, vaultIv, this.encodeUtf8(this.createRemoteVaultPayload(vault)));
+      return new EncryptedRemoteVaultBlob(
+        existingBlob.formatVersion,
+        existingBlob.vaultId,
+        existingBlob.kdf,
+        existingBlob.keyEncryption,
+        new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault))
+      );
+    } catch (error) {
+      throw new Error(`使用远端密钥加密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
     }
   }
 
@@ -142,18 +199,19 @@ export class RemoteVaultCryptoService {
       throw new Error('WebDAV encryptedVault.kdf 字段无效。');
     }
     let kdfRecord: Record<string, Object> = kdfValue as Record<string, Object>;
+    let keyEncryption: RemoteAesGcmRecord = this.parseAesGcmRecord(record['keyEncryption']);
+    let vaultEncryption: RemoteAesGcmRecord = this.parseAesGcmRecord(record['vaultEncryption']);
     return new EncryptedRemoteVaultBlob(
       this.readNumber(record, 'formatVersion', 0),
+      this.readString(record, 'vaultId', ''),
       new RemoteKdfRecord(
         this.readString(kdfRecord, 'name', ''),
         this.readNumber(kdfRecord, 'iterations', 0),
-        this.readString(kdfRecord, 'hash', '')
+        this.readString(kdfRecord, 'hash', ''),
+        this.readString(kdfRecord, 'salt', '')
       ),
-      this.readString(record, 'cipher', ''),
-      this.readString(record, 'salt', ''),
-      this.readString(record, 'iv', ''),
-      this.readString(record, 'ciphertext', ''),
-      this.readString(record, 'passwordVerifier', '')
+      keyEncryption,
+      vaultEncryption
     );
   }
 
@@ -222,7 +280,8 @@ export class RemoteVaultCryptoService {
       blob.kdf.name !== REMOTE_KDF_NAME ||
       blob.kdf.hash !== REMOTE_KDF_HASH ||
       blob.kdf.iterations !== REMOTE_KDF_ITERATIONS ||
-      blob.cipher !== REMOTE_CIPHER) {
+      blob.keyEncryption.cipher !== REMOTE_CIPHER ||
+      blob.vaultEncryption.cipher !== REMOTE_CIPHER) {
       throw new Error('WebDAV 加密保管库格式暂不支持。');
     }
   }
@@ -244,21 +303,6 @@ export class RemoteVaultCryptoService {
     }
   }
 
-  private deriveVerifier(password: string, salt: Uint8Array, iterations: number): Uint8Array {
-    let spec: cryptoFramework.PBKDF2Spec = {
-      algName: REMOTE_KDF_NAME,
-      password: password,
-      salt: salt,
-      iterations: iterations,
-      keySize: REMOTE_AES_KEY_SIZE
-    };
-    try {
-      return cryptoFramework.createKdf(REMOTE_KDF_ALGORITHM).generateSecretSync(spec).data;
-    } catch (error) {
-      throw new Error(`派生 WebDAV 主密码校验密钥失败：${this.readErrorMessage(error)}`);
-    }
-  }
-
   private createGcmParams(iv: Uint8Array, authTag: Uint8Array): cryptoFramework.GcmParamsSpec {
     return {
       iv: { data: iv },
@@ -266,6 +310,50 @@ export class RemoteVaultCryptoService {
       authTag: { data: authTag },
       algName: 'GcmParamsSpec'
     };
+  }
+
+  private encryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, plaintext: Uint8Array): Uint8Array {
+    try {
+      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, new Uint8Array(REMOTE_TAG_SIZE));
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, params);
+      return cipher.doFinalSync({ data: plaintext }).data;
+    } catch (error) {
+      throw new Error(`WebDAV AES-GCM 加密失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  private decryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, encryptedWithTag: Uint8Array): Uint8Array {
+    try {
+      if (encryptedWithTag.length < REMOTE_TAG_SIZE) {
+        throw new Error('远端保管库密文缺少认证标签。');
+      }
+      let splitIndex: number = encryptedWithTag.length - REMOTE_TAG_SIZE;
+      let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
+      let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
+      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, authTag);
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(REMOTE_AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, params);
+      return cipher.doFinalSync({ data: ciphertext }).data;
+    } catch (error) {
+      throw new Error(`WebDAV AES-GCM 解密失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  private parseAesGcmRecord(value: Object | undefined): RemoteAesGcmRecord {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error('WebDAV encryptedVault AES-GCM 字段无效。');
+    }
+    let record: Record<string, Object> = value as Record<string, Object>;
+    return new RemoteAesGcmRecord(
+      this.readString(record, 'cipher', ''),
+      this.readString(record, 'iv', ''),
+      this.readString(record, 'ciphertext', '')
+    );
+  }
+
+  private createVaultId(): string {
+    return `harmony-${new Date().getTime()}-${Math.floor(Math.random() * 1000000)}`;
   }
 
   private toRemoteGroupId(groupName: string): string {
@@ -344,17 +432,6 @@ export class RemoteVaultCryptoService {
     let sliced: Uint8Array = new Uint8Array(end - start);
     sliced.set(bytes.subarray(start, end), 0);
     return sliced;
-  }
-
-  private bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
-    if (left.length !== right.length) {
-      return false;
-    }
-    let result: number = 0;
-    for (let index: number = 0; index < left.length; index++) {
-      result = result | (left[index] ^ right[index]);
-    }
-    return result === 0;
   }
 
   private readErrorMessage(error: Object): string {

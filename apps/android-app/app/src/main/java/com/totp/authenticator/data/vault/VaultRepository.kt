@@ -55,6 +55,12 @@ class VaultRepository(
         return vaultCipher.deriveVaultKey(envelope, password).encoded
     }
 
+    fun exportEncryptedEnvelope(): EncryptedVaultEnvelope {
+        val encoded = preferences.getString(KEY_ENCRYPTED_VAULT, null)
+            ?: throw VaultNotFoundException()
+        return VaultEnvelopeJson.decodeEnvelope(encoded)
+    }
+
     fun unlockWithVaultKey(vaultKey: ByteArray): LocalVault {
         val startedAt = SystemClock.elapsedRealtime()
         val encoded = preferences.getString(KEY_ENCRYPTED_VAULT, null)
@@ -71,6 +77,29 @@ class VaultRepository(
         }
     }
 
+    fun saveWithVaultKey(vault: LocalVault, vaultKey: ByteArray): EncryptedVaultEnvelope {
+        val existingEnvelope = preferences.getString(KEY_ENCRYPTED_VAULT, null)
+            ?.let { VaultEnvelopeJson.decodeEnvelope(it) }
+            ?: throw VaultNotFoundException()
+        val envelope = vaultCipher.encryptWithVaultKey(vault, existingEnvelope, vaultKey)
+        preferences.edit()
+            .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(envelope))
+            .apply()
+        return envelope
+    }
+
+    fun saveWithVaultKeyEnvelope(
+        vault: LocalVault,
+        keyEnvelope: EncryptedVaultEnvelope,
+        vaultKey: ByteArray
+    ): EncryptedVaultEnvelope {
+        val envelope = vaultCipher.encryptWithVaultKey(vault, keyEnvelope, vaultKey)
+        preferences.edit()
+            .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(envelope))
+            .apply()
+        return envelope
+    }
+
     fun save(vault: LocalVault, password: String): EncryptedVaultEnvelope {
         val existingEnvelope = preferences.getString(KEY_ENCRYPTED_VAULT, null)
             ?.let { runCatching { VaultEnvelopeJson.decodeEnvelope(it) }.getOrNull() }
@@ -84,6 +113,18 @@ class VaultRepository(
             .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(envelope))
             .apply()
         return envelope
+    }
+
+    fun changePassword(currentPassword: String, nextPassword: String): LocalVault {
+        val encoded = preferences.getString(KEY_ENCRYPTED_VAULT, null)
+            ?: throw VaultNotFoundException()
+        val envelope = VaultEnvelopeJson.decodeEnvelope(encoded)
+        val vault = vaultCipher.decrypt(envelope, currentPassword)
+        val updatedEnvelope = vaultCipher.rewrapVaultKey(envelope, currentPassword, nextPassword)
+        preferences.edit()
+            .putString(KEY_ENCRYPTED_VAULT, VaultEnvelopeJson.encodeEnvelope(updatedEnvelope))
+            .apply()
+        return vault
     }
 
     fun clear() {

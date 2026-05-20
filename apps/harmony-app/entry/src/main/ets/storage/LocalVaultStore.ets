@@ -4,50 +4,72 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { buffer, util } from '@kit.ArkTS';
 import { LocalVault, createEmptyLocalVault, createLocalVaultFromJson } from '../model/LocalVault';
+import { EncryptedRemoteVaultBlob } from '../services/RemoteVaultCryptoService';
 import { UnlockService } from '../services/UnlockService';
 
 const STORE_NAME: string = 'totp_local_vault';
 const SNAPSHOT_KEY: string = 'vault.snapshot';
 const CORRUPT_SNAPSHOT_PREFIX: string = 'vault.snapshot.corrupt.';
-const ENCRYPTED_VAULT_FORMAT: string = 'totp.localVault.encrypted.v1';
-const VAULT_KDF_NAME: string = 'PBKDF2';
-const VAULT_KDF_HASH: string = 'SHA256';
-const VAULT_KDF_ITERATIONS: number = 310000;
-const VAULT_KEY_SIZE: number = 16;
-const VAULT_SALT_SIZE: number = 16;
-const VAULT_IV_SIZE: number = 12;
-const VAULT_TAG_SIZE: number = 16;
+const FORMAT_VERSION: number = 2;
+const KDF_NAME: string = 'PBKDF2';
+const KDF_HASH: string = 'SHA-256';
+const KDF_ALGORITHM: string = 'PBKDF2|SHA256';
+const KDF_ITERATIONS: number = 310000;
+const CIPHER: string = 'AES-GCM';
+const AES_KEY_SIZE: number = 32;
+const AES_ALGORITHM: string = 'AES256';
+const AES_CIPHER: string = 'AES256|GCM|PKCS7';
+const SALT_SIZE: number = 16;
+const IV_SIZE: number = 12;
+const TAG_SIZE: number = 16;
+
+class KdfRecord {
+  name: string;
+  iterations: number;
+  hash: string;
+  salt: string;
+
+  constructor(name: string, iterations: number, hash: string, salt: string) {
+    this.name = name;
+    this.iterations = iterations;
+    this.hash = hash;
+    this.salt = salt;
+  }
+}
+
+class AesGcmRecord {
+  cipher: string;
+  iv: string;
+  ciphertext: string;
+
+  constructor(cipher: string, iv: string, ciphertext: string) {
+    this.cipher = cipher;
+    this.iv = iv;
+    this.ciphertext = ciphertext;
+  }
+}
 
 class EncryptedVaultRecord {
-  format: string;
-  kdfName: string;
-  hash: string;
-  iterations: number;
-  salt: string;
-  iv: string;
-  authTag: string;
-  ciphertext: string;
+  formatVersion: number;
+  vaultId: string;
+  kdf: KdfRecord;
+  keyEncryption: AesGcmRecord;
+  vaultEncryption: AesGcmRecord;
   updatedAt: string;
 
   constructor(
-    format: string,
-    kdfName: string,
-    hash: string,
-    iterations: number,
-    salt: string,
-    iv: string,
-    authTag: string,
-    ciphertext: string,
+    formatVersion: number,
+    vaultId: string,
+    kdf: KdfRecord,
+    keyEncryption: AesGcmRecord,
+    vaultEncryption: AesGcmRecord,
     updatedAt: string
   ) {
-    this.format = format;
-    this.kdfName = kdfName;
-    this.hash = hash;
-    this.iterations = iterations;
-    this.salt = salt;
-    this.iv = iv;
-    this.authTag = authTag;
-    this.ciphertext = ciphertext;
+    this.formatVersion = formatVersion;
+    this.vaultId = vaultId;
+    this.kdf = kdf;
+    this.keyEncryption = keyEncryption;
+    this.vaultEncryption = vaultEncryption;
     this.updatedAt = updatedAt;
   }
 }
@@ -61,16 +83,11 @@ export class LocalVaultStore {
         return createEmptyLocalVault();
       }
 
-      if (this.isEncryptedPayload(payload)) {
-        try {
-          return createLocalVaultFromJson(this.decryptPayload(payload));
-        } catch (error) {
-          this.backupCorruptSnapshot(store, payload, this.readErrorMessage(error));
-          return createEmptyLocalVault();
-        }
+      try {
+        return createLocalVaultFromJson(this.decryptPayload(payload));
+      } catch (error) {
+        throw new Error(this.readErrorMessage(error));
       }
-
-      return createLocalVaultFromJson(payload);
     } catch (error) {
       throw new Error(`load local vault failed: ${this.readErrorMessage(error)}`);
     }
@@ -79,12 +96,63 @@ export class LocalVaultStore {
   save(context: common.UIAbilityContext, vault: LocalVault): LocalVault {
     try {
       let store: preferences.Preferences = this.getStore(context);
-      store.putSync(SNAPSHOT_KEY, this.encryptPayload(JSON.stringify(vault.toRecord())));
+      let existingPayload: string = store.getSync(SNAPSHOT_KEY, '') as string;
+      store.putSync(SNAPSHOT_KEY, this.encryptPayload(JSON.stringify(vault.toRecord()), existingPayload));
       store.flushSync();
       return vault;
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
       throw new Error(`save local vault failed: ${businessError.message}`);
+    }
+  }
+
+  saveWithRemoteKey(context: common.UIAbilityContext, vault: LocalVault, remoteEnvelope: EncryptedRemoteVaultBlob, vaultKeyBytes: Uint8Array): LocalVault {
+    try {
+      let store: preferences.Preferences = this.getStore(context);
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let vaultIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(IV_SIZE).data;
+      let encryptedVault: Uint8Array = this.encryptGcm(vaultKey, vaultIv, this.encodeUtf8(JSON.stringify(vault.toRecord())));
+      let record: EncryptedVaultRecord = new EncryptedVaultRecord(
+        remoteEnvelope.formatVersion,
+        remoteEnvelope.vaultId,
+        new KdfRecord(remoteEnvelope.kdf.name, remoteEnvelope.kdf.iterations, remoteEnvelope.kdf.hash, remoteEnvelope.kdf.salt),
+        new AesGcmRecord(remoteEnvelope.keyEncryption.cipher, remoteEnvelope.keyEncryption.iv, remoteEnvelope.keyEncryption.ciphertext),
+        new AesGcmRecord(CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault)),
+        new Date().toISOString()
+      );
+      store.putSync(SNAPSHOT_KEY, JSON.stringify(record));
+      store.flushSync();
+      return vault;
+    } catch (error) {
+      let businessError: BusinessError = error as BusinessError;
+      throw new Error(`save local vault failed: ${businessError.message}`);
+    }
+  }
+
+  rewrapMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): void {
+    try {
+      let store: preferences.Preferences = this.getStore(context);
+      let payload: string = store.getSync(SNAPSHOT_KEY, '') as string;
+      if (payload.length === 0) {
+        return;
+      }
+      let existing: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
+      let vaultKeyBytes: Uint8Array = this.unwrapVaultKeyWithPassword(existing, currentPassword);
+      let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(SALT_SIZE).data;
+      let keyIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(IV_SIZE).data;
+      let wrappingKey: cryptoFramework.SymKey = this.createAesKey(nextPassword, salt, KDF_ITERATIONS);
+      let updated: EncryptedVaultRecord = new EncryptedVaultRecord(
+        existing.formatVersion,
+        existing.vaultId,
+        new KdfRecord(KDF_NAME, KDF_ITERATIONS, KDF_HASH, this.encodeBase64(salt)),
+        new AesGcmRecord(CIPHER, this.encodeBase64(keyIv), this.encodeBase64(this.encryptGcm(wrappingKey, keyIv, vaultKeyBytes))),
+        existing.vaultEncryption,
+        new Date().toISOString()
+      );
+      store.putSync(SNAPSHOT_KEY, JSON.stringify(updated));
+      store.flushSync();
+    } catch (error) {
+      throw new Error(`修改本地主密码失败：${this.readErrorMessage(error)}`);
     }
   }
 
@@ -108,33 +176,40 @@ export class LocalVaultStore {
     }
   }
 
-  private encryptPayload(payload: string): string {
+  private encryptPayload(payload: string, existingPayload: string): string {
     try {
       let password: string = UnlockService.getInstance().requireVaultPassword();
-      let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(VAULT_SALT_SIZE).data;
-      let iv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(VAULT_IV_SIZE).data;
-      let key: cryptoFramework.SymKey = this.createAesKey(password, salt, VAULT_KDF_ITERATIONS);
-      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, new Uint8Array(VAULT_TAG_SIZE));
-      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher('AES128|GCM|PKCS7');
-      cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, params);
-      let encryptedWithTag: Uint8Array = cipher.doFinalSync({ data: this.encodeUtf8(payload) }).data;
-      let splitIndex: number = encryptedWithTag.length - VAULT_TAG_SIZE;
-      if (splitIndex < 0) {
-        throw new Error('加密结果缺少认证标签');
+      let existing: EncryptedVaultRecord | null = this.tryParseEncryptedPayload(existingPayload);
+      let vaultKeyBytes: Uint8Array = existing === null
+        ? cryptoFramework.createRandom().generateRandomSync(AES_KEY_SIZE).data
+        : this.unwrapVaultKey(existing, password);
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      let vaultIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(IV_SIZE).data;
+      let encryptedVault: Uint8Array = this.encryptGcm(vaultKey, vaultIv, this.encodeUtf8(payload));
+      let record: EncryptedVaultRecord;
+
+      if (existing === null) {
+        let salt: Uint8Array = cryptoFramework.createRandom().generateRandomSync(SALT_SIZE).data;
+        let keyIv: Uint8Array = cryptoFramework.createRandom().generateRandomSync(IV_SIZE).data;
+        let wrappingKey: cryptoFramework.SymKey = this.createAesKey(password, salt, KDF_ITERATIONS);
+        record = new EncryptedVaultRecord(
+          FORMAT_VERSION,
+          this.createVaultId(),
+          new KdfRecord(KDF_NAME, KDF_ITERATIONS, KDF_HASH, this.encodeBase64(salt)),
+          new AesGcmRecord(CIPHER, this.encodeBase64(keyIv), this.encodeBase64(this.encryptGcm(wrappingKey, keyIv, vaultKeyBytes))),
+          new AesGcmRecord(CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault)),
+          new Date().toISOString()
+        );
+      } else {
+        record = new EncryptedVaultRecord(
+          existing.formatVersion,
+          existing.vaultId,
+          existing.kdf,
+          existing.keyEncryption,
+          new AesGcmRecord(CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault)),
+          new Date().toISOString()
+        );
       }
-      let encrypted: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
-      let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
-      let record: EncryptedVaultRecord = new EncryptedVaultRecord(
-        ENCRYPTED_VAULT_FORMAT,
-        VAULT_KDF_NAME,
-        VAULT_KDF_HASH,
-        VAULT_KDF_ITERATIONS,
-        this.encodeBase64(salt),
-        this.encodeBase64(iv),
-        this.encodeBase64(authTag),
-        this.encodeBase64(encrypted),
-        new Date().toISOString()
-      );
       return JSON.stringify(record);
     } catch (error) {
       throw new Error(`加密本地保管库失败：${this.readErrorMessage(error)}`);
@@ -145,35 +220,67 @@ export class LocalVaultStore {
     try {
       let record: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
       let password: string = UnlockService.getInstance().requireVaultPassword();
-      let salt: Uint8Array = this.decodeBase64(record.salt);
-      let iv: Uint8Array = this.decodeBase64(record.iv);
-      let authTag: Uint8Array = this.decodeBase64(record.authTag);
-      let ciphertext: Uint8Array = this.decodeBase64(record.ciphertext);
-      let key: cryptoFramework.SymKey = this.createAesKey(password, salt, record.iterations);
-      let params: cryptoFramework.GcmParamsSpec = this.createGcmParams(iv, authTag);
-      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher('AES128|GCM|PKCS7');
-      cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, params);
-      let decrypted: Uint8Array = cipher.doFinalSync({ data: ciphertext }).data;
-      return this.decodeUtf8(decrypted);
+      let vaultKeyBytes: Uint8Array = this.unwrapVaultKey(record, password);
+      let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
+      return this.decodeUtf8(this.decryptGcm(vaultKey, this.decodeBase64(record.vaultEncryption.iv), this.decodeBase64(record.vaultEncryption.ciphertext)));
     } catch (error) {
       throw new Error(`解密本地保管库失败：${this.readErrorMessage(error)}`);
     }
   }
 
+  private unwrapVaultKey(record: EncryptedVaultRecord, password: string): Uint8Array {
+    return this.unwrapVaultKeyWithPassword(record, password);
+  }
+
+  private unwrapVaultKeyWithPassword(record: EncryptedVaultRecord, password: string): Uint8Array {
+    let wrappingKey: cryptoFramework.SymKey = this.createAesKey(password, this.decodeBase64(record.kdf.salt), record.kdf.iterations);
+    return this.decryptGcm(
+      wrappingKey,
+      this.decodeBase64(record.keyEncryption.iv),
+      this.decodeBase64(record.keyEncryption.ciphertext)
+    );
+  }
+
   private createAesKey(password: string, salt: Uint8Array, iterations: number): cryptoFramework.SymKey {
     let spec: cryptoFramework.PBKDF2Spec = {
-      algName: VAULT_KDF_NAME,
+      algName: KDF_NAME,
       password: password,
       salt: salt,
       iterations: iterations,
-      keySize: VAULT_KEY_SIZE
+      keySize: AES_KEY_SIZE
     };
     try {
-      let kdf: cryptoFramework.Kdf = cryptoFramework.createKdf('PBKDF2|SHA256');
+      let kdf: cryptoFramework.Kdf = cryptoFramework.createKdf(KDF_ALGORITHM);
       let keyBytes: Uint8Array = kdf.generateSecretSync(spec).data;
-      return cryptoFramework.createSymKeyGenerator('AES128').convertKeySync({ data: keyBytes });
+      return cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: keyBytes });
     } catch (error) {
       throw new Error(`派生本地保管库密钥失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  private encryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, plaintext: Uint8Array): Uint8Array {
+    try {
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, this.createGcmParams(iv, new Uint8Array(TAG_SIZE)));
+      return cipher.doFinalSync({ data: plaintext }).data;
+    } catch (error) {
+      throw new Error(`本地 AES-GCM 加密失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
+  private decryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, encryptedWithTag: Uint8Array): Uint8Array {
+    try {
+      if (encryptedWithTag.length < TAG_SIZE) {
+        throw new Error('本地保管库密文缺少认证标签。');
+      }
+      let splitIndex: number = encryptedWithTag.length - TAG_SIZE;
+      let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
+      let authTag: Uint8Array = this.sliceBytes(encryptedWithTag, splitIndex, encryptedWithTag.length);
+      let cipher: cryptoFramework.Cipher = cryptoFramework.createCipher(AES_CIPHER);
+      cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, this.createGcmParams(iv, authTag));
+      return cipher.doFinalSync({ data: ciphertext }).data;
+    } catch (error) {
+      throw new Error(`本地 AES-GCM 解密失败：${this.readErrorMessage(error)}`);
     }
   }
 
@@ -186,42 +293,60 @@ export class LocalVaultStore {
     };
   }
 
-  private isEncryptedPayload(payload: string): boolean {
-    if (!payload.startsWith('{')) {
-      return false;
+  private tryParseEncryptedPayload(payload: string): EncryptedVaultRecord | null {
+    if (payload.length === 0) {
+      return null;
     }
-    try {
-      let parsed: Record<string, Object> = JSON.parse(payload) as Record<string, Object>;
-      return this.readString(parsed, 'format', '') === ENCRYPTED_VAULT_FORMAT;
-    } catch (_error) {
-      return false;
-    }
+    return this.parseEncryptedPayload(payload);
   }
 
   private parseEncryptedPayload(payload: string): EncryptedVaultRecord {
     let parsed: Record<string, Object> = JSON.parse(payload) as Record<string, Object>;
-    let format: string = this.readString(parsed, 'format', '');
-    let kdfName: string = this.readString(parsed, 'kdfName', '');
-    let hash: string = this.readString(parsed, 'hash', '');
-    let iterations: number = this.readNumber(parsed, 'iterations', 0);
-    if (format !== ENCRYPTED_VAULT_FORMAT ||
-      kdfName !== VAULT_KDF_NAME ||
-      hash !== VAULT_KDF_HASH ||
-      iterations !== VAULT_KDF_ITERATIONS) {
+    let kdfValue: Object | undefined = parsed['kdf'];
+    let keyEncryptionValue: Object | undefined = parsed['keyEncryption'];
+    let vaultEncryptionValue: Object | undefined = parsed['vaultEncryption'];
+    if (typeof kdfValue !== 'object' || kdfValue === null || Array.isArray(kdfValue) ||
+      typeof keyEncryptionValue !== 'object' || keyEncryptionValue === null || Array.isArray(keyEncryptionValue) ||
+      typeof vaultEncryptionValue !== 'object' || vaultEncryptionValue === null || Array.isArray(vaultEncryptionValue)) {
       throw new Error('本地加密保管库格式暂不支持。');
     }
-
-    return new EncryptedVaultRecord(
-      format,
-      kdfName,
-      hash,
-      iterations,
-      this.readString(parsed, 'salt', ''),
-      this.readString(parsed, 'iv', ''),
-      this.readString(parsed, 'authTag', ''),
-      this.readString(parsed, 'ciphertext', ''),
+    let kdf: Record<string, Object> = kdfValue as Record<string, Object>;
+    let keyEncryption: Record<string, Object> = keyEncryptionValue as Record<string, Object>;
+    let vaultEncryption: Record<string, Object> = vaultEncryptionValue as Record<string, Object>;
+    let record: EncryptedVaultRecord = new EncryptedVaultRecord(
+      this.readNumber(parsed, 'formatVersion', 0),
+      this.readString(parsed, 'vaultId', ''),
+      new KdfRecord(
+        this.readString(kdf, 'name', ''),
+        this.readNumber(kdf, 'iterations', 0),
+        this.readString(kdf, 'hash', ''),
+        this.readString(kdf, 'salt', '')
+      ),
+      new AesGcmRecord(
+        this.readString(keyEncryption, 'cipher', ''),
+        this.readString(keyEncryption, 'iv', ''),
+        this.readString(keyEncryption, 'ciphertext', '')
+      ),
+      new AesGcmRecord(
+        this.readString(vaultEncryption, 'cipher', ''),
+        this.readString(vaultEncryption, 'iv', ''),
+        this.readString(vaultEncryption, 'ciphertext', '')
+      ),
       this.readString(parsed, 'updatedAt', '')
     );
+    this.assertSupportedRecord(record);
+    return record;
+  }
+
+  private assertSupportedRecord(record: EncryptedVaultRecord): void {
+    if (record.formatVersion !== FORMAT_VERSION ||
+      record.kdf.name !== KDF_NAME ||
+      record.kdf.hash !== KDF_HASH ||
+      record.kdf.iterations !== KDF_ITERATIONS ||
+      record.keyEncryption.cipher !== CIPHER ||
+      record.vaultEncryption.cipher !== CIPHER) {
+      throw new Error('本地加密保管库格式暂不支持。');
+    }
   }
 
   private readString(record: Record<string, Object>, key: string, fallback: string): string {
@@ -266,20 +391,14 @@ export class LocalVaultStore {
     }
   }
 
-  private concatBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
-    if (right.length === 0) {
-      return left;
-    }
-    let merged: Uint8Array = new Uint8Array(left.length + right.length);
-    merged.set(left, 0);
-    merged.set(right, left.length);
-    return merged;
-  }
-
   private sliceBytes(bytes: Uint8Array, start: number, end: number): Uint8Array {
     let sliced: Uint8Array = new Uint8Array(end - start);
     sliced.set(bytes.subarray(start, end), 0);
     return sliced;
+  }
+
+  private createVaultId(): string {
+    return `harmony-local-${new Date().getTime()}-${Math.floor(Math.random() * 1000000)}`;
   }
 
   private readErrorMessage(error: Object): string {

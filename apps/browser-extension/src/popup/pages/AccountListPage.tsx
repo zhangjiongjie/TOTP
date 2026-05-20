@@ -6,7 +6,7 @@ import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
 import { accountService } from '../../services/account-service';
 import { runRuntimeManualSync } from '../../services/runtime-sync-service';
-import { getAppState, subscribeApp } from '../../state/app-store';
+import { getAppState, subscribeApp, type AppSyncSnapshot } from '../../state/app-store';
 
 interface AccountListPageProps {
   onOpenAdd?: () => void;
@@ -32,9 +32,9 @@ export function AccountListPage({
     ? appState.sync.trigger === 'manual'
       ? '同步中...'
       : '正在同步本地变更，请稍候...'
-    : statusMessage ?? formatDefaultBanner(appState.sync.isWebDavEnabled);
+    : statusMessage ?? formatDefaultBanner(appState.sync);
   const syncBannerTone =
-    isSyncing ? 'idle' : statusMessage ? statusTone : 'idle';
+    isSyncing ? 'idle' : statusMessage ? statusTone : getDefaultBannerTone(appState.sync);
 
   useEffect(() => {
     async function refreshAccounts() {
@@ -117,6 +117,10 @@ export function AccountListPage({
         case 'conflict':
           setStatusTone('error');
           setStatusMessage('检测到同步冲突，请前往设置页处理。');
+          break;
+        case 'blocked':
+          setStatusTone('error');
+          setStatusMessage(result.error?.message ?? '远端保管库需要主密码验证后才能继续同步。');
           break;
         case 'download-error':
         case 'upload-error':
@@ -257,10 +261,31 @@ export function formatLastSyncLabel(status: string | null, lastSyncedAt: string 
   }
 }
 
-function formatDefaultBanner(isWebDavEnabled: boolean) {
-  return isWebDavEnabled
+function formatDefaultBanner(sync: AppSyncSnapshot) {
+  if (sync.isWebDavEnabled && (sync.lastResultStatus === 'blocked' || isRemotePasswordError(sync.lastError))) {
+    return '远端保管库需要主密码验证后才能继续同步。';
+  }
+
+  return sync.isWebDavEnabled
     ? '本地与 WebDAV 已经是最新版本。'
     : 'WebDAV 同步未开启，本地模式。';
+}
+
+function getDefaultBannerTone(sync: AppSyncSnapshot) {
+  return sync.isWebDavEnabled && (sync.lastResultStatus === 'blocked' || isRemotePasswordError(sync.lastError))
+    ? 'error'
+    : 'idle';
+}
+
+function isRemotePasswordError(message: string | null) {
+  if (!message) {
+    return false;
+  }
+
+  return message.includes('远端保管库') ||
+    message.includes('远端密码库') ||
+    message.includes('Master password is incorrect') ||
+    message.includes('主密码');
 }
 
 function bannerStyle(tone: 'idle' | 'success' | 'error'): React.CSSProperties {

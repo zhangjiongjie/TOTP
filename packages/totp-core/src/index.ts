@@ -14,5 +14,6 @@ export * from './vault/base64';
 export * from './vault/crypto';
 export * from './vault/errors';
 export * from './vault/export';
+export * from './vault/legacy-v1';
 export * from './vault/password';
 export * from './vault/vault-store';

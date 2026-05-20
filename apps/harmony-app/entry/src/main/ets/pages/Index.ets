@@ -37,11 +37,15 @@ struct Index {
   @State private errorMessage: string = '';
   @State private activeRoute: string = 'home';
   @State private activeAccountId: string = '';
-  @State private syncStatusMessage: string = '未配置 WebDAV，数据仅保留在本机。';
+  @State private syncStatusMessage: string = 'WebDAV 同步未开启，本地模式。';
   @State private isSyncing: boolean = false;
   @State private canSync: boolean = false;
   @State private syncSpinAngle: number = 0;
   @State private hasSyncConflict: boolean = false;
+  @State private showRemotePasswordDialog: boolean = false;
+  @State private remotePassword: string = '';
+  @State private remotePasswordError: string = '';
+  @State private isRemotePasswordBusy: boolean = false;
   @State private isUnlocked: boolean = false;
   @State private activeTabIndex: number = 0;
   @State private addPhotoRequestToken: number = 0;
@@ -49,6 +53,7 @@ struct Index {
   @StorageProp('colorMode') private colorMode: ColorMode = ColorMode.LIGHT;
   private tickerId: number = -1;
   private syncAnimationId: number = -1;
+  private transientStatusTimerId: number = -1;
   private hasSyncedOnOpen: boolean = false;
   private hasRegisteredSessionEvents: boolean = false;
   private sessionLockedHandler: () => void = () => {
@@ -74,6 +79,7 @@ struct Index {
   aboutToDisappear(): void {
     this.stopTicker();
     this.stopSyncAnimation();
+    this.clearTransientStatusTimer();
   }
 
   build() {
@@ -84,6 +90,7 @@ struct Index {
             this.isUnlocked = true;
             this.activeRoute = 'home';
             this.copyStatusMessage = '';
+            this.errorMessage = '';
             this.loadHome();
             this.hasSyncedOnOpen = false;
             setTimeout(() => {
@@ -97,6 +104,9 @@ struct Index {
         this.buildEditPage()
       } else {
         this.buildHomePage()
+      }
+      if (this.isUnlocked && this.activeRoute !== 'unlock' && this.showRemotePasswordDialog) {
+        this.buildRemotePasswordDialog()
       }
     }
     .width('100%')
@@ -174,6 +184,15 @@ struct Index {
             onSaved: (message: string) => {
               this.syncStatusMessage = message;
               this.refreshSyncAvailability();
+              if (message === 'WebDAV 同步未开启，本地模式。') {
+                this.canSync = false;
+                this.hasSyncConflict = false;
+                this.showRemotePasswordDialog = false;
+                this.clearTransientStatusTimer();
+                this.copyStatusMessage = '';
+                this.errorMessage = '';
+                return;
+              }
               if (this.canSync) {
                 this.handleManualSync();
               }
@@ -371,37 +390,13 @@ struct Index {
   @Builder
   private buildStatusCard(): void {
     Column({ space: 12 }) {
-      if (this.statusMessage.length > 0) {
-        Text(this.statusMessage)
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor($r('sys.color.font_secondary'))
-          .width('100%')
-      }
-
-      if (this.syncStatusMessage.length > 0 && this.syncStatusMessage !== '未配置 WebDAV，数据仅保留在本机。') {
-        Text(this.syncStatusMessage)
-          .fontSize(13)
-          .lineHeight(20)
-          .fontColor($r('sys.color.font_secondary'))
-          .width('100%')
-      }
-
-      if (this.copyStatusMessage.length > 0) {
-        Text(this.copyStatusMessage)
-          .fontSize(13)
-          .lineHeight(20)
-          .fontColor('#2D7A59')
-          .width('100%')
-      }
-
-      if (this.errorMessage.length > 0) {
-        Text(this.errorMessage)
-          .fontSize(13)
-          .lineHeight(20)
-          .fontColor('#C53D3D')
-          .width('100%')
-      }
+      Text(this.resolveHomeBannerMessage())
+        .fontSize(13)
+        .lineHeight(20)
+        .fontColor(this.resolveHomeBannerColor())
+        .width('100%')
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
 
       if (this.hasSyncConflict) {
         this.buildSyncConflictActions()
@@ -563,13 +558,14 @@ struct Index {
       this.applyVault(vault);
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      this.accounts = [];
-      this.codeSnapshots = [];
-      this.accountCountLabel = '0 个账号';
-      this.lastUpdatedLabel = '最新同步：暂无';
-      this.errorMessage = `读取本地保管库失败：${businessError.message}`;
+      this.showHomeError(`读取本地保管库失败：${businessError.message}`);
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       this.isUnlocked = UnlockService.getInstance().readState(context).isUnlocked;
+      if (this.accounts.length === 0) {
+        this.codeSnapshots = [];
+        this.accountCountLabel = '0 个账号';
+        this.lastUpdatedLabel = '最新同步：暂无';
+      }
     } finally {
       this.isLoading = false;
     }
@@ -604,6 +600,10 @@ struct Index {
     this.statusMessage = '';
     this.errorMessage = '';
     this.hasSyncConflict = false;
+    this.showRemotePasswordDialog = false;
+    this.remotePassword = '';
+    this.remotePasswordError = '';
+    this.isRemotePasswordBusy = false;
     this.hasSyncedOnOpen = false;
     this.isSyncing = false;
     this.stopSyncAnimation();
@@ -692,30 +692,30 @@ struct Index {
     let account: TotpAccount | undefined = this.findAccount(accountId);
 
     if (snapshot.rawCode.length === 0) {
-      this.copyStatusMessage = '当前账号验证码不可复制，请先修正密钥或算法配置。';
+      this.showHomeError('当前账号验证码不可复制，请先修正密钥或算法配置。');
       return;
     }
 
     try {
       TotpRuntimeService.getInstance().copyCodeToClipboard(snapshot.rawCode);
       let label: string = account !== undefined && account.issuer.length > 0 ? account.issuer : '当前账号';
-      this.copyStatusMessage = `已复制 ${label} 的验证码到系统剪贴板。`;
+      this.showHomeSuccess(`已复制 ${label} 的验证码到系统剪贴板。`);
       this.statusMessage = '';
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      this.copyStatusMessage = `复制失败：${businessError.message}`;
+      this.showHomeError(`复制失败：${businessError.message}`);
     }
   }
 
   private async handleManualSync(): Promise<void> {
     if (this.isSyncing) {
-      this.syncStatusMessage = '同步正在进行中，请稍后再试。';
+      this.showHomeError('同步正在进行中，请稍后再试。');
       return;
     }
 
     this.refreshSyncAvailability();
     if (!this.canSync) {
-      this.syncStatusMessage = '未配置 WebDAV，数据仅保留在本机。';
+      this.showHomeSuccess('WebDAV 同步未开启，本地模式。');
       return;
     }
 
@@ -727,17 +727,25 @@ struct Index {
       let result: WebDavSyncResult = await WebDavSyncService.getInstance().syncNow(context);
       if (result.vault !== undefined) {
         this.applyVault(result.vault);
-      } else {
-        await this.loadHome();
       }
       this.hasSyncConflict = result.status === 'conflict';
       this.syncStatusMessage = result.message;
+      if (result.status === 'blocked') {
+        this.showHomeError(result.message);
+        this.showRemotePasswordDialog = this.isUnlocked && this.activeRoute !== 'unlock';
+      } else if (result.status === 'conflict') {
+        this.showHomeError(result.message);
+      } else {
+        this.showHomeSuccess(result.message);
+      }
       this.refreshLastSyncLabel(context);
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      this.syncStatusMessage = businessError && businessError.message && businessError.message.length > 0
+      let message: string = businessError && businessError.message && businessError.message.length > 0
         ? `同步失败：${businessError.message}`
         : '同步失败，请稍后重试。';
+      this.syncStatusMessage = message;
+      this.showHomeError(message);
     } finally {
       this.isSyncing = false;
       this.stopSyncAnimation();
@@ -750,7 +758,122 @@ struct Index {
       this.errorMessage.length > 0 ||
       this.statusMessage.length > 0 ||
       this.copyStatusMessage.length > 0 ||
-      (this.syncStatusMessage.length > 0 && this.syncStatusMessage !== '未配置 WebDAV，数据仅保留在本机。');
+      this.resolveRegularHomeSyncStatus().length > 0;
+  }
+
+  @Builder
+  private buildRemotePasswordDialog(): void {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 14 }) {
+        Text('验证远端密码库')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_primary'))
+          .width('100%')
+
+        Text('远端主密码已变化，请输入新的远端主密码后继续同步。')
+          .fontSize(14)
+          .lineHeight(22)
+          .fontColor($r('sys.color.font_secondary'))
+          .width('100%')
+
+        Text('验证通过后，本地保管库和当前解锁密码会同步更新为远端密码。')
+          .fontSize(13)
+          .lineHeight(20)
+          .fontColor($r('app.color.dialog_accent_text'))
+          .width('100%')
+
+        TextInput({ text: this.remotePassword, placeholder: '远端主密码' })
+          .type(InputType.Password)
+          .height(46)
+          .fontSize(15)
+          .backgroundColor($r('sys.color.comp_background_gray'))
+          .borderRadius(14)
+          .padding({ left: 14, right: 14 })
+          .enabled(!this.isRemotePasswordBusy)
+          .onChange((value: string) => {
+            this.remotePassword = value;
+          })
+
+        if (this.remotePasswordError.length > 0) {
+          Text(this.remotePasswordError)
+            .fontSize(13)
+            .lineHeight(20)
+            .fontColor('#C53D3D')
+            .width('100%')
+        }
+
+        Row({ space: 10 }) {
+          Button('稍后处理')
+            .height(42)
+            .layoutWeight(1)
+            .enabled(!this.isRemotePasswordBusy)
+            .backgroundColor($r('sys.color.comp_background_gray'))
+            .fontColor($r('sys.color.font_primary'))
+            .onClick(() => {
+              this.showRemotePasswordDialog = false;
+              this.remotePassword = '';
+              this.remotePasswordError = '';
+            })
+
+          Button(this.isRemotePasswordBusy ? '验证中...' : '验证')
+            .height(42)
+            .layoutWeight(1)
+            .enabled(!this.isRemotePasswordBusy)
+            .backgroundColor('#2878C8')
+            .fontColor(Color.White)
+            .onClick(() => {
+              this.verifyRemotePassword();
+            })
+        }
+        .width('100%')
+      }
+      .width('86%')
+      .padding(22)
+      .backgroundColor($r('app.color.dialog_surface'))
+      .border({ width: 1, color: $r('app.color.dialog_border') })
+      .borderRadius(26)
+      .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
+    }
+    .width('100%')
+    .height('100%')
+    .backdropBlur(18)
+    .backgroundColor($r('app.color.dialog_overlay'))
+  }
+
+  private async verifyRemotePassword(): Promise<void> {
+    if (this.remotePassword.trim().length === 0) {
+      this.remotePasswordError = '请输入远端主密码。';
+      return;
+    }
+    this.isRemotePasswordBusy = true;
+    this.remotePasswordError = '';
+    try {
+      let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      let result: WebDavSyncResult = await WebDavSyncService.getInstance().verifyRemoteMasterPassword(context, this.remotePassword);
+      if (result.vault !== undefined) {
+        this.applyVault(result.vault);
+      }
+      this.hasSyncConflict = result.status === 'conflict';
+      this.syncStatusMessage = result.message;
+      if (result.status === 'conflict') {
+        this.showHomeError(result.message);
+      } else {
+        this.showHomeSuccess(result.message);
+      }
+      this.refreshLastSyncLabel(context);
+      this.showRemotePasswordDialog = false;
+      this.remotePassword = '';
+      this.remotePasswordError = '';
+      this.hasSyncedOnOpen = true;
+    } catch (error) {
+      let businessError: BusinessError = error as BusinessError;
+      this.remotePasswordError = businessError && businessError.message && businessError.message.length > 0
+        ? businessError.message
+        : '远端密码库验证失败。';
+    } finally {
+      this.isRemotePasswordBusy = false;
+    }
   }
 
   private syncAfterLocalChange(): void {
@@ -770,7 +893,7 @@ struct Index {
 
   private async resolveSyncConflict(keepLocal: boolean): Promise<void> {
     if (this.isSyncing) {
-      this.syncStatusMessage = '同步正在进行中，请稍后再试。';
+      this.showHomeError('同步正在进行中，请稍后再试。');
       return;
     }
 
@@ -784,17 +907,22 @@ struct Index {
         : await WebDavSyncService.getInstance().useRemoteVersion(context);
       if (result.vault !== undefined) {
         this.applyVault(result.vault);
-      } else {
-        await this.loadHome();
       }
       this.hasSyncConflict = result.status === 'conflict';
       this.syncStatusMessage = result.message;
+      if (result.status === 'blocked' || result.status === 'conflict') {
+        this.showHomeError(result.message);
+      } else {
+        this.showHomeSuccess(result.message);
+      }
       this.refreshLastSyncLabel(context);
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      this.syncStatusMessage = businessError && businessError.message && businessError.message.length > 0
+      let message: string = businessError && businessError.message && businessError.message.length > 0
         ? `处理冲突失败：${businessError.message}`
         : '处理冲突失败，请稍后重试。';
+      this.syncStatusMessage = message;
+      this.showHomeError(message);
     } finally {
       this.isSyncing = false;
       this.stopSyncAnimation();
@@ -807,7 +935,7 @@ struct Index {
       let settings: WebDavSettings = SettingsService.getInstance().loadWebDavSettings(context);
       this.canSync = settings.enabled && settings.serverUrl.trim().length > 0 && settings.filePath.trim().length > 0;
       if (!this.canSync && !this.isSyncing && !this.hasSyncConflict) {
-        this.syncStatusMessage = '未配置 WebDAV，数据仅保留在本机。';
+        this.syncStatusMessage = 'WebDAV 同步未开启，本地模式。';
       }
     } catch (_error) {
       this.canSync = false;
@@ -830,6 +958,82 @@ struct Index {
 
   private resolveHomeSubTitle(): string {
     return `${this.accountCountLabel} · ${this.lastUpdatedLabel}`;
+  }
+
+  private resolveHomeBannerMessage(): string {
+    if (this.errorMessage.length > 0) {
+      return this.errorMessage;
+    }
+    if (this.copyStatusMessage.length > 0) {
+      return this.copyStatusMessage;
+    }
+    return this.resolveRegularHomeSyncStatus();
+  }
+
+  private resolveHomeBannerColor(): ResourceColor {
+    let message: string = this.resolveHomeBannerMessage();
+    if (this.errorMessage.length > 0 || this.isRemotePasswordStatus(message)) {
+      return this.isDarkMode() ? '#FF6B6B' : '#C53D3D';
+    }
+    if (this.copyStatusMessage.length > 0) {
+      return this.isDarkMode() ? '#58C18F' : '#2D7A59';
+    }
+    return $r('sys.color.font_secondary');
+  }
+
+  private resolveRegularHomeSyncStatus(): string {
+    if (this.isSyncing) {
+      return '同步中...';
+    }
+    try {
+      let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      let settings: WebDavSettings = SettingsService.getInstance().loadWebDavSettings(context);
+      if (!settings.enabled || settings.serverUrl.trim().length === 0 || settings.filePath.trim().length === 0) {
+        return 'WebDAV 同步未开启，本地模式。';
+      }
+      let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
+      if (metadata.lastStatus === 'blocked' || this.isRemotePasswordStatus(metadata.lastError)) {
+        return '远端保管库需要主密码验证后才能继续同步。';
+      }
+      return '本地与 WebDAV 已经是最新版本。';
+    } catch (_error) {
+      return '同步设置暂不可用。';
+    }
+  }
+
+  private isRemotePasswordStatus(message: string): boolean {
+    return message.indexOf('远端保管库') >= 0 ||
+      message.indexOf('远端密码库') >= 0 ||
+      message.indexOf('Master password is incorrect') >= 0 ||
+      message.indexOf('主密码') >= 0;
+  }
+
+  private showHomeSuccess(message: string): void {
+    this.copyStatusMessage = message;
+    this.errorMessage = '';
+    this.scheduleClearTransientHomeStatus();
+  }
+
+  private showHomeError(message: string): void {
+    this.errorMessage = message;
+    this.copyStatusMessage = '';
+    this.scheduleClearTransientHomeStatus();
+  }
+
+  private scheduleClearTransientHomeStatus(): void {
+    this.clearTransientStatusTimer();
+    this.transientStatusTimerId = setTimeout(() => {
+      this.copyStatusMessage = '';
+      this.errorMessage = '';
+      this.transientStatusTimerId = -1;
+    }, 2000);
+  }
+
+  private clearTransientStatusTimer(): void {
+    if (this.transientStatusTimerId >= 0) {
+      clearTimeout(this.transientStatusTimerId);
+      this.transientStatusTimerId = -1;
+    }
   }
 
   private resolveRootTitle(): string {

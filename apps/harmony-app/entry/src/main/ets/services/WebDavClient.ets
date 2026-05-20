@@ -2,7 +2,7 @@ import { http } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { LocalVault } from '../model/LocalVault';
 import { WebDavSettings } from '../model/WebDavSettings';
-import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService } from './RemoteVaultCryptoService';
+import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService, RemoteVaultDecryption } from './RemoteVaultCryptoService';
 
 interface WebDavRemoteEnvelopeRecord {
   schemaVersion: number;
@@ -16,12 +16,16 @@ export class WebDavRemoteSnapshot {
   updatedAt: string;
   etag: string;
   vault: LocalVault;
+  encryptedVault: EncryptedRemoteVaultBlob;
+  vaultKey: Uint8Array;
 
-  constructor(revision: string, updatedAt: string, etag: string, vault: LocalVault) {
+  constructor(revision: string, updatedAt: string, etag: string, vault: LocalVault, encryptedVault: EncryptedRemoteVaultBlob, vaultKey: Uint8Array) {
     this.revision = revision;
     this.updatedAt = updatedAt;
     this.etag = etag;
     this.vault = vault;
+    this.encryptedVault = encryptedVault;
+    this.vaultKey = vaultKey;
   }
 }
 
@@ -39,6 +43,10 @@ export class WebDavClient {
   private cryptoService: RemoteVaultCryptoService = new RemoteVaultCryptoService();
 
   async download(settings: WebDavSettings): Promise<WebDavRemoteSnapshot | undefined> {
+    return this.downloadWithPassword(settings, '');
+  }
+
+  async downloadWithPassword(settings: WebDavSettings, remotePassword: string): Promise<WebDavRemoteSnapshot | undefined> {
     let response: http.HttpResponse = await this.request(this.buildVaultUrl(settings), http.RequestMethod.GET, settings, '');
     if (response.responseCode === 404 || response.responseCode === 410) {
       return undefined;
@@ -54,22 +62,69 @@ export class WebDavClient {
 
     let record: Record<string, Object> = JSON.parse(payload) as Record<string, Object>;
     let encryptedVault: EncryptedRemoteVaultBlob = this.cryptoService.parseEncryptedBlob(record['encryptedVault']);
-    let vault: LocalVault = this.cryptoService.decrypt(encryptedVault);
+    let decrypted: RemoteVaultDecryption = remotePassword.length > 0
+      ? this.cryptoService.decryptWithPassword(encryptedVault, remotePassword)
+      : this.cryptoService.decryptWithKey(encryptedVault);
     return new WebDavRemoteSnapshot(
       this.readString(record, 'revision', ''),
       this.readString(record, 'updatedAt', ''),
       this.readEtag(response),
-      vault
+      decrypted.vault,
+      encryptedVault,
+      decrypted.vaultKey
     );
   }
 
-  async upload(settings: WebDavSettings, vault: LocalVault, revision: string, previousEtag: string): Promise<WebDavUploadResult> {
+  async upload(
+    settings: WebDavSettings,
+    vault: LocalVault,
+    revision: string,
+    previousEtag: string,
+    keySource: WebDavRemoteSnapshot | undefined = undefined
+  ): Promise<WebDavUploadResult> {
     let now: string = new Date().toISOString();
     let envelope: WebDavRemoteEnvelopeRecord = {
       schemaVersion: 1,
       revision: revision,
       updatedAt: now,
-      encryptedVault: this.cryptoService.encrypt(vault)
+      encryptedVault: keySource === undefined
+        ? this.cryptoService.encrypt(vault)
+        : this.cryptoService.encryptWithVaultKey(vault, keySource.encryptedVault, keySource.vaultKey)
+    };
+    let response: http.HttpResponse = await this.request(
+      this.buildVaultUrl(settings),
+      http.RequestMethod.PUT,
+      settings,
+      JSON.stringify(envelope),
+      previousEtag
+    );
+    if (response.responseCode < 200 || response.responseCode >= 300) {
+      if (response.responseCode === 409) {
+        throw new Error('WebDAV 上传失败，远端目录不存在或路径不可写。请确认保管库路径所在目录已存在。');
+      }
+      if (response.responseCode === 401 || response.responseCode === 403) {
+        throw new Error('WebDAV 上传失败，用户名或密码无效。');
+      }
+      if (response.responseCode === 412) {
+        throw new Error('WebDAV 上传失败，远端版本已变化，请先同步后再保存。');
+      }
+      throw new Error(`WebDAV 上传失败，HTTP ${response.responseCode}`);
+    }
+    return new WebDavUploadResult(revision, this.readEtag(response));
+  }
+
+  async uploadEncryptedVault(
+    settings: WebDavSettings,
+    encryptedVault: EncryptedRemoteVaultBlob,
+    revision: string,
+    previousEtag: string
+  ): Promise<WebDavUploadResult> {
+    let now: string = new Date().toISOString();
+    let envelope: WebDavRemoteEnvelopeRecord = {
+      schemaVersion: 1,
+      revision: revision,
+      updatedAt: now,
+      encryptedVault: encryptedVault
     };
     let response: http.HttpResponse = await this.request(
       this.buildVaultUrl(settings),

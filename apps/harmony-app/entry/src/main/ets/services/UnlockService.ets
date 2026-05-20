@@ -129,6 +129,7 @@ export class UnlockService {
 
     if (savedPassword.length === 0) {
       this.saveMasterPassword(store, normalizedPassword);
+      this.refreshBiometricCredentialIfEnabled(context, normalizedPassword);
       this.isUnlocked = true;
       this.sessionPassword = normalizedPassword;
       this.lastUnlockAt = new Date().toISOString();
@@ -148,6 +149,7 @@ export class UnlockService {
     if (!this.isPasswordRecord(savedPassword)) {
       this.saveMasterPassword(store, normalizedPassword);
     }
+    this.refreshBiometricCredentialIfEnabled(context, normalizedPassword);
 
     this.isUnlocked = true;
     this.sessionPassword = normalizedPassword;
@@ -179,6 +181,40 @@ export class UnlockService {
       throw new Error('本地保管库尚未解锁，请先输入主密码。');
     }
     return this.sessionPassword;
+  }
+
+  updateMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): void {
+    let normalizedCurrent: string = currentPassword.trim();
+    let normalizedNext: string = nextPassword.trim();
+    if (normalizedCurrent.length === 0 || normalizedNext.length === 0) {
+      throw new Error('请输入当前主密码和新主密码。');
+    }
+    if (normalizedCurrent === normalizedNext) {
+      throw new Error('新主密码不能和当前主密码相同。');
+    }
+    let store: preferences.Preferences = this.getStore(context);
+    let savedPassword: string = this.getStoredMasterPassword(store);
+    if (savedPassword.length === 0 || !this.verifyStoredPassword(savedPassword, normalizedCurrent)) {
+      throw new Error('当前主密码错误');
+    }
+    this.saveMasterPassword(store, normalizedNext);
+    this.refreshBiometricCredentialIfEnabled(context, normalizedNext);
+    this.isUnlocked = true;
+    this.sessionPassword = normalizedNext;
+    this.lastUnlockAt = new Date().toISOString();
+  }
+
+  adoptRemoteMasterPassword(context: common.UIAbilityContext, remotePassword: string): void {
+    let normalizedPassword: string = remotePassword.trim();
+    if (normalizedPassword.length === 0) {
+      throw new Error('请输入远端主密码。');
+    }
+    let store: preferences.Preferences = this.getStore(context);
+    this.saveMasterPassword(store, normalizedPassword);
+    this.refreshBiometricCredentialIfEnabled(context, normalizedPassword);
+    this.isUnlocked = true;
+    this.sessionPassword = normalizedPassword;
+    this.lastUnlockAt = new Date().toISOString();
   }
 
   lockSession(): void {
@@ -446,6 +482,12 @@ export class UnlockService {
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
       throw new Error(`打开解锁状态存储失败：${businessError.message}`);
+    }
+  }
+
+  private refreshBiometricCredentialIfEnabled(context: common.UIAbilityContext, password: string): void {
+    if (this.settingsStore.loadBiometricUnlockEnabled(context)) {
+      BiometricVaultCredentialService.getInstance().saveMasterPassword(password);
     }
   }
 

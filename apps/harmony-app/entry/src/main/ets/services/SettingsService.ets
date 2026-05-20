@@ -8,6 +8,8 @@ import { TotpAccount } from '../model/TotpAccount';
 import { createDefaultWebDavSyncMetadata } from '../model/WebDavSyncMetadata';
 import { BiometricVaultCredentialService } from './BiometricVaultCredentialService';
 import { UnlockService } from './UnlockService';
+import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService, RemoteVaultDecryption } from './RemoteVaultCryptoService';
+import { WebDavSyncResult, WebDavSyncService } from './WebDavSyncService';
 import { LocalVaultStore } from '../storage/LocalVaultStore';
 import { SettingsStore } from '../storage/SettingsStore';
 
@@ -65,9 +67,9 @@ class PlainExportBundle {
 
 class EncryptedExportBundle {
   mode: string;
-  encryptedVault: WebEncryptedVaultBlob;
+  encryptedVault: Object;
 
-  constructor(encryptedVault: WebEncryptedVaultBlob) {
+  constructor(encryptedVault: Object) {
     this.mode = 'encrypted';
     this.encryptedVault = encryptedVault;
   }
@@ -149,6 +151,7 @@ export class SettingsService {
   private static instance: SettingsService | undefined;
   private store: SettingsStore = new SettingsStore();
   private vaultStore: LocalVaultStore = new LocalVaultStore();
+  private remoteCrypto: RemoteVaultCryptoService = new RemoteVaultCryptoService();
 
   static getInstance(): SettingsService {
     if (!SettingsService.instance) {
@@ -230,9 +233,18 @@ export class SettingsService {
     }
 
     let raw: string = this.readTextFile(selectedUris[0]);
-    let vault: LocalVault = this.parseImportContent(raw);
+    let vault: LocalVault = this.parseImportContent(context, raw);
     let savedVault: LocalVault = this.vaultStore.save(context, vault);
     return new ImportVaultResult(savedVault, savedVault.accounts.length);
+  }
+
+  async changeMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): Promise<WebDavSyncResult> {
+    return await WebDavSyncService.getInstance().changeMasterPassword(context, currentPassword, nextPassword);
+  }
+
+  isRemotePasswordBlocked(context: common.UIAbilityContext): boolean {
+    return this.store.loadWebDavSettings(context).enabled &&
+      this.store.loadWebDavSyncMetadata(context).lastStatus === 'blocked';
   }
 
   private hasSyncProfileChanged(previousSettings: WebDavSettings, nextSettings: WebDavSettings): boolean {
@@ -251,12 +263,11 @@ export class SettingsService {
   }
 
   private createEncryptedExportContent(vault: LocalVault): string {
-    let payload: PlainExportVaultPayload = new PlainExportVaultPayload(1, this.toWebAccountRecords(vault.accounts));
-    let encryptedVault: WebEncryptedVaultBlob = this.encryptWebVaultPayload(JSON.stringify(payload));
+    let encryptedVault: EncryptedRemoteVaultBlob = this.remoteCrypto.encrypt(vault);
     return JSON.stringify(new EncryptedExportBundle(encryptedVault), null, 2);
   }
 
-  private parseImportContent(raw: string): LocalVault {
+  private parseImportContent(context: common.UIAbilityContext, raw: string): LocalVault {
     let parsed: Record<string, Object> = JSON.parse(raw) as Record<string, Object>;
     let modeValue: Object | undefined = parsed['mode'];
     if (modeValue === 'encrypted') {
@@ -264,9 +275,14 @@ export class SettingsService {
       if (typeof encryptedVaultValue !== 'object' || encryptedVaultValue === null || Array.isArray(encryptedVaultValue)) {
         throw new Error('加密备份内容无效。');
       }
-      return this.createLocalVaultFromWebPayload(
-        this.decryptWebVaultPayload(encryptedVaultValue as Record<string, Object>)
-      );
+      let encryptedVault: Record<string, Object> = encryptedVaultValue as Record<string, Object>;
+      if (this.readNumber(encryptedVault, 'formatVersion', 0) === 2 && typeof encryptedVault['keyEncryption'] === 'object') {
+        let remoteBlob: EncryptedRemoteVaultBlob = this.remoteCrypto.parseEncryptedBlob(encryptedVault);
+        let decrypted: RemoteVaultDecryption = this.remoteCrypto.decryptWithKey(remoteBlob);
+        this.vaultStore.saveWithRemoteKey(context, decrypted.vault, remoteBlob, decrypted.vaultKey);
+        return decrypted.vault;
+      }
+      return this.createLocalVaultFromWebPayload(this.decryptWebVaultPayload(encryptedVault));
     }
 
     if (modeValue === 'plain') {

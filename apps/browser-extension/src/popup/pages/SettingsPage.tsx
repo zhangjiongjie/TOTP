@@ -40,14 +40,21 @@ export function SettingsPage({ onBack }: SettingsPageProps = {}) {
   const [importExportMessage, setImportExportMessage] = useState('');
   const [conflictMessage, setConflictMessage] = useState('');
   const [securityMessage, setSecurityMessage] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
   const [isSavingWebDav, setIsSavingWebDav] = useState(false);
   const [isImportExportBusy, setIsImportExportBusy] = useState(false);
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
   const [isSavingSecurity, setIsSavingSecurity] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [conflictOpen, setConflictOpen] = useState(false);
   const [rememberSessionUntilBrowserRestart, setRememberSessionUntilBrowserRestart] =
     useState(true);
   const [webAuthnUnlockEnabled, setWebAuthnUnlockEnabled] = useState(false);
+  const [passwordDraft, setPasswordDraft] = useState({
+    current: '',
+    next: '',
+    confirm: ''
+  });
 
   useEffect(() => {
     void refreshSnapshot();
@@ -184,6 +191,27 @@ export function SettingsPage({ onBack }: SettingsPageProps = {}) {
     }
   }
 
+  async function handleChangeMasterPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsChangingPassword(true);
+    setPasswordMessage('');
+
+    try {
+      if (passwordDraft.next !== passwordDraft.confirm) {
+        throw new Error('两次输入的新主密码不一致。');
+      }
+
+      await settingsService.changeMasterPassword(passwordDraft.current, passwordDraft.next);
+      setPasswordDraft({ current: '', next: '', confirm: '' });
+      await refreshSnapshot();
+      setPasswordMessage('主密码已修改。');
+    } catch (error) {
+      setPasswordMessage(error instanceof Error ? error.message : '主密码修改失败。');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
   return (
     <>
       <PopupShell
@@ -259,6 +287,49 @@ export function SettingsPage({ onBack }: SettingsPageProps = {}) {
             ) : null}
           </section>
           {securityMessage ? <p style={panelMessageStyle}>{securityMessage}</p> : null}
+          <form style={panelStyle} onSubmit={handleChangeMasterPassword}>
+            <div>
+              <h2 style={panelHeadingStyle}>修改主密码</h2>
+              <p style={panelHelperStyle}>WebDAV 开启时会先确认远端可同步，再更新主密码。</p>
+            </div>
+            <input
+              aria-label="当前主密码"
+              type="password"
+              value={passwordDraft.current}
+              placeholder="当前主密码"
+              style={inputStyle}
+              disabled={isChangingPassword}
+              onChange={(event) =>
+                setPasswordDraft((draft) => ({ ...draft, current: event.target.value }))
+              }
+            />
+            <input
+              aria-label="新主密码"
+              type="password"
+              value={passwordDraft.next}
+              placeholder="新主密码"
+              style={inputStyle}
+              disabled={isChangingPassword}
+              onChange={(event) =>
+                setPasswordDraft((draft) => ({ ...draft, next: event.target.value }))
+              }
+            />
+            <input
+              aria-label="确认新主密码"
+              type="password"
+              value={passwordDraft.confirm}
+              placeholder="再次输入新主密码"
+              style={inputStyle}
+              disabled={isChangingPassword}
+              onChange={(event) =>
+                setPasswordDraft((draft) => ({ ...draft, confirm: event.target.value }))
+              }
+            />
+            <button type="submit" style={primaryButtonStyle} disabled={isChangingPassword}>
+              {isChangingPassword ? '修改中...' : '修改主密码'}
+            </button>
+            {passwordMessage ? <p style={panelMessageStyle}>{passwordMessage}</p> : null}
+          </form>
           <WebDavForm
             profile={snapshot.webDavProfile}
             syncStatus={snapshot.syncMetadata}
@@ -386,4 +457,26 @@ const panelMessageStyle = {
   margin: 0,
   lineHeight: 1.5,
   color: 'var(--color-ink-soft)'
+} satisfies React.CSSProperties;
+
+const inputStyle = {
+  width: '100%',
+  minHeight: '44px',
+  boxSizing: 'border-box',
+  borderRadius: '10px',
+  border: '1px solid var(--color-line)',
+  background: 'var(--color-card-muted)',
+  color: 'var(--color-ink-strong)',
+  padding: '0 12px',
+  fontSize: '15px'
+} satisfies React.CSSProperties;
+
+const primaryButtonStyle = {
+  minHeight: '44px',
+  border: '0',
+  borderRadius: '10px',
+  background: 'var(--color-brand)',
+  color: '#ffffff',
+  fontWeight: 700,
+  cursor: 'pointer'
 } satisfies React.CSSProperties;

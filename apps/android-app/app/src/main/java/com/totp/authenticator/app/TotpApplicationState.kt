@@ -22,16 +22,35 @@ class TotpApplicationState(
     var activePassword: String? by mutableStateOf(null)
         private set
 
-    fun applyUnlockedVault(vault: LocalVault, password: String) {
+    var activeVaultKey: ByteArray? by mutableStateOf(null)
+        private set
+
+    fun applyUnlockedVault(vault: LocalVault, password: String, vaultKey: ByteArray? = null) {
         this.vault = vault
         activePassword = password
+        activeVaultKey = vaultKey
         isUnlocked = true
         currentRoute = TotpRoute.Home
     }
 
-    fun updateUnlockedVault(vault: LocalVault, password: String) {
+    fun applyUnlockedVaultWithKey(vault: LocalVault, vaultKey: ByteArray) {
+        this.vault = vault
+        activePassword = null
+        activeVaultKey = vaultKey
+        isUnlocked = true
+        currentRoute = TotpRoute.Home
+    }
+
+    fun updateUnlockedVault(vault: LocalVault, password: String, vaultKey: ByteArray? = activeVaultKey) {
         this.vault = vault
         activePassword = password
+        activeVaultKey = vaultKey
+        isUnlocked = true
+    }
+
+    fun updateUnlockedVaultWithKey(vault: LocalVault, vaultKey: ByteArray) {
+        this.vault = vault
+        activeVaultKey = vaultKey
         isUnlocked = true
     }
 
@@ -45,6 +64,7 @@ class TotpApplicationState(
     fun lock() {
         vault = null
         activePassword = null
+        activeVaultKey = null
         isUnlocked = false
         currentRoute = TotpRoute.Unlock
     }
