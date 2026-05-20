@@ -105,6 +105,9 @@ fun TotpApp() {
         )
     }
     val biometricUnlockStore = remember { BiometricVaultUnlockStore(context) }
+    val webDavFlowCoordinator = remember { WebDavFlowCoordinator(repository, webDavSyncService) }
+    val backupFlowCoordinator = remember { BackupFlowCoordinator(repository, backupService, webDavSyncService) }
+    val quickUnlockCoordinator = remember { QuickUnlockCoordinator(biometricUnlockStore, repository) }
     val appScope = rememberCoroutineScope()
     var hasExistingVault by remember { mutableStateOf(repository.hasVault()) }
     val state: TotpApplicationState = viewModel(
@@ -187,9 +190,10 @@ fun TotpApp() {
     }
 
     fun refreshQuickUnlockAvailability() {
-        quickUnlockAvailability = biometricUnlockStore.quickUnlockStatus()
-        biometricUnlockAvailable = quickUnlockAvailability == QuickUnlockAvailability.Available
-        hasStrongBiometric = biometricUnlockStore.hasStrongBiometric()
+        val quickUnlockState = quickUnlockCoordinator.availability()
+        quickUnlockAvailability = quickUnlockState.availability
+        biometricUnlockAvailable = quickUnlockState.available
+        hasStrongBiometric = quickUnlockState.hasStrongBiometric
     }
 
     fun acceptImportedOtpAuthUri(uri: String) {
@@ -241,23 +245,22 @@ fun TotpApp() {
         }
     }
 
-    fun exportBackupWithPassword(password: String) {
+    val exportBackupWithPassword: (String) -> Unit = exportBackupWithPassword@{ password ->
         val vault = state.vault
         if (vault == null) {
             backupErrorMessage = "保管库未解锁。"
-            return
+            return@exportBackupWithPassword
         }
         appScope.launch {
             backupBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.exportVaultKey(password)
-                    backupService.createEncryptedExport(vault, password) to backupService.createBackupFilename()
+                    backupFlowCoordinator.createExportWithPassword(vault, password)
                 }
-            }.onSuccess { (content, filename) ->
-                pendingExportContent = content
+            }.onSuccess { payload ->
+                pendingExportContent = payload.content
                 documentPickerActive = true
-                backupExportLauncher.launch(filename)
+                backupExportLauncher.launch(payload.filename)
             }.onFailure { error ->
                 backupErrorMessage = error.message ?: "导出备份失败，请稍后重试。"
                 backupBusy = false
@@ -265,23 +268,22 @@ fun TotpApp() {
         }
     }
 
-    fun exportBackupWithVaultKey(vaultKey: ByteArray) {
+    val exportBackupWithVaultKey: (ByteArray) -> Unit = exportBackupWithVaultKey@{ vaultKey ->
         val vault = state.vault
         if (vault == null) {
             backupErrorMessage = "保管库未解锁。"
-            return
+            return@exportBackupWithVaultKey
         }
         appScope.launch {
             backupBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val envelope = repository.exportEncryptedEnvelope()
-                    backupService.createEncryptedExport(vault, envelope, vaultKey) to backupService.createBackupFilename()
+                    backupFlowCoordinator.createExportWithVaultKey(vault, vaultKey)
                 }
-            }.onSuccess { (content, filename) ->
-                pendingExportContent = content
+            }.onSuccess { payload ->
+                pendingExportContent = payload.content
                 documentPickerActive = true
-                backupExportLauncher.launch(filename)
+                backupExportLauncher.launch(payload.filename)
             }.onFailure { error ->
                 backupErrorMessage = error.message ?: "导出备份失败，请稍后重试。"
                 backupBusy = false
@@ -289,23 +291,17 @@ fun TotpApp() {
         }
     }
 
-    fun importBackupFromUri(uri: Uri, password: String) {
+    val importBackupFromUri: (Uri, String) -> Unit = { uri, password ->
         appScope.launch {
             backupBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val vaultKey = repository.exportVaultKey(password)
-                    val importedVault = backupService.parseImport(readTextFromUri(uri), password)
-                    repository.save(importedVault, password)
-                    if (webDavSyncService.loadSettings().enabled) {
-                        webDavSyncService.syncLocalChange(password)
-                    }
-                    importedVault to vaultKey
+                    backupFlowCoordinator.importBackup(readTextFromUri(uri), password)
                 }
-            }.onSuccess { (importedVault, vaultKey) ->
-                state.updateUnlockedVault(importedVault, password, vaultKey)
-                webDavMetadata = webDavSyncService.loadMetadata()
-                backupStatusMessage = "已导入 ${importedVault.accounts.size} 个账号。"
+            }.onSuccess { result ->
+                state.updateUnlockedVault(result.vault, password, result.vaultKey)
+                webDavMetadata = result.webDavMetadata
+                backupStatusMessage = "已导入 ${result.vault.accounts.size} 个账号。"
                 backupErrorMessage = ""
             }.onFailure { error ->
                 backupErrorMessage = error.message ?: "导入备份失败，请稍后重试。"
@@ -496,7 +492,7 @@ fun TotpApp() {
         }
     }
 
-    fun enableBiometricUnlock(vaultKey: ByteArray) {
+    val enableBiometricUnlock: (ByteArray) -> Unit = enableBiometricUnlock@{ vaultKey ->
         refreshQuickUnlockAvailability()
         if (quickUnlockAvailability == QuickUnlockAvailability.NeedsSystemCredential) {
             val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -509,11 +505,11 @@ fun TotpApp() {
             }
             Toast.makeText(context, "请先设置系统锁屏密码。", Toast.LENGTH_SHORT).show()
             activityContext.startActivity(intent)
-            return
+            return@enableBiometricUnlock
         }
         if (!biometricUnlockAvailable) {
             Toast.makeText(context, "当前设备不支持快速解锁", Toast.LENGTH_SHORT).show()
-            return
+            return@enableBiometricUnlock
         }
         biometricBusy = true
         authenticateQuickUnlock(
@@ -523,8 +519,8 @@ fun TotpApp() {
                 appScope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            val authenticatedCipher = biometricUnlockStore.createSetupCipher()
-                            biometricUnlockStore.saveCredential(authenticatedCipher, vaultKey)
+                            val authenticatedCipher = quickUnlockCoordinator.createSetupCipher()
+                            quickUnlockCoordinator.saveCredential(authenticatedCipher, vaultKey)
                         }
                     }.onSuccess {
                         biometricUnlockEnabled = true
@@ -538,15 +534,15 @@ fun TotpApp() {
         )
     }
 
-    fun disableBiometricUnlock() {
-        biometricUnlockStore.disable()
+    val disableBiometricUnlock: () -> Unit = {
+        quickUnlockCoordinator.disable()
         biometricUnlockEnabled = false
         Toast.makeText(context, "快速解锁已关闭", Toast.LENGTH_SHORT).show()
     }
 
-    fun refreshQuickUnlockCredentialIfNeeded(previousVaultKey: ByteArray?, nextVaultKey: ByteArray) {
-        if (!biometricUnlockEnabled || previousVaultKey?.contentEquals(nextVaultKey) == true) {
-            return
+    val refreshQuickUnlockCredentialIfNeeded: (ByteArray?, ByteArray) -> Unit = refreshQuickUnlockCredentialIfNeeded@{ previousVaultKey, nextVaultKey ->
+        if (!quickUnlockCoordinator.shouldRefreshCredential(biometricUnlockEnabled, previousVaultKey, nextVaultKey)) {
+            return@refreshQuickUnlockCredentialIfNeeded
         }
         biometricBusy = true
         authenticateQuickUnlock(
@@ -556,8 +552,8 @@ fun TotpApp() {
                 appScope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            val authenticatedCipher = biometricUnlockStore.createSetupCipher()
-                            biometricUnlockStore.saveCredential(authenticatedCipher, nextVaultKey)
+                            val authenticatedCipher = quickUnlockCoordinator.createSetupCipher()
+                            quickUnlockCoordinator.saveCredential(authenticatedCipher, nextVaultKey)
                         }
                     }.onSuccess {
                         Toast.makeText(context, "快速解锁凭据已更新", Toast.LENGTH_SHORT).show()
@@ -574,23 +570,15 @@ fun TotpApp() {
     }
 
     fun needsMasterPasswordForSync(result: WebDavSyncResult): Boolean {
-        return result.status == "blocked"
+        return webDavFlowCoordinator.needsMasterPassword(result)
     }
 
     fun formatWebDavResultMessage(result: WebDavSyncResult): String {
-        return when (result.status) {
-            "pushed" -> if (result.message.contains("主密码")) result.message else "同步完成，已推送本地最新数据。"
-            "pulled" -> "同步完成，已拉取远端最新数据。"
-            "synced", "noop" -> "同步完成，当前数据已经是最新。"
-            "conflict" -> "检测到同步冲突，请前往设置页处理。"
-            "blocked" -> result.message.ifBlank { "远端保管库需要主密码验证后才能继续同步。" }
-            else -> result.message
-        }
+        return webDavFlowCoordinator.formatResultMessage(result)
     }
 
     fun canUseFastWebDavSync(vaultKey: ByteArray?): Boolean {
-        val metadata = webDavSyncService.loadMetadata()
-        return vaultKey != null && metadata.remoteEtag.isNotBlank() && metadata.lastStatus != "blocked"
+        return webDavFlowCoordinator.canUseFastSync(vaultKey)
     }
 
     fun quickUnlockTitleForMessage(hasStrongBiometric: Boolean): String {
@@ -609,34 +597,31 @@ fun TotpApp() {
         }
     }
 
-    fun syncWebDavWithPassword(password: String) {
+    val syncWebDavWithPassword: (String) -> Unit = syncWebDavWithPassword@{ password ->
         val vault = state.vault
         if (vault == null) {
             homeErrorStatusMessage = "保管库未解锁。"
-            return
+            return@syncWebDavWithPassword
         }
         appScope.launch {
             webDavBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val result = webDavSyncService.syncNow(password)
-                    val vaultKey = result.vaultKey ?: repository.exportVaultKey(password)
-                    val refreshedVault = if (result.vaultChanged) repository.unlockWithVaultKey(vaultKey) else vault
-                    Triple(result, refreshedVault, vaultKey)
+                    webDavFlowCoordinator.syncWithPassword(vault, password)
                 }
-            }.onSuccess { (result, refreshedVault, vaultKey) ->
-                webDavMetadata = webDavSyncService.loadMetadata()
-                val syncMessage = formatWebDavResultMessage(result)
-                if (needsMasterPasswordForSync(result)) {
+            }.onSuccess { flowResult ->
+                webDavMetadata = flowResult.metadata
+                val syncMessage = formatWebDavResultMessage(flowResult.syncResult)
+                if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     homeErrorStatusMessage = syncMessage
                     pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
                     webDavBusy = false
                     return@onSuccess
                 }
                 val previousVaultKey = state.activeVaultKey
-                state.updateUnlockedVault(refreshedVault, password, vaultKey)
-                if (result.vaultKey != null) {
-                    refreshQuickUnlockCredentialIfNeeded(previousVaultKey, vaultKey)
+                state.updateUnlockedVault(flowResult.refreshedVault ?: vault, password, flowResult.vaultKey)
+                if (flowResult.syncResult.vaultKey != null && flowResult.vaultKey != null) {
+                    refreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
                 }
                 homeCopyStatusMessage = syncMessage
                 homeErrorStatusMessage = ""
@@ -648,45 +633,34 @@ fun TotpApp() {
         }
     }
 
-    fun syncWebDavAfterUnlock(vault: LocalVault, password: String?, vaultKey: ByteArray?) {
+    val syncWebDavAfterUnlock: (LocalVault, String?, ByteArray?) -> Unit = syncWebDavAfterUnlock@{ _, password, vaultKey ->
         val settings = webDavSyncService.loadSettings()
         if (hasSyncedAfterUnlock || !settings.enabled || !settings.isConfigured) {
-            return
+            return@syncWebDavAfterUnlock
         }
         hasSyncedAfterUnlock = true
         appScope.launch {
             webDavBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val result = if (canUseFastWebDavSync(vaultKey)) {
-                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
-                    } else if (password != null) {
-                        webDavSyncService.syncNow(password)
-                    } else {
-                        throw IllegalStateException("保管库未解锁。")
-                    }
-                    val nextVaultKey = result.vaultKey ?: vaultKey
-                    val refreshedVault = if (result.vaultChanged) {
-                        if (nextVaultKey != null) repository.unlockWithVaultKey(nextVaultKey) else repository.unlock(password!!)
-                    } else null
-                    Triple(result, refreshedVault, nextVaultKey)
+                    webDavFlowCoordinator.syncUnlocked(password, vaultKey)
                 }
-            }.onSuccess { (result, refreshedVault, nextVaultKey) ->
-                webDavSettings = webDavSyncService.loadSettings()
-                webDavMetadata = webDavSyncService.loadMetadata()
-                val syncMessage = formatWebDavResultMessage(result)
-                if (refreshedVault != null) {
-                    if (password != null && nextVaultKey != null) {
+            }.onSuccess { flowResult ->
+                webDavSettings = flowResult.settings
+                webDavMetadata = flowResult.metadata
+                val syncMessage = formatWebDavResultMessage(flowResult.syncResult)
+                if (flowResult.refreshedVault != null) {
+                    if (password != null && flowResult.vaultKey != null) {
                         val previousVaultKey = state.activeVaultKey
-                        state.updateUnlockedVault(refreshedVault, password, nextVaultKey)
-                        if (result.vaultKey != null) {
-                            refreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
+                        state.updateUnlockedVault(flowResult.refreshedVault, password, flowResult.vaultKey)
+                        if (flowResult.syncResult.vaultKey != null) {
+                            refreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
                         }
-                    } else if (nextVaultKey != null) {
-                        state.updateUnlockedVaultWithKey(refreshedVault, nextVaultKey)
+                    } else if (flowResult.vaultKey != null) {
+                        state.updateUnlockedVaultWithKey(flowResult.refreshedVault, flowResult.vaultKey)
                     }
                 }
-                if (needsMasterPasswordForSync(result)) {
+                if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     homeErrorStatusMessage = syncMessage
                     pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
                 } else {
@@ -701,12 +675,12 @@ fun TotpApp() {
         }
     }
 
-    fun startBiometricUnlock() {
+    val startBiometricUnlock: () -> Unit = startBiometricUnlock@{
         biometricBusy = false
         autoQuickUnlockAttempted = true
         if (!biometricUnlockEnabled) {
             errorMessage = "快速解锁未开启，请使用主密码。"
-            return
+            return@startBiometricUnlock
         }
         biometricBusy = true
         authenticateQuickUnlock(
@@ -716,16 +690,14 @@ fun TotpApp() {
                 appScope.launch {
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            val authenticatedCipher = biometricUnlockStore.createUnlockCipher()
+                            val authenticatedCipher = quickUnlockCoordinator.createUnlockCipher()
                                 ?: throw IllegalStateException("快速解锁凭据已失效，请使用主密码。")
-                            val credential = biometricUnlockStore.readCredential(authenticatedCipher)
-                            val vault = repository.unlockWithVaultKey(credential.vaultKey)
-                            credential to vault
+                            quickUnlockCoordinator.unlock(authenticatedCipher)
                         }
-                    }.onSuccess { (credential, vault) ->
+                    }.onSuccess { result ->
                         errorMessage = null
-                        state.applyUnlockedVaultWithKey(vault, credential.vaultKey)
-                        syncWebDavAfterUnlock(vault, password = null, vaultKey = credential.vaultKey)
+                        state.applyUnlockedVaultWithKey(result.vault, result.vaultKey)
+                        syncWebDavAfterUnlock(result.vault, null, result.vaultKey)
                     }.onFailure { error ->
                         errorMessage = error.message ?: "快速解锁失败，请使用主密码。"
                     }
@@ -738,26 +710,20 @@ fun TotpApp() {
         )
     }
 
-    fun syncWebDavAfterLocalChange(vault: LocalVault, password: String?, vaultKey: ByteArray?) {
+    val syncWebDavAfterLocalChange: (LocalVault, String?, ByteArray?) -> Unit = syncWebDavAfterLocalChange@{ vault, password, vaultKey ->
         if (!webDavSyncService.loadSettings().enabled) {
-            return
+            return@syncWebDavAfterLocalChange
         }
         appScope.launch {
             webDavBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    if (canUseFastWebDavSync(vaultKey)) {
-                        webDavSyncService.syncLocalChangeWithVaultKey(vaultKey!!)
-                    } else if (password != null) {
-                        webDavSyncService.syncLocalChange(password)
-                    } else {
-                        throw IllegalStateException("保管库未解锁。")
-                    }
+                    webDavFlowCoordinator.syncUnlocked(password, vaultKey, localChange = true)
                 }
-            }.onSuccess { result ->
-                webDavMetadata = webDavSyncService.loadMetadata()
-                val syncMessage = formatWebDavResultMessage(result)
-                result.vaultKey?.let { nextVaultKey ->
+            }.onSuccess { flowResult ->
+                webDavMetadata = flowResult.metadata
+                val syncMessage = formatWebDavResultMessage(flowResult.syncResult)
+                flowResult.syncResult.vaultKey?.let { nextVaultKey ->
                     val previousVaultKey = state.activeVaultKey
                     if (password != null) {
                         state.updateUnlockedVault(vault, password, nextVaultKey)
@@ -766,7 +732,7 @@ fun TotpApp() {
                         state.updateUnlockedVaultWithKey(vault, nextVaultKey)
                     }
                 }
-                if (needsMasterPasswordForSync(result)) {
+                if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     homeErrorStatusMessage = syncMessage
                     pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
                 } else {
@@ -810,50 +776,39 @@ fun TotpApp() {
         return "最新同步：$formatted"
     }
 
-    fun syncWebDavFromHome() {
+    val syncWebDavFromHome: () -> Unit = syncWebDavFromHome@{
         val vault = state.vault
         val password = state.activePassword
         val vaultKey = state.activeVaultKey
         if (vault == null || (password == null && vaultKey == null)) {
             homeErrorStatusMessage = "保管库未解锁。"
-            return
+            return@syncWebDavFromHome
         }
         if (!webDavSettings.enabled) {
             homeCopyStatusMessage = "WebDAV 同步未开启，本地模式。"
-            return
+            return@syncWebDavFromHome
         }
         appScope.launch {
             webDavBusy = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val result = if (canUseFastWebDavSync(vaultKey)) {
-                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
-                    } else if (password != null) {
-                        webDavSyncService.syncNow(password)
-                    } else {
-                        throw IllegalStateException("保管库未解锁。")
-                    }
-                    val nextVaultKey = result.vaultKey ?: vaultKey
-                    val refreshedVault = if (result.vaultChanged) {
-                        if (nextVaultKey != null) repository.unlockWithVaultKey(nextVaultKey) else repository.unlock(password!!)
-                    } else null
-                    Triple(result, refreshedVault, nextVaultKey)
+                    webDavFlowCoordinator.syncUnlocked(password, vaultKey)
                 }
-            }.onSuccess { (result, refreshedVault, nextVaultKey) ->
-                webDavMetadata = webDavSyncService.loadMetadata()
-                val syncMessage = formatWebDavResultMessage(result)
-                if (refreshedVault != null) {
-                    if (password != null && nextVaultKey != null) {
+            }.onSuccess { flowResult ->
+                webDavMetadata = flowResult.metadata
+                val syncMessage = formatWebDavResultMessage(flowResult.syncResult)
+                if (flowResult.refreshedVault != null) {
+                    if (password != null && flowResult.vaultKey != null) {
                         val previousVaultKey = state.activeVaultKey
-                        state.updateUnlockedVault(refreshedVault, password, nextVaultKey)
-                        if (result.vaultKey != null) {
-                            refreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
+                        state.updateUnlockedVault(flowResult.refreshedVault, password, flowResult.vaultKey)
+                        if (flowResult.syncResult.vaultKey != null) {
+                            refreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
                         }
-                    } else if (nextVaultKey != null) {
-                        state.updateUnlockedVaultWithKey(refreshedVault, nextVaultKey)
+                    } else if (flowResult.vaultKey != null) {
+                        state.updateUnlockedVaultWithKey(flowResult.refreshedVault, flowResult.vaultKey)
                     }
                 }
-                if (needsMasterPasswordForSync(result)) {
+                if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     homeErrorStatusMessage = syncMessage
                     pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
                 } else {
@@ -1040,7 +995,7 @@ fun TotpApp() {
                         unlockBusy = false
                     }
                 },
-                onBiometricUnlock = ::startBiometricUnlock,
+                onBiometricUnlock = startBiometricUnlock,
                 onUnlock = { password ->
                     appScope.launch {
                         unlockBusy = true
@@ -1079,7 +1034,7 @@ fun TotpApp() {
                             iconRes = R.drawable.action_sync,
                             contentDescription = "Sync",
                             spinning = webDavBusy,
-                            onClick = ::syncWebDavFromHome
+                            onClick = syncWebDavFromHome
                         )
                     }
                 ) { padding ->
@@ -1215,32 +1170,20 @@ fun TotpApp() {
                         webDavBusy = true
                         runCatching {
                             withContext(Dispatchers.IO) {
-                                val saved = webDavSyncService.saveSettings(settings)
-                                val vault = state.vault
-                                val password = state.activePassword
-                                val vaultKey = state.activeVaultKey
-                                val syncResult = if (saved.enabled && vault != null && (password != null || vaultKey != null)) {
-                                    if (password != null) {
-                                        webDavSyncService.syncNow(password)
-                                    } else if (canUseFastWebDavSync(vaultKey)) {
-                                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
-                                    } else {
-                                        webDavSyncService.syncNowWithVaultKey(vaultKey!!)
-                                    }
-                                } else {
-                                    null
-                                }
-                                val nextVaultKey = syncResult?.vaultKey ?: vaultKey
-                                val refreshedVault = if (syncResult?.vaultChanged == true) {
-                                    if (nextVaultKey != null) repository.unlockWithVaultKey(nextVaultKey) else repository.unlock(password!!)
-                                } else {
-                                    null
-                                }
-                                Quad(saved, syncResult, refreshedVault, nextVaultKey)
+                                webDavFlowCoordinator.saveSettingsAndSyncIfUnlocked(
+                                    settings = settings,
+                                    isUnlocked = state.vault != null,
+                                    password = state.activePassword,
+                                    vaultKey = state.activeVaultKey
+                                )
                             }
-                        }.onSuccess { (saved, syncResult, refreshedVault, nextVaultKey) ->
-                            webDavSettings = saved
-                            webDavMetadata = webDavSyncService.loadMetadata()
+                        }.onSuccess { settingsFlowResult ->
+                            val syncFlowResult = settingsFlowResult.syncFlowResult
+                            val syncResult = syncFlowResult?.syncResult
+                            val refreshedVault = syncFlowResult?.refreshedVault
+                            val nextVaultKey = syncFlowResult?.vaultKey
+                            webDavSettings = settingsFlowResult.settings
+                            webDavMetadata = settingsFlowResult.metadata
                             val password = state.activePassword
                             if (refreshedVault != null) {
                                 if (password != null && nextVaultKey != null) {
@@ -1266,9 +1209,9 @@ fun TotpApp() {
                                     webDavStatusIsError = false
                                 }
                             } else {
-                                homeCopyStatusMessage = if (saved.enabled) "WebDAV 设置已保存" else ""
+                                homeCopyStatusMessage = if (settingsFlowResult.settings.enabled) "WebDAV 设置已保存" else ""
                                 homeErrorStatusMessage = ""
-                                webDavStatusMessage = if (saved.enabled) "WebDAV 设置已保存" else ""
+                                webDavStatusMessage = if (settingsFlowResult.settings.enabled) "WebDAV 设置已保存" else ""
                                 webDavStatusIsError = false
                             }
                         }.onFailure { error ->
@@ -1285,7 +1228,7 @@ fun TotpApp() {
                         webDavBusy = true
                         runCatching {
                             withContext(Dispatchers.IO) {
-                                webDavSyncService.testConnection(settings)
+                                webDavFlowCoordinator.testConnection(settings)
                             }
                         }.onSuccess {
                             homeCopyStatusMessage = "WebDAV 连接正常"
@@ -1314,23 +1257,13 @@ fun TotpApp() {
                         webDavBusy = true
                         runCatching {
                             withContext(Dispatchers.IO) {
-                                val result = if (canUseFastWebDavSync(vaultKey)) {
-                                    webDavSyncService.syncNowWithVaultKey(vaultKey!!)
-                                } else if (password != null) {
-                                    webDavSyncService.syncNow(password)
-                                } else {
-                                    webDavSyncService.syncNowWithVaultKey(vaultKey!!)
-                                }
-                                val nextVaultKey = result.vaultKey ?: vaultKey
-                                val refreshedVault = if (result.vaultChanged) {
-                                    if (nextVaultKey != null) repository.unlockWithVaultKey(nextVaultKey) else repository.unlock(password!!)
-                                } else {
-                                    null
-                                }
-                                Triple(result, refreshedVault, nextVaultKey)
+                                webDavFlowCoordinator.syncUnlocked(password, vaultKey)
                             }
-                        }.onSuccess { (result, refreshedVault, nextVaultKey) ->
-                            webDavMetadata = webDavSyncService.loadMetadata()
+                        }.onSuccess { flowResult ->
+                            val result = flowResult.syncResult
+                            val refreshedVault = flowResult.refreshedVault
+                            val nextVaultKey = flowResult.vaultKey
+                            webDavMetadata = flowResult.metadata
                             val syncMessage = formatWebDavResultMessage(result)
                             if (refreshedVault != null) {
                                 if (password != null && nextVaultKey != null) {
@@ -1389,29 +1322,12 @@ fun TotpApp() {
                         }
                         runCatching {
                             withContext(Dispatchers.IO) {
-                                val currentWebDavSettings = webDavSyncService.loadSettings()
-                                val currentWebDavMetadata = webDavSyncService.loadMetadata()
-                                if (currentWebDavSettings.enabled && currentWebDavMetadata.lastStatus == "blocked") {
-                                    throw IllegalStateException("远端保管库需要主密码验证后才能继续同步，请先验证远端主密码。")
-                                }
-                                val currentVault = state.vault ?: repository.unlock(currentPassword)
-                                val syncResult = if (currentWebDavSettings.enabled) {
-                                    webDavSyncService.syncPasswordChange(currentPassword, nextPassword)
-                                } else {
-                                    repository.changePassword(currentPassword, nextPassword)
-                                    null
-                                }
-                                if (syncResult?.status == "conflict" || syncResult?.status == "blocked") {
-                                    throw IllegalStateException(syncResult.message)
-                                }
-                                val vaultKey = syncResult?.vaultKey ?: repository.exportVaultKey(nextPassword)
-                                val vault = repository.unlockWithVaultKey(vaultKey)
-                                Triple(vault, syncResult, vaultKey)
+                                webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
                             }
-                        }.onSuccess { (vault, syncResult, vaultKey) ->
-                            state.updateUnlockedVault(vault, nextPassword, vaultKey)
-                            webDavMetadata = webDavSyncService.loadMetadata()
-                            biometricUnlockStore.disable()
+                        }.onSuccess { result ->
+                            state.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
+                            webDavMetadata = result.metadata
+                            quickUnlockCoordinator.disable()
                             biometricUnlockEnabled = false
                             passwordChangeInProgress = false
                             passwordChangeDialogMessage = "主密码已修改，${quickUnlockTitleForMessage(hasStrongBiometric)}需要重新开启。"
