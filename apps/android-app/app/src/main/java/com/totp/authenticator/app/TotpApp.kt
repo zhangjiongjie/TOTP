@@ -144,10 +144,6 @@ fun TotpApp() {
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var importedOtpAuthUri by remember { mutableStateOf<String?>(null) }
     var foregroundUnlockTick by remember { mutableStateOf(0) }
-    var pendingExportContent by remember { mutableStateOf<String?>(null) }
-    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
-    var pendingBackupPasswordAction by remember { mutableStateOf<BackupPasswordAction?>(null) }
-    var documentPickerActive by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -168,7 +164,7 @@ fun TotpApp() {
                     if (state.currentRoute == TotpRoute.Unlock) {
                         quickUnlockState.resetUnlockAttempt()
                     }
-                    if (state.isUnlocked && !isConfigurationChange && !documentPickerActive) {
+                    if (state.isUnlocked && !isConfigurationChange && !backupState.documentPickerActive) {
                         webDavSyncService.clearCryptoCache()
                         quickUnlockState.resetUnlockAttempt()
                         syncState.resetSyncedAfterUnlock()
@@ -215,9 +211,8 @@ fun TotpApp() {
     val backupExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        documentPickerActive = false
-        val content = pendingExportContent
-        pendingExportContent = null
+        backupState.markDocumentPickerActive(false)
+        val content = backupState.consumePendingExportContent()
         if (uri == null || content == null) {
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
@@ -251,8 +246,7 @@ fun TotpApp() {
                 }
             },
             onSuccess = { payload ->
-                pendingExportContent = payload.content
-                documentPickerActive = true
+                backupState.prepareExport(payload)
                 backupExportLauncher.launch(payload.filename)
             },
             onFailure = { error ->
@@ -275,8 +269,7 @@ fun TotpApp() {
                 }
             },
             onSuccess = { payload ->
-                pendingExportContent = payload.content
-                documentPickerActive = true
+                backupState.prepareExport(payload)
                 backupExportLauncher.launch(payload.filename)
             },
             onFailure = { error ->
@@ -290,15 +283,14 @@ fun TotpApp() {
     val backupImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        documentPickerActive = false
+        backupState.markDocumentPickerActive(false)
         if (uri == null) {
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
         }
         val password = state.activePassword
         if (password == null) {
-            pendingImportUri = uri
-            pendingBackupPasswordAction = BackupPasswordAction.Import
+            backupState.requestImportPassword(uri)
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
         }
@@ -418,7 +410,7 @@ fun TotpApp() {
             return
         }
         backupState.updateBusy(true)
-        documentPickerActive = true
+        backupState.markDocumentPickerActive(true)
         backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
     }
 
@@ -579,7 +571,7 @@ fun TotpApp() {
                 val syncMessage = formatWebDavResultMessage(flowResult.syncResult)
                 if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     syncState.showHomeError(syncMessage)
-                    pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
+                    backupState.requestRemotePassword()
                 } else {
                     val previousVaultKey = state.activeVaultKey
                     state.updateUnlockedVault(flowResult.refreshedVault ?: vault, password, flowResult.vaultKey)
@@ -625,7 +617,7 @@ fun TotpApp() {
                 }
                 if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     syncState.showHomeError(syncMessage)
-                    pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
+                    backupState.requestRemotePassword()
                 } else {
                     syncState.showHomeCopy(syncMessage)
                 }
@@ -697,7 +689,7 @@ fun TotpApp() {
                 }
                 if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     syncState.showHomeError(syncMessage)
-                    pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
+                    backupState.requestRemotePassword()
                 } else {
                     syncState.showHomeCopy(syncMessage)
                 }
@@ -790,7 +782,7 @@ fun TotpApp() {
                 }
                 if (needsMasterPasswordForSync(flowResult.syncResult)) {
                     syncState.showHomeError(syncMessage)
-                    pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
+                    backupState.requestRemotePassword()
                 } else {
                     syncState.showHomeCopy(syncMessage)
                 }
@@ -884,24 +876,19 @@ fun TotpApp() {
         }
     }
 
-    if (pendingBackupPasswordAction != null) {
+    if (backupState.pendingPasswordAction != null) {
         BackupMasterPasswordDialog(
-            action = pendingBackupPasswordAction!!,
+            action = backupState.pendingPasswordAction!!,
             onDismiss = {
-                pendingBackupPasswordAction = null
-                pendingImportUri = null
-                backupState.updateBusy(false)
+                backupState.dismissPasswordPrompt()
             },
             onConfirm = { password ->
-                val action = pendingBackupPasswordAction
-                val importUri = pendingImportUri
-                pendingBackupPasswordAction = null
-                pendingImportUri = null
-                when (action) {
+                val request = backupState.consumePasswordRequest()
+                when (request?.action) {
                     BackupPasswordAction.Export -> exportBackupWithPassword(password)
                     BackupPasswordAction.Import -> {
-                        if (importUri != null) {
-                            importBackupFromUri(importUri, password)
+                        if (request.importUri != null) {
+                            importBackupFromUri(request.importUri, password)
                         } else {
                             backupState.showError("未选择导入文件。")
                         }
@@ -1130,10 +1117,17 @@ fun TotpApp() {
                 quickUnlockState = quickUnlockState,
                 passwordChangeState = passwordChangeState
             )
-            SettingsScreen(
-                accountCount = state.vault?.accounts?.size ?: 0,
-                state = settingsScreenState,
-                actions = SettingsActionCoordinator(
+            val settingsActions = remember(
+                state,
+                syncState,
+                quickUnlockState,
+                passwordChangeState,
+                webDavFlowCoordinator,
+                webDavSyncService,
+                appScope,
+                backupState
+            ) {
+                SettingsActionCoordinator(
                     appState = state,
                     syncState = syncState,
                     quickUnlockState = quickUnlockState,
@@ -1149,11 +1143,16 @@ fun TotpApp() {
                         quickUnlockState.updateEnabled(false)
                     },
                     onRefreshQuickUnlockCredentialIfNeeded = refreshQuickUnlockCredentialIfNeeded,
-                    onRemotePasswordNeeded = { pendingBackupPasswordAction = BackupPasswordAction.WebDavSync },
+                    onRemotePasswordNeeded = backupState::requestRemotePassword,
                     onVaultLocked = { Toast.makeText(context, "保管库未解锁", Toast.LENGTH_SHORT).show() },
                     onExportBackup = ::startBackupExport,
                     onImportBackup = ::startBackupImport
-                ).buildActions(),
+                ).buildActions()
+            }
+            SettingsScreen(
+                accountCount = state.vault?.accounts?.size ?: 0,
+                state = settingsScreenState,
+                actions = settingsActions,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -1287,11 +1286,6 @@ private suspend fun VaultRepository.create(password: String, now: Long): LocalVa
     return vault
 }
 
-private enum class BackupPasswordAction {
-    Export,
-    Import,
-    WebDavSync
-}
 
 private data class Quad<A, B, C, D>(
     val first: A,

@@ -2,6 +2,7 @@ package com.totp.authenticator.app
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -83,5 +84,48 @@ class BackupViewModelTest {
 
         assertEquals("payload", viewModel.statusMessage)
         assertTrue(viewModel.isBusy)
+    }
+
+    @Test
+    fun tracksPendingExportContentForDocumentPicker() {
+        val viewModel = BackupViewModel()
+
+        viewModel.prepareExport(BackupExportPayload(content = """{"encrypted":true}""", filename = "totp.json"))
+
+        assertTrue(viewModel.documentPickerActive)
+        assertEquals("totp.json", viewModel.pendingExportFilename)
+        assertEquals("""{"encrypted":true}""", viewModel.consumePendingExportContent())
+        assertNull(viewModel.consumePendingExportContent())
+    }
+
+    @Test
+    fun tracksImportPasswordPromptAndDismissal() {
+        val viewModel = BackupViewModel()
+
+        viewModel.requestImportPassword(null)
+
+        assertEquals(BackupPasswordAction.Import, viewModel.pendingPasswordAction)
+        assertNull(viewModel.pendingImportUri)
+
+        viewModel.dismissPasswordPrompt()
+
+        assertNull(viewModel.pendingPasswordAction)
+        assertNull(viewModel.pendingImportUri)
+        assertFalse(viewModel.isBusy)
+    }
+
+    @Test
+    fun consumesPasswordPromptOnce() {
+        val viewModel = BackupViewModel()
+
+        viewModel.requestImportPassword(null)
+
+        val request = viewModel.consumePasswordRequest()
+
+        assertEquals(BackupPasswordAction.Import, request?.action)
+        assertNull(request?.importUri)
+        assertNull(viewModel.pendingPasswordAction)
+        assertNull(viewModel.pendingImportUri)
+        assertNull(viewModel.consumePasswordRequest())
     }
 }

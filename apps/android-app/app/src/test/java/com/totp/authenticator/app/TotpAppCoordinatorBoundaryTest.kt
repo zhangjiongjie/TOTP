@@ -93,7 +93,11 @@ class TotpAppCoordinatorBoundaryTest {
             "var passwordChangeDialogIsError",
             "var masterPasswordErrorMessage",
             "var errorMessage",
-            "var unlockBusy"
+            "var unlockBusy",
+            "var pendingExportContent",
+            "var pendingImportUri",
+            "var pendingBackupPasswordAction",
+            "var documentPickerActive"
         ).forEach { stateDeclaration ->
             assertFalse("$stateDeclaration should live in a dedicated ViewModel", source.contains(stateDeclaration))
         }
@@ -157,6 +161,18 @@ class TotpAppCoordinatorBoundaryTest {
         ).forEach { inlineAction ->
             assertFalse("$inlineAction should live outside TotpApp", source.contains(inlineAction))
         }
+    }
+
+    @Test
+    fun settingsActionsAreRemembered() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+        val settingsRouteSource = source.substringAfter("TotpRoute.Settings ->").substringBefore("modifier = Modifier.padding(padding)")
+
+        assertTrue(
+            "Settings actions should be remembered to avoid recreating callbacks on every recomposition",
+            settingsRouteSource.contains("val settingsActions = remember(")
+        )
+        assertTrue(settingsRouteSource.contains("SettingsActionCoordinator("))
     }
 
     @Test
