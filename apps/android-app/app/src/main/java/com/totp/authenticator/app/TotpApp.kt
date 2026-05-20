@@ -76,6 +76,7 @@ import com.totp.authenticator.ui.importer.QrImportService
 import com.totp.authenticator.ui.importer.QrScannerScreen
 import com.totp.authenticator.ui.common.PasswordVisibilityIcon
 import com.totp.authenticator.ui.settings.SettingsScreen
+import com.totp.authenticator.ui.settings.SettingsScreenActions
 import com.totp.authenticator.ui.unlock.UnlockScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -1124,49 +1125,120 @@ fun TotpApp() {
             onAdd = { state.navigate(TotpRoute.Add) },
             onSettings = { state.navigate(TotpRoute.Settings) }
         ) { padding ->
-            val settingsUiModel = settingsState.buildUiModel(syncState, backupState, quickUnlockState)
+            val settingsScreenState = settingsState.buildScreenState(
+                syncState = syncState,
+                backupState = backupState,
+                quickUnlockState = quickUnlockState,
+                passwordChangeState = passwordChangeState
+            )
             SettingsScreen(
                 accountCount = state.vault?.accounts?.size ?: 0,
-                biometricUnlockEnabled = quickUnlockState.enabled,
-                webDavSettings = syncState.webDavSettings,
-                isWebDavBusy = syncState.isBusy,
-                settingsUiModel = settingsUiModel,
-                isPasswordChangeBusy = passwordChangeState.dialogVisible,
-                masterPasswordErrorMessage = passwordChangeState.masterPasswordErrorMessage,
-                onSaveWebDavSettings = { settings ->
-                    syncState.launchExclusiveSyncTask(
-                        task = {
-                            withContext(Dispatchers.IO) {
-                                webDavFlowCoordinator.saveSettingsAndSyncIfUnlocked(
-                                    settings = settings,
-                                    isUnlocked = state.vault != null,
-                                    password = state.activePassword,
-                                    vaultKey = state.activeVaultKey
-                                )
-                            }
-                        },
-                        onSuccess = { settingsFlowResult ->
-                            val syncFlowResult = settingsFlowResult.syncFlowResult
-                            val syncResult = syncFlowResult?.syncResult
-                            val refreshedVault = syncFlowResult?.refreshedVault
-                            val nextVaultKey = syncFlowResult?.vaultKey
-                            syncState.updateSettings(settingsFlowResult.settings)
-                            syncState.updateMetadata(settingsFlowResult.metadata)
-                            val password = state.activePassword
-                            if (refreshedVault != null) {
-                                if (password != null && nextVaultKey != null) {
-                                    val previousVaultKey = state.activeVaultKey
-                                    state.updateUnlockedVault(refreshedVault, password, nextVaultKey)
-                                    if (syncResult?.vaultKey != null) {
-                                        refreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
-                                    }
-                                } else if (nextVaultKey != null) {
-                                    state.updateUnlockedVaultWithKey(refreshedVault, nextVaultKey)
+                state = settingsScreenState,
+                actions = SettingsScreenActions(
+                    onSaveWebDavSettings = { settings ->
+                        syncState.launchExclusiveSyncTask(
+                            task = {
+                                withContext(Dispatchers.IO) {
+                                    webDavFlowCoordinator.saveSettingsAndSyncIfUnlocked(
+                                        settings = settings,
+                                        isUnlocked = state.vault != null,
+                                        password = state.activePassword,
+                                        vaultKey = state.activeVaultKey
+                                    )
                                 }
+                            },
+                            onSuccess = { settingsFlowResult ->
+                                val syncFlowResult = settingsFlowResult.syncFlowResult
+                                val syncResult = syncFlowResult?.syncResult
+                                val refreshedVault = syncFlowResult?.refreshedVault
+                                val nextVaultKey = syncFlowResult?.vaultKey
+                                syncState.updateSettings(settingsFlowResult.settings)
+                                syncState.updateMetadata(settingsFlowResult.metadata)
+                                val password = state.activePassword
+                                if (refreshedVault != null) {
+                                    if (password != null && nextVaultKey != null) {
+                                        val previousVaultKey = state.activeVaultKey
+                                        state.updateUnlockedVault(refreshedVault, password, nextVaultKey)
+                                        if (syncResult?.vaultKey != null) {
+                                            refreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
+                                        }
+                                    } else if (nextVaultKey != null) {
+                                        state.updateUnlockedVaultWithKey(refreshedVault, nextVaultKey)
+                                    }
+                                }
+                                if (syncResult != null) {
+                                    val syncMessage = formatWebDavResultMessage(syncResult)
+                                    if (needsMasterPasswordForSync(syncResult)) {
+                                        syncState.showHomeError(syncMessage)
+                                        syncState.showSettingsError(syncMessage)
+                                        pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
+                                    } else {
+                                        syncState.showHomeCopy(syncMessage)
+                                        syncState.showSettingsCopy(syncMessage)
+                                    }
+                                } else {
+                                    syncState.showHomeCopy(if (settingsFlowResult.settings.enabled) "WebDAV 设置已保存" else "")
+                                    syncState.showSettingsCopy(if (settingsFlowResult.settings.enabled) "WebDAV 设置已保存" else "")
+                                }
+                            },
+                            onFailure = { error ->
+                                val message = error.message ?: "无法保存 WebDAV 设置"
+                                syncState.showHomeError(message)
+                                syncState.showSettingsError(message)
                             }
-                            if (syncResult != null) {
-                                val syncMessage = formatWebDavResultMessage(syncResult)
-                                if (needsMasterPasswordForSync(syncResult)) {
+                        )
+                    },
+                    onTestWebDav = { settings ->
+                        syncState.launchExclusiveSyncTask(
+                            task = {
+                                withContext(Dispatchers.IO) {
+                                    webDavFlowCoordinator.testConnection(settings)
+                                }
+                            },
+                            onSuccess = {
+                                syncState.showHomeCopy("WebDAV 连接正常")
+                                syncState.showSettingsCopy("WebDAV 连接正常")
+                            },
+                            onFailure = { error ->
+                                val message = error.message ?: "WebDAV 测试失败"
+                                syncState.showHomeError(message)
+                                syncState.showSettingsError(message)
+                            }
+                        )
+                    },
+                    onSyncWebDav = sync@{
+                        val vault = state.vault
+                        val password = state.activePassword
+                        val vaultKey = state.activeVaultKey
+                        if (vault == null || (password == null && vaultKey == null)) {
+                            syncState.showHomeError("保管库未解锁")
+                            syncState.showSettingsError("保管库未解锁")
+                            return@sync
+                        }
+                        syncState.launchExclusiveSyncTask(
+                            task = {
+                                withContext(Dispatchers.IO) {
+                                    webDavFlowCoordinator.syncUnlocked(password, vaultKey)
+                                }
+                            },
+                            onSuccess = { flowResult ->
+                                val result = flowResult.syncResult
+                                val refreshedVault = flowResult.refreshedVault
+                                val nextVaultKey = flowResult.vaultKey
+                                syncState.updateMetadata(flowResult.metadata)
+                                val syncMessage = formatWebDavResultMessage(result)
+                                if (refreshedVault != null) {
+                                    if (password != null && nextVaultKey != null) {
+                                        val previousVaultKey = state.activeVaultKey
+                                        state.updateUnlockedVault(refreshedVault, password, nextVaultKey)
+                                        if (result.vaultKey != null) {
+                                            refreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
+                                        }
+                                    } else if (nextVaultKey != null) {
+                                        state.updateUnlockedVaultWithKey(refreshedVault, nextVaultKey)
+                                    }
+                                }
+                                if (needsMasterPasswordForSync(result)) {
                                     syncState.showHomeError(syncMessage)
                                     syncState.showSettingsError(syncMessage)
                                     pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
@@ -1174,125 +1246,56 @@ fun TotpApp() {
                                     syncState.showHomeCopy(syncMessage)
                                     syncState.showSettingsCopy(syncMessage)
                                 }
-                            } else {
-                                syncState.showHomeCopy(if (settingsFlowResult.settings.enabled) "WebDAV 设置已保存" else "")
-                                syncState.showSettingsCopy(if (settingsFlowResult.settings.enabled) "WebDAV 设置已保存" else "")
-                            }
-                        },
-                        onFailure = { error ->
-                            val message = error.message ?: "无法保存 WebDAV 设置"
-                            syncState.showHomeError(message)
-                            syncState.showSettingsError(message)
-                        }
-                    )
-                },
-                onTestWebDav = { settings ->
-                    syncState.launchExclusiveSyncTask(
-                        task = {
-                            withContext(Dispatchers.IO) {
-                                webDavFlowCoordinator.testConnection(settings)
-                            }
-                        },
-                        onSuccess = {
-                            syncState.showHomeCopy("WebDAV 连接正常")
-                            syncState.showSettingsCopy("WebDAV 连接正常")
-                        },
-                        onFailure = { error ->
-                            val message = error.message ?: "WebDAV 测试失败"
-                            syncState.showHomeError(message)
-                            syncState.showSettingsError(message)
-                        }
-                    )
-                },
-                onSyncWebDav = {
-                    val vault = state.vault
-                    val password = state.activePassword
-                    val vaultKey = state.activeVaultKey
-                    if (vault == null || (password == null && vaultKey == null)) {
-                        syncState.showHomeError("保管库未解锁")
-                        syncState.showSettingsError("保管库未解锁")
-                        return@SettingsScreen
-                    }
-                    syncState.launchExclusiveSyncTask(
-                        task = {
-                            withContext(Dispatchers.IO) {
-                                webDavFlowCoordinator.syncUnlocked(password, vaultKey)
-                            }
-                        },
-                        onSuccess = { flowResult ->
-                            val result = flowResult.syncResult
-                            val refreshedVault = flowResult.refreshedVault
-                            val nextVaultKey = flowResult.vaultKey
-                            syncState.updateMetadata(flowResult.metadata)
-                            val syncMessage = formatWebDavResultMessage(result)
-                            if (refreshedVault != null) {
-                                if (password != null && nextVaultKey != null) {
-                                    val previousVaultKey = state.activeVaultKey
-                                    state.updateUnlockedVault(refreshedVault, password, nextVaultKey)
-                                    if (result.vaultKey != null) {
-                                        refreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
-                                    }
-                                } else if (nextVaultKey != null) {
-                                    state.updateUnlockedVaultWithKey(refreshedVault, nextVaultKey)
-                                }
-                            }
-                            if (needsMasterPasswordForSync(result)) {
-                                syncState.showHomeError(syncMessage)
-                                syncState.showSettingsError(syncMessage)
-                                pendingBackupPasswordAction = BackupPasswordAction.WebDavSync
-                            } else {
-                                syncState.showHomeCopy(syncMessage)
-                                syncState.showSettingsCopy(syncMessage)
-                            }
-                        },
-                        onFailure = { error ->
-                            syncState.updateMetadata(webDavSyncService.loadMetadata())
-                            val message = error.message ?: "WebDAV 同步失败"
-                            syncState.showHomeError(message)
-                            syncState.showSettingsError(message)
-                        }
-                    )
-                },
-                onBiometricUnlockChanged = { enabled ->
-                    refreshQuickUnlockAvailability()
-                    val vaultKey = state.activeVaultKey
-                    if (enabled) {
-                        if (vaultKey == null) {
-                            Toast.makeText(context, "保管库未解锁", Toast.LENGTH_SHORT).show()
-                        } else {
-                            enableBiometricUnlock(vaultKey)
-                        }
-                    } else {
-                        disableBiometricUnlock()
-                    }
-                },
-                onChangeMasterPassword = { currentPassword, nextPassword ->
-                    val shouldSyncPasswordChange = webDavSyncService.loadSettings().enabled
-                    val changePassword: suspend () -> Unit = {
-                        passwordChangeState.runChange(
-                            successMessage = "主密码已修改，${quickUnlockTitleForMessage(quickUnlockState.hasStrongBiometric)}需要重新开启。",
-                            task = {
-                                withContext(Dispatchers.IO) {
-                                    webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
-                                }
                             },
-                            onSuccess = { result ->
-                                state.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
-                                syncState.updateMetadata(result.metadata)
-                                quickUnlockCoordinator.disable()
-                                quickUnlockState.updateEnabled(false)
-                            },
-                            onFailure = {}
+                            onFailure = { error ->
+                                syncState.updateMetadata(webDavSyncService.loadMetadata())
+                                val message = error.message ?: "WebDAV 同步失败"
+                                syncState.showHomeError(message)
+                                syncState.showSettingsError(message)
+                            }
                         )
-                    }
-                    if (shouldSyncPasswordChange) {
-                        syncState.launchExclusiveSync(changePassword)
-                    } else {
-                        appScope.launch { changePassword() }
-                    }
-                },
-                onExportBackup = ::startBackupExport,
-                onImportBackup = ::startBackupImport,
+                    },
+                    onBiometricUnlockChanged = { enabled ->
+                        refreshQuickUnlockAvailability()
+                        val vaultKey = state.activeVaultKey
+                        if (enabled) {
+                            if (vaultKey == null) {
+                                Toast.makeText(context, "保管库未解锁", Toast.LENGTH_SHORT).show()
+                            } else {
+                                enableBiometricUnlock(vaultKey)
+                            }
+                        } else {
+                            disableBiometricUnlock()
+                        }
+                    },
+                    onChangeMasterPassword = { currentPassword, nextPassword ->
+                        val shouldSyncPasswordChange = webDavSyncService.loadSettings().enabled
+                        val changePassword: suspend () -> Unit = {
+                            passwordChangeState.runChange(
+                                successMessage = "主密码已修改，${quickUnlockTitleForMessage(quickUnlockState.hasStrongBiometric)}需要重新开启。",
+                                task = {
+                                    withContext(Dispatchers.IO) {
+                                        webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
+                                    }
+                                },
+                                onSuccess = { result ->
+                                    state.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
+                                    syncState.updateMetadata(result.metadata)
+                                    quickUnlockCoordinator.disable()
+                                    quickUnlockState.updateEnabled(false)
+                                },
+                                onFailure = {}
+                            )
+                        }
+                        if (shouldSyncPasswordChange) {
+                            syncState.launchExclusiveSync(changePassword)
+                        } else {
+                            appScope.launch { changePassword() }
+                        }
+                    },
+                    onExportBackup = ::startBackupExport,
+                    onImportBackup = ::startBackupImport
+                ),
                 modifier = Modifier.padding(padding)
             )
         }

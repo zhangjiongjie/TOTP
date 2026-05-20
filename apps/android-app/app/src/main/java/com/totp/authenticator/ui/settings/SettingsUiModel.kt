@@ -6,6 +6,25 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class SettingsScreenState(
+    val biometricUnlockEnabled: Boolean,
+    val webDavSettings: WebDavSettings,
+    val isWebDavBusy: Boolean,
+    val uiModel: SettingsUiModel,
+    val isPasswordChangeBusy: Boolean,
+    val masterPasswordErrorMessage: String
+)
+
+data class SettingsScreenActions(
+    val onSaveWebDavSettings: (WebDavSettings) -> Unit,
+    val onTestWebDav: (WebDavSettings) -> Unit,
+    val onSyncWebDav: () -> Unit,
+    val onBiometricUnlockChanged: (Boolean) -> Unit,
+    val onChangeMasterPassword: (String, String) -> Unit,
+    val onExportBackup: () -> Unit,
+    val onImportBackup: () -> Unit
+)
+
 data class SettingsUiModel(
     val quickUnlockTitle: String,
     val quickUnlockSummary: String,

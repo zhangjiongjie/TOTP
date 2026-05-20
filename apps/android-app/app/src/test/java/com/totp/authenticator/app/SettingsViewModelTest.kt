@@ -35,4 +35,38 @@ class SettingsViewModelTest {
         assertEquals("已导出 1 个账号。", uiModel.backupStatusMessage)
         assertTrue(uiModel.quickUnlockToggleEnabled)
     }
+
+    @Test
+    fun buildsSettingsScreenStateFromFeatureViewModels() {
+        val syncState = SyncViewModel(
+            initialSettings = WebDavSettings(enabled = true, serverUrl = "https://dav.example.com"),
+            initialMetadata = WebDavSyncMetadata(lastStatus = "synced")
+        )
+        val backupState = BackupViewModel()
+        val quickUnlockState = QuickUnlockViewModel(
+            QuickUnlockState(
+                enabled = true,
+                availability = QuickUnlockAvailability.Available,
+                available = true,
+                hasStrongBiometric = true
+            )
+        )
+        val passwordChangeState = PasswordChangeViewModel()
+        val viewModel = SettingsViewModel()
+
+        passwordChangeState.start()
+        val screenState = viewModel.buildScreenState(
+            syncState = syncState,
+            backupState = backupState,
+            quickUnlockState = quickUnlockState,
+            passwordChangeState = passwordChangeState
+        )
+
+        assertEquals(syncState.webDavSettings, screenState.webDavSettings)
+        assertEquals(true, screenState.biometricUnlockEnabled)
+        assertEquals(false, screenState.isWebDavBusy)
+        assertEquals(true, screenState.isPasswordChangeBusy)
+        assertEquals("", screenState.masterPasswordErrorMessage)
+        assertEquals("生物识别解锁", screenState.uiModel.quickUnlockTitle)
+    }
 }

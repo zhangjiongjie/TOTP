@@ -43,24 +43,16 @@ import com.totp.authenticator.ui.common.PasswordVisibilityIcon
 @Composable
 fun SettingsScreen(
     accountCount: Int,
-    biometricUnlockEnabled: Boolean,
-    webDavSettings: WebDavSettings,
-    isWebDavBusy: Boolean,
-    settingsUiModel: SettingsUiModel,
-    isPasswordChangeBusy: Boolean,
-    masterPasswordErrorMessage: String,
-    onSaveWebDavSettings: (WebDavSettings) -> Unit,
-    onTestWebDav: (WebDavSettings) -> Unit,
-    onSyncWebDav: () -> Unit,
-    onBiometricUnlockChanged: (Boolean) -> Unit,
-    onChangeMasterPassword: (String, String) -> Unit,
-    onExportBackup: () -> Unit,
-    onImportBackup: () -> Unit,
+    state: SettingsScreenState,
+    actions: SettingsScreenActions,
     modifier: Modifier = Modifier
 ) {
     var showWebDavDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showBlockedPasswordDialog by remember { mutableStateOf(false) }
+    val settingsUiModel = state.uiModel
+    val webDavSettings = state.webDavSettings
+    val isWebDavBusy = state.isWebDavBusy
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -94,9 +86,9 @@ fun SettingsScreen(
                         )
                     }
                     Checkbox(
-                        checked = biometricUnlockEnabled,
+                        checked = state.biometricUnlockEnabled,
                         enabled = settingsUiModel.quickUnlockToggleEnabled,
-                        onCheckedChange = onBiometricUnlockChanged
+                        onCheckedChange = actions.onBiometricUnlockChanged
                     )
                 }
             }
@@ -120,10 +112,10 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        InlineMessage(masterPasswordErrorMessage, isError = true)
+                        InlineMessage(state.masterPasswordErrorMessage, isError = true)
                     }
                     TextButton(
-                        enabled = !isPasswordChangeBusy,
+                        enabled = !state.isPasswordChangeBusy,
                         onClick = {
                             if (settingsUiModel.isRemotePasswordBlocked) {
                                 showBlockedPasswordDialog = true
@@ -178,7 +170,7 @@ fun SettingsScreen(
                             }
                             TextButton(
                                 enabled = !isWebDavBusy && webDavSettings.enabled,
-                                onClick = onSyncWebDav
+                                onClick = actions.onSyncWebDav
                             ) {
                                 Text(if (isWebDavBusy) "同步中..." else "立即同步")
                             }
@@ -192,7 +184,7 @@ fun SettingsScreen(
                             checked = webDavSettings.enabled,
                             enabled = !isWebDavBusy,
                             onCheckedChange = { enabled ->
-                                onSaveWebDavSettings(webDavSettings.copy(enabled = enabled))
+                                actions.onSaveWebDavSettings(webDavSettings.copy(enabled = enabled))
                             }
                         )
                         Text(
@@ -233,13 +225,13 @@ fun SettingsScreen(
                             iconRes = R.drawable.action_export,
                             contentDescription = "导出",
                             enabled = settingsUiModel.backupActionsEnabled,
-                            onClick = onExportBackup
+                            onClick = actions.onExportBackup
                         )
                         BackupIconButton(
                             iconRes = R.drawable.action_import,
                             contentDescription = "导入",
                             enabled = settingsUiModel.backupActionsEnabled,
-                            onClick = onImportBackup
+                            onClick = actions.onImportBackup
                         )
                     }
                 }
@@ -253,10 +245,10 @@ fun SettingsScreen(
             isBusy = isWebDavBusy,
             onDismiss = { showWebDavDialog = false },
             onSave = {
-                onSaveWebDavSettings(it)
+                actions.onSaveWebDavSettings(it)
                 showWebDavDialog = false
             },
-            onTest = onTestWebDav
+            onTest = actions.onTestWebDav
         )
     }
 
@@ -264,7 +256,7 @@ fun SettingsScreen(
         ChangeMasterPasswordDialog(
             onDismiss = { showChangePasswordDialog = false },
             onSave = { currentPassword, nextPassword ->
-                onChangeMasterPassword(currentPassword, nextPassword)
+                actions.onChangeMasterPassword(currentPassword, nextPassword)
                 showChangePasswordDialog = false
             }
         )

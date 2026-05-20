@@ -114,6 +114,32 @@ class TotpAppCoordinatorBoundaryTest {
     }
 
     @Test
+    fun settingsScreenReceivesAggregatedState() {
+        val source = File("src/main/java/com/totp/authenticator/ui/settings/SettingsScreen.kt").readText()
+        val signature = source.substringAfter("fun SettingsScreen(").substringBefore(") {")
+
+        assertTrue("SettingsScreen should receive one aggregated screen state", signature.contains("state: SettingsScreenState"))
+        assertTrue("SettingsScreen should receive one actions object", signature.contains("actions: SettingsScreenActions"))
+        listOf(
+            "biometricUnlockEnabled:",
+            "webDavSettings:",
+            "isWebDavBusy:",
+            "settingsUiModel:",
+            "isPasswordChangeBusy:",
+            "masterPasswordErrorMessage:",
+            "onSaveWebDavSettings:",
+            "onTestWebDav:",
+            "onSyncWebDav:",
+            "onBiometricUnlockChanged:",
+            "onChangeMasterPassword:",
+            "onExportBackup:",
+            "onImportBackup:"
+        ).forEach { parameter ->
+            assertFalse("$parameter should be part of SettingsScreenState or SettingsScreenActions", signature.contains(parameter))
+        }
+    }
+
+    @Test
     fun backupImportDoesNotTriggerWebDavSyncDirectly() {
         val source = File("src/main/java/com/totp/authenticator/app/BackupFlowCoordinator.kt").readText()
 
