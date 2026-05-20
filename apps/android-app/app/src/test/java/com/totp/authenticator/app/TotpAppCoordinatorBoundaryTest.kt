@@ -21,7 +21,15 @@ class TotpAppCoordinatorBoundaryTest {
             "fun startBiometricUnlock(",
             "fun enableBiometricUnlock(",
             "fun disableBiometricUnlock(",
-            "fun refreshQuickUnlockCredentialIfNeeded("
+            "fun refreshQuickUnlockCredentialIfNeeded(",
+            "val syncWebDavWithPassword:",
+            "val syncWebDavAfterUnlock:",
+            "val syncWebDavAfterLocalChange:",
+            "val syncWebDavFromHome:",
+            "val startBiometricUnlock:",
+            "val enableBiometricUnlock:",
+            "val disableBiometricUnlock:",
+            "val refreshQuickUnlockCredentialIfNeeded:"
         ).forEach { functionName ->
             assertFalse("$functionName should live outside TotpApp", source.contains(functionName))
         }
@@ -44,6 +52,8 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(File(appDir, "BackupFlowCoordinator.kt").exists())
         assertTrue(File(appDir, "WebDavFlowCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockCoordinator.kt").exists())
+        assertTrue(File(appDir, "QuickUnlockActionCoordinator.kt").exists())
+        assertTrue(File(appDir, "HomeSyncActionCoordinator.kt").exists())
         assertTrue(File(appDir, "BackupViewModel.kt").exists())
         assertTrue(File(appDir, "SyncViewModel.kt").exists())
         assertTrue(File(appDir, "QuickUnlockViewModel.kt").exists())
