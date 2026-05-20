@@ -43,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -53,6 +52,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.fragment.app.FragmentActivity
 import com.totp.authenticator.R
@@ -1124,7 +1124,6 @@ fun TotpApp() {
                 passwordChangeState,
                 webDavFlowCoordinator,
                 webDavSyncService,
-                appScope,
                 backupState
             ) {
                 SettingsActionCoordinator(
@@ -1134,7 +1133,6 @@ fun TotpApp() {
                     passwordChangeState = passwordChangeState,
                     webDavFlowCoordinator = webDavFlowCoordinator,
                     webDavSyncService = webDavSyncService,
-                    appScope = appScope,
                     onRefreshQuickUnlockAvailability = ::refreshQuickUnlockAvailability,
                     onEnableQuickUnlock = enableBiometricUnlock,
                     onDisableQuickUnlock = disableBiometricUnlock,

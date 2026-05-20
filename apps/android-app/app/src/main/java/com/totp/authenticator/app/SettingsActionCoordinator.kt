@@ -4,9 +4,7 @@ import com.totp.authenticator.data.webdav.WebDavSettings
 import com.totp.authenticator.data.webdav.WebDavSyncResult
 import com.totp.authenticator.data.webdav.WebDavSyncService
 import com.totp.authenticator.ui.settings.SettingsScreenActions
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class SettingsActionCoordinator(
@@ -16,7 +14,6 @@ class SettingsActionCoordinator(
     private val passwordChangeState: PasswordChangeViewModel,
     private val webDavFlowCoordinator: WebDavFlowCoordinator,
     private val webDavSyncService: WebDavSyncService,
-    private val appScope: CoroutineScope,
     private val onRefreshQuickUnlockAvailability: () -> Unit,
     private val onEnableQuickUnlock: (ByteArray) -> Unit,
     private val onDisableQuickUnlock: () -> Unit,
@@ -162,8 +159,12 @@ class SettingsActionCoordinator(
 
     private fun changeMasterPassword(currentPassword: String, nextPassword: String) {
         val shouldSyncPasswordChange = webDavSyncService.loadSettings().enabled
-        val changePassword: suspend () -> Unit = {
-            passwordChangeState.runChange(
+        if (shouldSyncPasswordChange) {
+            syncState.launchExclusiveSync {
+                runPasswordChange(currentPassword, nextPassword)
+            }
+        } else {
+            passwordChangeState.launchChange(
                 successMessage = "主密码已修改，${quickUnlockTitleForMessage()}需要重新开启。",
                 task = {
                     withContext(Dispatchers.IO) {
@@ -171,18 +172,32 @@ class SettingsActionCoordinator(
                     }
                 },
                 onSuccess = { result ->
-                    appState.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
-                    syncState.updateMetadata(result.metadata)
-                    onResetQuickUnlockAfterPasswordChange()
+                    applyPasswordChangeResult(result, nextPassword)
                 },
                 onFailure = {}
             )
         }
-        if (shouldSyncPasswordChange) {
-            syncState.launchExclusiveSync(changePassword)
-        } else {
-            appScope.launch { changePassword() }
-        }
+    }
+
+    private suspend fun runPasswordChange(currentPassword: String, nextPassword: String) {
+        passwordChangeState.runChange(
+            successMessage = "主密码已修改，${quickUnlockTitleForMessage()}需要重新开启。",
+            task = {
+                withContext(Dispatchers.IO) {
+                    webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
+                }
+            },
+            onSuccess = { result ->
+                applyPasswordChangeResult(result, nextPassword)
+            },
+            onFailure = {}
+        )
+    }
+
+    private fun applyPasswordChangeResult(result: MasterPasswordChangeResult, nextPassword: String) {
+        appState.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
+        syncState.updateMetadata(result.metadata)
+        onResetQuickUnlockAfterPasswordChange()
     }
 
     private fun showSyncResult(result: WebDavSyncResult) {

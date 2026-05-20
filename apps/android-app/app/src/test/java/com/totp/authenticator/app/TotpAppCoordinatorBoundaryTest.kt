@@ -176,6 +176,15 @@ class TotpAppCoordinatorBoundaryTest {
     }
 
     @Test
+    fun settingsActionCoordinatorDoesNotUseComposableScope() {
+        val source = File("src/main/java/com/totp/authenticator/app/SettingsActionCoordinator.kt").readText()
+
+        assertFalse("Settings actions should use ViewModel scopes, not rememberCoroutineScope", source.contains("CoroutineScope"))
+        assertFalse("Settings actions should not receive appScope", source.contains("appScope"))
+        assertFalse("Settings actions should not launch directly from appScope", source.contains(".launch { changePassword() }"))
+    }
+
+    @Test
     fun backupImportDoesNotTriggerWebDavSyncDirectly() {
         val source = File("src/main/java/com/totp/authenticator/app/BackupFlowCoordinator.kt").readText()
 
