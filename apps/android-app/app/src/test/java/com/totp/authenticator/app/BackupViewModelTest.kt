@@ -94,8 +94,36 @@ class BackupViewModelTest {
 
         assertTrue(viewModel.externalPickerActive)
         assertEquals("totp.json", viewModel.pendingExportFilename)
+        assertEquals("totp.json", viewModel.consumePendingExportFilename())
+        assertNull(viewModel.consumePendingExportFilename())
         assertEquals("""{"encrypted":true}""", viewModel.consumePendingExportContent())
         assertNull(viewModel.consumePendingExportContent())
+    }
+
+    @Test
+    fun importPickerRequestIsConsumedOnce() {
+        val viewModel = BackupViewModel()
+
+        viewModel.requestImportPicker()
+
+        assertTrue(viewModel.externalPickerActive)
+        assertTrue(viewModel.importPickerRequested)
+        assertTrue(viewModel.consumeImportPickerRequest())
+        assertFalse(viewModel.importPickerRequested)
+        assertFalse(viewModel.consumeImportPickerRequest())
+    }
+
+    @Test
+    fun readyImportRequestIsConsumedOnce() {
+        val viewModel = BackupViewModel()
+
+        viewModel.prepareReadyImport("""{"accounts":[]}""", "secret")
+
+        val request = viewModel.consumeReadyImport()
+
+        assertEquals("""{"accounts":[]}""", request?.content)
+        assertEquals("secret", request?.password)
+        assertNull(viewModel.consumeReadyImport())
     }
 
     @Test

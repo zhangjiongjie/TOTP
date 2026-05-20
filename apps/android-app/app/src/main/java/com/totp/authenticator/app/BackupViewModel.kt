@@ -26,6 +26,12 @@ class BackupViewModel : ViewModel() {
     var pendingImportContent: String? by mutableStateOf(null)
         private set
 
+    var pendingReadyImport: BackupReadyImport? by mutableStateOf(null)
+        private set
+
+    var importPickerRequested: Boolean by mutableStateOf(false)
+        private set
+
     var pendingPasswordAction: BackupPasswordAction? by mutableStateOf(null)
         private set
 
@@ -51,6 +57,12 @@ class BackupViewModel : ViewModel() {
         externalPickerActive = true
     }
 
+    fun consumePendingExportFilename(): String? {
+        val filename = pendingExportFilename
+        pendingExportFilename = null
+        return filename
+    }
+
     fun consumePendingExportContent(): String? {
         val content = pendingExportContent
         pendingExportContent = null
@@ -62,6 +74,17 @@ class BackupViewModel : ViewModel() {
         externalPickerActive = active
     }
 
+    fun requestImportPicker() {
+        externalPickerActive = true
+        importPickerRequested = true
+    }
+
+    fun consumeImportPickerRequest(): Boolean {
+        val requested = importPickerRequested
+        importPickerRequested = false
+        return requested
+    }
+
     fun requestExportPassword() {
         pendingPasswordAction = BackupPasswordAction.Export
     }
@@ -69,6 +92,16 @@ class BackupViewModel : ViewModel() {
     fun requestImportPassword(content: String) {
         pendingImportContent = content
         pendingPasswordAction = BackupPasswordAction.Import
+    }
+
+    fun prepareReadyImport(content: String, password: String) {
+        pendingReadyImport = BackupReadyImport(content, password)
+    }
+
+    fun consumeReadyImport(): BackupReadyImport? {
+        val request = pendingReadyImport
+        pendingReadyImport = null
+        return request
     }
 
     fun requestRemotePassword() {
@@ -111,6 +144,11 @@ class BackupViewModel : ViewModel() {
         }
     }
 }
+
+data class BackupReadyImport(
+    val content: String,
+    val password: String
+)
 
 data class BackupPasswordRequest(
     val action: BackupPasswordAction,

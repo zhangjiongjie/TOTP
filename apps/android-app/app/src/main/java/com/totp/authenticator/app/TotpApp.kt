@@ -1,23 +1,16 @@
 package com.totp.authenticator.app
 
-import android.Manifest
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
-import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -37,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,18 +39,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.fragment.app.FragmentActivity
 import com.totp.authenticator.R
 import com.totp.authenticator.data.backup.BackupService
 import com.totp.authenticator.data.biometric.BiometricVaultUnlockStore
-import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.vault.VaultRepository
 import com.totp.authenticator.data.webdav.RemoteVaultCrypto
 import com.totp.authenticator.data.webdav.RemoteVaultKeyCacheStore
@@ -69,8 +58,6 @@ import com.totp.authenticator.ui.app.MainDestination
 import com.totp.authenticator.ui.app.TotpMainScaffold
 import com.totp.authenticator.ui.editor.AccountEditorScreen
 import com.totp.authenticator.ui.home.HomeScreen
-import com.totp.authenticator.ui.importer.QrImportException
-import com.totp.authenticator.ui.importer.QrImportService
 import com.totp.authenticator.ui.importer.QrScannerScreen
 import com.totp.authenticator.ui.common.PasswordVisibilityIcon
 import com.totp.authenticator.ui.settings.SettingsScreen
@@ -78,7 +65,6 @@ import com.totp.authenticator.ui.unlock.UnlockScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -89,7 +75,6 @@ fun TotpApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = activityContext.applicationContext
     val repository = remember { VaultRepository(context) }
-    val qrImportService = remember(context) { QrImportService(context.applicationContext) }
     val backupService = remember { BackupService() }
     val webDavSettingsStore = remember { WebDavSettingsStore(context) }
     val remoteKeyCacheStore = remember { RemoteVaultKeyCacheStore(context) }
@@ -104,7 +89,6 @@ fun TotpApp() {
     val webDavFlowCoordinator = remember { WebDavFlowCoordinator(repository, webDavSyncService) }
     val backupFlowCoordinator = remember { BackupFlowCoordinator(repository, backupService) }
     val quickUnlockCoordinator = remember { QuickUnlockCoordinator(biometricUnlockStore, repository) }
-    val appScope = rememberCoroutineScope()
     var hasExistingVault by remember { mutableStateOf(repository.hasVault()) }
     val state: TotpApplicationState = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -189,106 +173,11 @@ fun TotpApp() {
         Toast.makeText(context, "QR code imported", Toast.LENGTH_SHORT).show()
     }
 
-    fun showQrImportError(message: String = "Could not read QR code") {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
-
-    fun readTextFromUri(uri: Uri): String {
-        return activityContext.contentResolver.openInputStream(uri)
-            ?.bufferedReader(Charsets.UTF_8)
-            ?.use { it.readText() }
-            ?: throw IllegalStateException("无法读取备份文件。")
-    }
-
-    fun writeTextToUri(uri: Uri, content: String) {
-        activityContext.contentResolver.openOutputStream(uri)
-            ?.bufferedWriter(Charsets.UTF_8)
-            ?.use { it.write(content) }
-            ?: throw IllegalStateException("无法写入备份文件。")
-    }
-
-    val backupActionsRef = remember { arrayOfNulls<BackupActionCoordinator>(1) }
-
-    val backupExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        backupState.markExternalPickerActive(false)
-        val content = backupState.consumePendingExportContent()
-        if (uri == null || content == null) {
-            backupState.updateBusy(false)
-            return@rememberLauncherForActivityResult
-        }
-        backupState.launchTask(
-            task = {
-                withContext(Dispatchers.IO) {
-                    writeTextToUri(uri, content)
-                }
-            },
-            onSuccess = {
-                backupState.showSuccess("已导出 ${state.vault?.accounts?.size ?: 0} 个账号。")
-            },
-            onFailure = { error ->
-                backupState.showError(error.message ?: "导出备份失败，请稍后重试。")
-            }
-        )
-    }
-
-    val backupImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        backupState.markExternalPickerActive(false)
-        if (uri == null) {
-            backupState.updateBusy(false)
-            return@rememberLauncherForActivityResult
-        }
-        val password = state.activePassword
-        val content = runCatching { readTextFromUri(uri) }
-            .onFailure { error ->
-                backupState.showError(error.message ?: "导入备份失败，请稍后重试。")
-                backupState.updateBusy(false)
-            }
-            .getOrNull() ?: return@rememberLauncherForActivityResult
-        if (password == null) {
-            backupState.requestImportPassword(content)
-            backupState.updateBusy(false)
-            return@rememberLauncherForActivityResult
-        }
-        backupActionsRef[0]?.importContent(content, password)
-    }
-
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri == null) {
-            backupState.markExternalPickerActive(false)
-            return@rememberLauncherForActivityResult
-        }
-        backupState.markExternalPickerActive(false)
-        appScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    qrImportService.decodeImage(uri)
-                }
-            }.onSuccess(::acceptImportedOtpAuthUri)
-                .onFailure { error ->
-                    Log.w("TotpQrImport", "Could not read QR image", error)
-                    showQrImportError(
-                        error.message?.takeIf { it.isNotBlank() }
-                            ?: if (error is QrImportException) "No QR code found in image" else "Could not read QR image"
-                    )
-                }
-        }
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            state.navigate(TotpRoute.Scan)
-        } else {
-            Toast.makeText(context, "Camera permission is required to scan QR codes", Toast.LENGTH_SHORT).show()
-        }
-    }
+    val qrImportActions = rememberQrImportActions(
+        appState = state,
+        backupState = backupState,
+        onImportedOtpAuthUri = ::acceptImportedOtpAuthUri
+    )
 
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
@@ -336,74 +225,15 @@ fun TotpApp() {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    fun startQrImageImport() {
-        backupState.markExternalPickerActive(true)
-        imagePickerLauncher.launch(
-            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-        )
-    }
-
-    fun startQrScan() {
-        if (ContextCompat.checkSelfPermission(activityContext, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            state.navigate(TotpRoute.Scan)
-        } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    fun authenticateQuickUnlock(
-        title: String,
-        subtitle: String,
-        onAuthenticated: () -> Unit,
-        onError: (String) -> Unit = { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
-    ) {
-        val fragmentActivity = activityContext as? FragmentActivity
-        if (fragmentActivity == null) {
-            quickUnlockState.updateBusy(false)
-            onError("当前界面不可使用快速解锁")
-            return
-        }
-        val prompt = BiometricPrompt(
-            fragmentActivity,
-            ContextCompat.getMainExecutor(activityContext),
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    onAuthenticated()
-                }
-
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    quickUnlockState.updateBusy(false)
-                    onError(errString.toString())
-                }
-
-                override fun onAuthenticationFailed() {
-                    onError("系统认证失败，请重试。")
-                }
-            }
-        )
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setAllowedAuthenticators(BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
-            .build()
-        runCatching {
-            prompt.authenticate(promptInfo)
-        }.onFailure { error ->
-            quickUnlockState.updateBusy(false)
-            onError(error.message ?: "无法启动系统凭据验证")
-        }
-    }
-
     val quickUnlockMessage: (String) -> Unit = { message ->
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
+    val quickUnlockPrompt = rememberQuickUnlockPromptBridge(quickUnlockState)
     val quickUnlockCredentialRefresher = remember {
         QuickUnlockCredentialRefresher(
             quickUnlockState = quickUnlockState,
             quickUnlockCoordinator = quickUnlockCoordinator,
-            onPrompt = ::authenticateQuickUnlock,
+            onPrompt = quickUnlockPrompt,
             onMessage = quickUnlockMessage
         )
     }
@@ -417,6 +247,15 @@ fun TotpApp() {
             onRefreshQuickUnlockCredentialIfNeeded = quickUnlockCredentialRefresher::refreshIfNeeded
         )
     }
+    val unlockActions = remember {
+        UnlockActionCoordinator(
+            appState = state,
+            repository = repository,
+            unlockState = unlockState,
+            onVaultExists = { hasExistingVault = true },
+            onSyncAfterUnlock = homeSyncActions::syncAfterUnlock
+        )
+    }
     val quickUnlockActions = remember {
         QuickUnlockActionCoordinator(
             appState = state,
@@ -424,7 +263,7 @@ fun TotpApp() {
             unlockState = unlockState,
             quickUnlockCoordinator = quickUnlockCoordinator,
             onRefreshAvailability = ::refreshQuickUnlockAvailability,
-            onPrompt = ::authenticateQuickUnlock,
+            onPrompt = quickUnlockPrompt,
             onOpenSystemCredentialSettings = {
                 val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Intent(Settings.ACTION_BIOMETRIC_ENROLL).putExtra(
@@ -446,14 +285,15 @@ fun TotpApp() {
             appState = state,
             backupState = backupState,
             backupFlowCoordinator = backupFlowCoordinator,
-            onLaunchExportDocument = backupExportLauncher::launch,
-            onLaunchImportDocument = {
-                backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-            },
             onLocalChange = homeSyncActions::syncAfterLocalChange
         )
     }
-    backupActionsRef[0] = backupActions
+
+    BackupPickerBridge(
+        appState = state,
+        backupState = backupState,
+        backupActions = backupActions
+    )
 
     fun isRemotePasswordError(message: String): Boolean {
         return message.contains("远端保管库") ||
@@ -562,44 +402,9 @@ fun TotpApp() {
                 biometricUnlockEnabled = hasExistingVault && quickUnlockState.enabled && quickUnlockState.available,
                 isBiometricBusy = quickUnlockState.isBusy,
                 modifier = Modifier.padding(padding),
-                onCreatePassword = { password ->
-                    unlockState.launchTask(
-                        task = {
-                            withContext(Dispatchers.IO) {
-                                val vault = repository.create(password, now = System.currentTimeMillis())
-                                val vaultKey = repository.exportVaultKey(password)
-                                vault to vaultKey
-                            }
-                        },
-                        onSuccess = { (vault, vaultKey) ->
-                            hasExistingVault = true
-                            state.applyUnlockedVault(vault, password, vaultKey)
-                            homeSyncActions.syncAfterUnlock(password, vaultKey)
-                        },
-                        onFailure = {
-                            unlockState.showError("Could not create vault")
-                        }
-                    )
-                },
+                onCreatePassword = unlockActions::createVault,
                 onBiometricUnlock = quickUnlockActions::startUnlock,
-                onUnlock = { password ->
-                    unlockState.launchTask(
-                        task = {
-                            withContext(Dispatchers.IO) {
-                                val vault = repository.unlock(password)
-                                val vaultKey = repository.exportVaultKey(password)
-                                vault to vaultKey
-                            }
-                        },
-                        onSuccess = { (vault, vaultKey) ->
-                            state.applyUnlockedVault(vault, password, vaultKey)
-                            homeSyncActions.syncAfterUnlock(password, vaultKey)
-                        },
-                        onFailure = {
-                            unlockState.showError("Could not unlock vault")
-                        }
-                    )
-                }
+                onUnlock = unlockActions::unlock
             )
         }
 
@@ -654,13 +459,13 @@ fun TotpApp() {
                 HeaderCircleIconButton(
                     iconRes = R.drawable.action_photo,
                     contentDescription = "Import QR image",
-                    onClick = ::startQrImageImport
+                    onClick = qrImportActions.startImageImport
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 HeaderCircleIconButton(
                     iconRes = R.drawable.action_scan,
                     contentDescription = "Scan QR code",
-                    onClick = ::startQrScan
+                    onClick = qrImportActions.startScan
                 )
             }
         ) { padding ->
@@ -895,17 +700,6 @@ private fun MissingAccountEffect(accountId: String, onMissingAccount: () -> Unit
         onMissingAccount()
     }
 }
-
-private suspend fun VaultRepository.create(password: String, now: Long): LocalVault {
-    val vault = LocalVault(
-        schemaVersion = 1,
-        accounts = emptyList(),
-        updatedAt = now
-    )
-    create(vault, password)
-    return vault
-}
-
 
 private data class Quad<A, B, C, D>(
     val first: A,

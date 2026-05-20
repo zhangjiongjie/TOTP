@@ -60,11 +60,15 @@ class TotpAppCoordinatorBoundaryTest {
 
         assertTrue(File(appDir, "BackupFlowCoordinator.kt").exists())
         assertTrue(File(appDir, "BackupActionCoordinator.kt").exists())
+        assertTrue(File(appDir, "BackupPickerBridge.kt").exists())
         assertTrue(File(appDir, "WebDavFlowCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockActionCoordinator.kt").exists())
         assertTrue(File(appDir, "QuickUnlockCredentialRefresher.kt").exists())
+        assertTrue(File(appDir, "QuickUnlockPromptBridge.kt").exists())
+        assertTrue(File(appDir, "QrImportBridge.kt").exists())
         assertTrue(File(appDir, "HomeSyncActionCoordinator.kt").exists())
+        assertTrue(File(appDir, "UnlockActionCoordinator.kt").exists())
         assertTrue(File(appDir, "VaultAccountActionCoordinator.kt").exists())
         assertTrue(File(appDir, "VaultAccountViewModel.kt").exists())
         assertTrue(File(appDir, "BackupViewModel.kt").exists())
@@ -125,6 +129,65 @@ class TotpAppCoordinatorBoundaryTest {
         ).forEach { stateDeclaration ->
             assertFalse("$stateDeclaration should live in a dedicated ViewModel", source.contains(stateDeclaration))
         }
+    }
+
+    @Test
+    fun backupPickerCallbacksDoNotUseLateBoundActionRefs() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+        val backupViewModelSource = File("src/main/java/com/totp/authenticator/app/BackupViewModel.kt").readText()
+        val pickerBridgeSource = File("src/main/java/com/totp/authenticator/app/BackupPickerBridge.kt").readText()
+
+        assertFalse("Backup actions should not be bridged through a single-element ref array", source.contains("backupActionsRef"))
+        listOf(
+            "ActivityResultContracts.CreateDocument",
+            "ActivityResultContracts.OpenDocument",
+            "fun readTextFromUri(",
+            "fun writeTextToUri(",
+            "consumePendingExportContent()",
+            "prepareReadyImport("
+        ).forEach { platformDetail ->
+            assertFalse("$platformDetail should live in BackupPickerBridge", source.contains(platformDetail))
+        }
+        assertTrue("Backup imports selected by the picker should be handed off through BackupViewModel state", backupViewModelSource.contains("pendingReadyImport"))
+        assertTrue(pickerBridgeSource.contains("ActivityResultContracts.CreateDocument"))
+        assertTrue(pickerBridgeSource.contains("ActivityResultContracts.OpenDocument"))
+    }
+
+    @Test
+    fun passwordUnlockFlowLivesOutsideTotpApp() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+
+        assertFalse("Creating a vault should be owned by UnlockActionCoordinator", source.contains("repository.create(password"))
+        assertFalse("Unlocking a vault should be owned by UnlockActionCoordinator", source.contains("repository.unlock(password"))
+        assertFalse("Exporting a vault key after password unlock should be owned by UnlockActionCoordinator", source.contains("repository.exportVaultKey(password"))
+        assertFalse("UnlockScreen should not define inline create-password flow", source.contains("onCreatePassword = { password ->"))
+        assertFalse("UnlockScreen should not define inline password-unlock flow", source.contains("onUnlock = { password ->"))
+    }
+
+    @Test
+    fun qrImportAndBiometricPromptBridgesLiveOutsideTotpApp() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+        val qrBridgeSource = File("src/main/java/com/totp/authenticator/app/QrImportBridge.kt").readText()
+        val promptBridgeSource = File("src/main/java/com/totp/authenticator/app/QuickUnlockPromptBridge.kt").readText()
+
+        listOf(
+            "BiometricPrompt",
+            "fun authenticateQuickUnlock(",
+            "ActivityResultContracts.PickVisualMedia",
+            "ActivityResultContracts.RequestPermission",
+            "PickVisualMediaRequest(",
+            "fun startQrImageImport(",
+            "fun startQrScan(",
+            "qrImportService.decodeImage(",
+            "ContextCompat.checkSelfPermission(activityContext, Manifest.permission.CAMERA)"
+        ).forEach { platformDetail ->
+            assertFalse("$platformDetail should live in a focused bridge", source.contains(platformDetail))
+        }
+
+        assertTrue(qrBridgeSource.contains("QrImportService(context.applicationContext)"))
+        assertTrue(qrBridgeSource.contains("ActivityResultContracts.PickVisualMedia"))
+        assertTrue(qrBridgeSource.contains("ActivityResultContracts.RequestPermission"))
+        assertTrue(promptBridgeSource.contains("BiometricPrompt"))
     }
 
     @Test
@@ -245,6 +308,7 @@ class TotpAppCoordinatorBoundaryTest {
     @Test
     fun qrImportServiceUsesApplicationContext() {
         val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+        val bridgeSource = File("src/main/java/com/totp/authenticator/app/QrImportBridge.kt").readText()
 
         assertFalse(
             "QrImportService should not retain Activity context",
@@ -252,7 +316,7 @@ class TotpAppCoordinatorBoundaryTest {
         )
         assertTrue(
             "QrImportService should be created with applicationContext",
-            source.contains("QrImportService(context.applicationContext)")
+            bridgeSource.contains("QrImportService(context.applicationContext)")
         )
     }
 }

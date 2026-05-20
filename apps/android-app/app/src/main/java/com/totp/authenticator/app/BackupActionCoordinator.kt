@@ -8,8 +8,6 @@ class BackupActionCoordinator(
     private val appState: TotpApplicationState,
     private val backupState: BackupViewModel,
     private val backupFlowCoordinator: BackupFlowCoordinator,
-    private val onLaunchExportDocument: (String) -> Unit,
-    private val onLaunchImportDocument: () -> Unit,
     private val onLocalChange: (LocalVault, String?, ByteArray?) -> Unit
 ) {
     fun startExport() {
@@ -33,8 +31,7 @@ class BackupActionCoordinator(
             return
         }
         backupState.updateBusy(true)
-        backupState.markExternalPickerActive(true)
-        onLaunchImportDocument()
+        backupState.requestImportPicker()
     }
 
     fun exportWithPassword(password: String) {
@@ -52,7 +49,6 @@ class BackupActionCoordinator(
             },
             onSuccess = { payload ->
                 backupState.prepareExport(payload)
-                onLaunchExportDocument(payload.filename)
             },
             onFailure = { error ->
                 backupState.showError(error.message ?: "导出备份失败，请稍后重试。")
@@ -75,7 +71,6 @@ class BackupActionCoordinator(
             },
             onSuccess = { payload ->
                 backupState.prepareExport(payload)
-                onLaunchExportDocument(payload.filename)
             },
             onFailure = { error ->
                 backupState.showError(error.message ?: "导出备份失败，请稍后重试。")
