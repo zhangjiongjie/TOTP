@@ -6,6 +6,7 @@ import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
 import { accountService } from '../../services/account-service';
 import { runRuntimeManualSync } from '../../services/runtime-sync-service';
+import { formatDateLabel } from '../../services/date-utils';
 import { getAppState, subscribeApp, type AppSyncSnapshot } from '../../state/app-store';
 
 interface AccountListPageProps {
@@ -307,15 +308,3 @@ function bannerStyle(tone: 'idle' | 'success' | 'error'): React.CSSProperties {
   };
 }
 
-function formatDateLabel(isoText: string): string {
-  const date = new Date(isoText);
-  if (Number.isNaN(date.getTime())) {
-    return isoText;
-  }
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function pad(value: number): string {
-  return value < 10 ? `0${value}` : `${value}`;
-}

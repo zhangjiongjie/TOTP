@@ -1,12 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { accountService } from '../../services/account-service';
+import { createSeedAccounts } from '../../services/__test_seed';
 import { AccountDetailPage } from './AccountDetailPage';
 
 describe('AccountDetailPage', () => {
   beforeEach(() => {
     accountService.__resetForTests?.();
-    accountService.__seedDemoForTests?.();
+    accountService.replaceAllAccounts(createSeedAccounts());
   });
 
   it('shows a loading state instead of a fake missing state while the account is still loading', () => {

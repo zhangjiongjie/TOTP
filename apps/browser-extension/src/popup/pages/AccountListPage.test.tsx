@@ -1,13 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { accountService } from '../../services/account-service';
+import { createSeedAccounts } from '../../services/__test_seed';
 import { __resetForTests } from '../../state/app-store';
 import { AccountListPage, formatLastSyncLabel } from './AccountListPage';
 
 describe('AccountListPage', () => {
   beforeEach(async () => {
     await __resetForTests();
-    accountService.__seedDemoForTests?.();
+    accountService.replaceAllAccounts(createSeedAccounts());
     Object.assign(navigator, {
       clipboard: {
         writeText: vi.fn().mockResolvedValue(undefined)

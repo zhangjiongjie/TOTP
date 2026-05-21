@@ -41,55 +41,11 @@ export interface AccountRuntime {
 }
 
 const DEFAULT_GROUP_ID = 'default';
-const SEED_UPDATED_AT = '2026-01-01T00:00:00.000Z';
 
 const accountGroups: AccountGroup[] = [
   { id: 'default', label: 'Default' },
   { id: 'personal', label: 'Personal' },
   { id: 'work', label: 'Work' }
-];
-
-const demoSeedAccounts: AccountDraft[] = [
-  {
-    issuer: 'GitHub',
-    accountName: 'alice@company.com',
-    secret: 'JBSWY3DPEHPK3PXP',
-    digits: 6,
-    period: 30,
-    algorithm: 'SHA1'
-  },
-  {
-    issuer: 'Google',
-    accountName: 'product.team@gmail.com',
-    secret: 'GEZDGNBVGY3TQOJQ',
-    digits: 6,
-    period: 30,
-    algorithm: 'SHA1'
-  },
-  {
-    issuer: 'Microsoft',
-    accountName: 'contoso.dev@outlook.com',
-    secret: 'JBSWY3DPFQQFO33S',
-    digits: 6,
-    period: 30,
-    algorithm: 'SHA1'
-  },
-  {
-    issuer: 'OpenAI',
-    accountName: 'workspace-owner',
-    secret: 'KRSXG5DSNFXGOIDB',
-    digits: 6,
-    period: 30,
-    algorithm: 'SHA256'
-  },
-  {
-    issuer: 'Slack',
-    accountName: 'design-ops',
-    secret: 'MZXW6YTBOI======',
-    digits: 6,
-    period: 30,
-    algorithm: 'SHA1'
-  }
 ];
 
 let accounts: AccountRecord[] = [];
@@ -237,19 +193,8 @@ export const accountService = {
   __resetForTests() {
     accounts = [];
     emit();
-  },
-
-  __seedDemoForTests() {
-    accounts = createSeedAccounts();
-    emit();
   }
 };
-
-function createSeedAccounts() {
-  return demoSeedAccounts.map((draft, index) =>
-    buildAccountRecord(draft, `demo-${index + 1}`, SEED_UPDATED_AT)
-  );
-}
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -280,13 +225,6 @@ function buildAccountRecord(
       accountName: normalizedAccountName
     }),
     updatedAt: now
-  };
-}
-
-export function getSeedVaultPayload() {
-  return {
-    version: 1 as const,
-    accounts: createSeedAccounts()
   };
 }
 

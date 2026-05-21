@@ -14,7 +14,8 @@
     "baseUrl": ".",
     "paths": {
       "@totp/core": ["packages/totp-core/src/index.ts"],
-      "@totp/sync": ["packages/totp-sync/src/index.ts"]
+      "@totp/sync": ["packages/totp-sync/src/index.ts"],
+      "@totp/test-fixtures": ["packages/totp-test-fixtures/src/index.ts"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

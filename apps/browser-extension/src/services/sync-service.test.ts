@@ -3,7 +3,7 @@ import { decryptVault, encryptVault, type VaultPayload } from '@totp/core';
 import { createMemoryVaultStorageAdapter } from '@totp/core';
 import { createMemorySyncMetadataStore } from '@totp/sync';
 import { clearCurrentMasterPassword, setCurrentMasterPassword } from '../state/master-password-store';
-import { getSeedVaultPayload } from './account-service';
+import { getSeedVaultPayload } from './__test_seed';
 import { createSyncService } from './sync-service';
 
 describe('syncService', () => {

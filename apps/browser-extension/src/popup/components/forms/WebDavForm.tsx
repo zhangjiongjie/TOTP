@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WebDavProfile } from '@totp/sync';
 import type { PendingSyncConflict } from '@totp/sync';
+import { formatDateLabel } from '../../../services/date-utils';
 
 interface WebDavFormProps {
   profile: WebDavProfile | null;
@@ -181,19 +182,6 @@ function formatSyncStatus(status: string | null) {
     default:
       return '空闲';
   }
-}
-
-function formatDateLabel(isoText: string): string {
-  const date = new Date(isoText);
-  if (Number.isNaN(date.getTime())) {
-    return isoText;
-  }
-
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function pad(value: number): string {
-  return value < 10 ? `0${value}` : `${value}`;
 }
 
 function Field({

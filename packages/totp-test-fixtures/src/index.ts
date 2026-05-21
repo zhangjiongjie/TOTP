@@ -43,3 +43,46 @@ export const accountFixture = {
   createdAt: 1779010000000,
   updatedAt: 1779010000000
 } as const;
+
+export const demoSeedDrafts = [
+  {
+    issuer: 'GitHub',
+    accountName: 'alice@company.com',
+    secret: 'JBSWY3DPEHPK3PXP',
+    digits: 6,
+    period: 30,
+    algorithm: 'SHA1' as const
+  },
+  {
+    issuer: 'Google',
+    accountName: 'product.team@gmail.com',
+    secret: 'GEZDGNBVGY3TQOJQ',
+    digits: 6,
+    period: 30,
+    algorithm: 'SHA1' as const
+  },
+  {
+    issuer: 'Microsoft',
+    accountName: 'contoso.dev@outlook.com',
+    secret: 'JBSWY3DPFQQFO33S',
+    digits: 6,
+    period: 30,
+    algorithm: 'SHA1' as const
+  },
+  {
+    issuer: 'OpenAI',
+    accountName: 'workspace-owner',
+    secret: 'KRSXG5DSNFXGOIDB',
+    digits: 6,
+    period: 30,
+    algorithm: 'SHA256' as const
+  },
+  {
+    issuer: 'Slack',
+    accountName: 'design-ops',
+    secret: 'MZXW6YTBOI======',
+    digits: 6,
+    period: 30,
+    algorithm: 'SHA1' as const
+  }
+] as const;
