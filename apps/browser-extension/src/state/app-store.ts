@@ -286,6 +286,11 @@ export async function __readStoredVaultForTests(password = 'very-secure-password
   return decryptVault(storedVault, password);
 }
 
+export async function __replaceStoredVaultForTests(encryptedVault: EncryptedVaultBlob) {
+  await saveEncryptedVault(encryptedVault, vaultStorage);
+  hasStoredVault = true;
+}
+
 export async function __flushPendingLocalVaultWritesForTests() {
   await flushPendingLocalVaultWrites();
 }
@@ -776,7 +781,22 @@ async function persistAccountsToStoredVault(
     storedVault,
     currentVaultKey
   );
-  await saveEncryptedVault(encryptedVault, vaultStorage);
+
+  try {
+    await unlockVault(encryptedVault, masterPassword);
+    await saveEncryptedVault(encryptedVault, vaultStorage);
+  } catch {
+    const unlocked = await unlockVault(storedVault, masterPassword);
+    currentVaultKey = unlocked.vaultKey;
+    const recoveredVault = await encryptVaultWithKey(
+      { version: 1, accounts },
+      storedVault,
+      currentVaultKey
+    );
+
+    await unlockVault(recoveredVault, masterPassword);
+    await saveEncryptedVault(recoveredVault, vaultStorage);
+  }
 }
 
 async function loadEnabledSyncProfile(): Promise<WebDavProfile | null> {
@@ -846,6 +866,9 @@ export async function reloadStoredVaultAfterRemotePasswordVerified(password: str
   } finally {
     isApplyingRemoteSyncUpdate = false;
   }
+
+  setCurrentMasterPassword(password);
+  await syncRememberedSessionPreference(password);
 }
 
 function formatWebAuthnUnlockError(error: unknown) {

@@ -79,6 +79,11 @@ export const accountService = {
     return accounts.map(cloneAccount);
   },
 
+  async replaceAllAccountsSilently(nextAccounts: AccountRecord[]) {
+    accounts = nextAccounts.map(cloneAccount);
+    return accounts.map(cloneAccount);
+  },
+
   async updateAccount(accountId: string, draft: AccountDraft) {
     const existing = accounts.find((item) => item.id === accountId);
     if (!existing) {

@@ -14,7 +14,10 @@ import {
   type CreateSyncEngineOptions,
   type PendingSyncConflict,
   type SyncOnOpenResult,
-  type SyncRunResult
+  type SyncRunResult,
+  WebDavClientError,
+  type WebDavClient,
+  type WebDavUploadInput
 } from '@totp/sync';
 import type { SyncMetadataSnapshot } from '@totp/sync';
 
@@ -35,8 +38,10 @@ export function createSyncService(options: CreateSyncEngineOptions): SyncService
   const emptyVaultFingerprintPromise = hashString(
     JSON.stringify(normalizeVaultForFingerprint({ version: 1, accounts: [] }))
   );
+  const guardedClient = createUploadGuardedClient(options.client);
   const engine = createSyncEngine({
     ...options,
+    client: guardedClient,
     fingerprintVault: createRuntimeVaultFingerprint,
     mergeConflict: ({ metadata, local, remote }) => mergeAccountLevelConflict(metadata, local, remote),
     preferRemoteOnFirstSync: ({ local, remote, metadata }) =>
@@ -96,6 +101,37 @@ export function createSyncService(options: CreateSyncEngineOptions): SyncService
       };
     }
   };
+}
+
+function createUploadGuardedClient(client: WebDavClient): WebDavClient {
+  return {
+    download(profile) {
+      return client.download(profile);
+    },
+    async upload(profile, payload) {
+      await assertUploadPayloadDecrypts(payload);
+      return client.upload(profile, payload);
+    }
+  };
+}
+
+async function assertUploadPayloadDecrypts(payload: WebDavUploadInput) {
+  const masterPassword = getCurrentMasterPassword();
+
+  if (!masterPassword) {
+    throw new WebDavClientError('validation', '本地保管库尚未解锁，已阻止上传到 WebDAV。', {
+      retryable: false
+    });
+  }
+
+  try {
+    await decryptVault(payload.encryptedVault, masterPassword);
+  } catch (error) {
+    throw new WebDavClientError('validation', '待上传的本地保管库无法用当前主密码解锁，已阻止覆盖 WebDAV。', {
+      cause: error,
+      retryable: false
+    });
+  }
 }
 
 async function createRuntimeVaultFingerprint(

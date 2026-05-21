@@ -10,8 +10,10 @@ import type { EncryptedVaultBlob, VaultPayload } from '@totp/core';
 import type { SyncRunResult } from '@totp/sync';
 import type { PendingSyncConflict } from '@totp/sync';
 import {
+  WebDavClientError,
   type WebDavProfile,
-  type WebDavRemoteSnapshot
+  type WebDavRemoteSnapshot,
+  type WebDavUploadInput
 } from '@totp/sync';
 import { type SyncMetadataSnapshot } from '@totp/sync';
 import { getCurrentMasterPassword, setCurrentMasterPassword } from '../state/master-password-store';
@@ -70,12 +72,14 @@ export const passwordOps = {
       const rewrappedVault = await rewrapVaultKey(sourceVault, currentPassword, nextPassword);
       const revision = `web:${Date.now()}:${await createVaultFingerprint(rewrappedVault, nextPassword)}`;
       const updatedAt = new Date().toISOString();
-      const uploaded = await webDavClient.upload(profile, {
+      const uploadPayload: WebDavUploadInput = {
         revision,
         updatedAt,
         encryptedVault: rewrappedVault,
         previousEtag: remote?.etag ?? null
-      });
+      };
+      await assertUploadPayloadDecrypts(uploadPayload, nextPassword);
+      const uploaded = await webDavClient.upload(profile, uploadPayload);
       const fingerprint = await createVaultFingerprint(rewrappedVault, nextPassword);
 
       await saveEncryptedVault(rewrappedVault, vaultStorage);
@@ -227,7 +231,7 @@ async function applyRemoteAccountsIfNeeded(result: SyncRunResult) {
   }
 
   const decryptedVault = await decryptVault(result.localVault, masterPassword);
-  await accountService.replaceAllAccounts(decryptedVault.accounts);
+  await accountService.replaceAllAccountsSilently(decryptedVault.accounts);
 }
 
 async function loadRequiredLocalVault() {
@@ -265,7 +269,7 @@ async function applyVerifiedRemoteVault(
   remotePassword: string
 ) {
   await saveEncryptedVault(remote.encryptedVault, vaultStorage);
-  await accountService.replaceAllAccounts(vault.accounts);
+  await accountService.replaceAllAccountsSilently(vault.accounts);
   await syncStore.save({
     profile,
     baseRevision: remote.revision,
@@ -297,15 +301,17 @@ async function pushVerifiedVault(
   const fingerprint = await createPlainVaultFingerprint(vault);
   const updatedAt = new Date().toISOString();
   const revision = `web:${Date.now()}:${fingerprint}`;
-  const uploaded = await webDavClient.upload(profile, {
+  const uploadPayload: WebDavUploadInput = {
     revision,
     updatedAt,
     encryptedVault,
     previousEtag: remote.etag
-  });
+  };
+  await assertUploadPayloadDecrypts(uploadPayload, remotePassword);
+  const uploaded = await webDavClient.upload(profile, uploadPayload);
 
   await saveEncryptedVault(encryptedVault, vaultStorage);
-  await accountService.replaceAllAccounts(vault.accounts);
+  await accountService.replaceAllAccountsSilently(vault.accounts);
   await syncStore.save({
     profile,
     baseRevision: uploaded.revision,
@@ -326,6 +332,17 @@ async function pushVerifiedVault(
   setCurrentMasterPassword(remotePassword);
 }
 
+async function assertUploadPayloadDecrypts(payload: WebDavUploadInput, password: string) {
+  try {
+    await decryptVault(payload.encryptedVault, password);
+  } catch (error) {
+    throw new WebDavClientError('validation', '待上传的保管库无法用目标主密码解锁，已阻止覆盖 WebDAV。', {
+      cause: error,
+      retryable: false
+    });
+  }
+}
+
 async function markVerifiedRemoteConflict(
   profile: WebDavProfile,
   metadata: SyncMetadataSnapshot,
@@ -344,7 +361,7 @@ async function markVerifiedRemoteConflict(
   const detectedAt = new Date().toISOString();
 
   await saveEncryptedVault(localEncryptedWithRemoteKey, vaultStorage);
-  await accountService.replaceAllAccounts(localVault.accounts);
+  await accountService.replaceAllAccountsSilently(localVault.accounts);
   await syncStore.save({
     profile,
     localRevision: `local:${localFingerprint}`,

@@ -448,6 +448,66 @@ describe('syncService', () => {
       groupId: 'work'
     });
   });
+
+  it('blocks uploads when the local envelope cannot be decrypted with the current password', async () => {
+    const password = 'remote-9!';
+    const otherPassword = 'very-secure-password';
+    const vaultStorage = createMemoryVaultStorageAdapter();
+    const syncStore = createMemorySyncMetadataStore();
+    const upload = vi.fn();
+    const remoteEnvelope = await encryptVault({ version: 1, accounts: [] }, password);
+    const otherEnvelope = await encryptVault(
+      {
+        version: 1,
+        accounts: [
+          {
+            id: 'mixed-1',
+            issuer: 'Mixed',
+            accountName: 'mixed@example.com',
+            secret: 'JBSWY3DPEHPK3PXP',
+            digits: 6,
+            period: 30,
+            algorithm: 'SHA1',
+            tags: [],
+            groupId: 'default',
+            pinned: false,
+            iconKey: null,
+            updatedAt: '2026-05-21T10:00:00.000Z'
+          }
+        ]
+      },
+      otherPassword
+    );
+    const mixedEnvelope = {
+      ...remoteEnvelope,
+      vaultEncryption: otherEnvelope.vaultEncryption
+    };
+
+    await vaultStorage.area.set({ vault: mixedEnvelope });
+    setCurrentMasterPassword(password);
+
+    const service = createSyncService({
+      profile: {
+        id: 'primary',
+        enabled: true,
+        baseUrl: 'https://dav.example.com',
+        filePath: '/vault.json'
+      },
+      vaultStorage,
+      syncStore,
+      client: {
+        download: vi.fn().mockResolvedValue(null),
+        upload
+      },
+      now: () => '2026-05-21T10:05:00.000Z'
+    });
+
+    const result = await service.manualSync();
+
+    expect(result.status).toBe('validation-error');
+    expect(result.error?.message).toContain('已阻止覆盖 WebDAV');
+    expect(upload).not.toHaveBeenCalled();
+  });
 });
 
 async function hashString(value: string) {

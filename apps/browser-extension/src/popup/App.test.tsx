@@ -10,16 +10,19 @@ import {
   __flushPendingLocalVaultWritesForTests,
   __readSyncMetadataForTests,
   __readStoredVaultForTests,
+  __replaceStoredVaultForTests,
   __resetForTests,
   __runAutomaticSyncNowForTests,
   __saveSyncProfileForTests,
   __seedStoredVaultForTests,
   __setSyncClientForTests,
   initializeApp,
+  reloadStoredVaultAfterRemotePasswordVerified,
   submitUnlock
 } from '../state/app-store';
 import { accountService } from '../services/account-service';
 import { runRuntimeManualSync } from '../services/runtime-sync-service';
+import { sessionCredentialsStore } from '../state/security-store';
 import { App } from './App';
 
 type TestRemoteSnapshot = {
@@ -724,6 +727,107 @@ describe('App', () => {
       expect(
         storedVault?.accounts.some((account) => account.accountName === 'deleted@example.com')
       ).toBe(false);
+    });
+  });
+
+  it('updates remembered session credentials after adopting a short remote password', async () => {
+    const localPassword = 'very-secure-password';
+    const remotePassword = 'remote-9!';
+
+    await accountService.replaceAllAccounts([
+      {
+        id: 'remote-short-password-1',
+        issuer: 'Remote',
+        accountName: 'short-password@example.com',
+        secret: 'JBSWY3DPEHPK3PXP',
+        digits: 6,
+        period: 30,
+        algorithm: 'SHA1',
+        tags: [],
+        groupId: 'default',
+        pinned: false,
+        iconKey: null,
+        updatedAt: '2026-05-21T10:00:00.000Z'
+      }
+    ]);
+    await __seedStoredVaultForTests(remotePassword);
+    await sessionCredentialsStore.save({ masterPassword: localPassword });
+
+    await reloadStoredVaultAfterRemotePasswordVerified(remotePassword);
+
+    await expect(__readStoredVaultForTests(remotePassword)).resolves.toMatchObject({
+      accounts: [{ accountName: 'short-password@example.com' }]
+    });
+    await expect(__readStoredVaultForTests(localPassword)).rejects.toThrow();
+    await expect(sessionCredentialsStore.load()).resolves.toEqual({
+      masterPassword: remotePassword
+    });
+  });
+
+  it('recovers the active vault key before persisting after a short remote password is adopted', async () => {
+    const localPassword = 'very-secure-password';
+    const remotePassword = 'remote-9!';
+    const remoteVault = await encryptVault(
+      {
+        version: 1,
+        accounts: [
+          {
+            id: 'remote-key-1',
+            issuer: 'Remote',
+            accountName: 'remote-key@example.com',
+            secret: 'JBSWY3DPEHPK3PXP',
+            digits: 6,
+            period: 30,
+            algorithm: 'SHA1',
+            tags: [],
+            groupId: 'default',
+            pinned: false,
+            iconKey: null,
+            updatedAt: '2026-05-21T10:00:00.000Z'
+          }
+        ]
+      },
+      remotePassword
+    );
+
+    await accountService.replaceAllAccounts([
+      {
+        id: 'local-key-1',
+        issuer: 'Local',
+        accountName: 'local-key@example.com',
+        secret: 'GEZDGNBVGY3TQOJQ',
+        digits: 6,
+        period: 30,
+        algorithm: 'SHA1',
+        tags: [],
+        groupId: 'default',
+        pinned: false,
+        iconKey: null,
+        updatedAt: '2026-05-21T09:00:00.000Z'
+      }
+    ]);
+    await __seedStoredVaultForTests(localPassword);
+    await submitUnlock(localPassword);
+    await accountService.replaceAllAccountsSilently((await decryptVault(remoteVault, remotePassword)).accounts);
+    await __replaceStoredVaultForTests(remoteVault);
+
+    await act(async () => {
+      await reloadStoredVaultAfterRemotePasswordVerified(remotePassword);
+      await accountService.addAccount({
+        issuer: 'After Remote',
+        accountName: 'after-remote@example.com',
+        secret: 'JBSWY3DPEHPK3PXP',
+        digits: 6,
+        period: 30,
+        algorithm: 'SHA1'
+      });
+      await __flushPendingLocalVaultWritesForTests();
+    });
+
+    await expect(__readStoredVaultForTests(remotePassword)).resolves.toMatchObject({
+      accounts: expect.arrayContaining([
+        expect.objectContaining({ accountName: 'after-remote@example.com' })
+      ])
     });
   });
 });
