@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,8 +44,6 @@ import com.totp.authenticator.ui.brand.BrandIconMatcher
 @Composable
 fun AccountCard(
     account: TotpAccount,
-    code: String,
-    secondsRemaining: Int,
     onCopy: (String) -> Unit,
     onEdit: (String) -> Unit
 ) {
@@ -98,25 +97,35 @@ fun AccountCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = formatTotpCode(code),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onCopy(code) },
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    CountdownRing(
-                        secondsRemaining = secondsRemaining,
-                        period = account.period
-                    )
-                    CopyPill(onClick = { onCopy(code) })
+                    AccountOtpTicker(account = account, onCopy = onCopy)
                 }
             }
         }
     }
+}
+
+@Composable
+fun RowScope.AccountCodeRow(
+    account: TotpAccount,
+    code: String,
+    secondsRemaining: Int,
+    onCopy: (String) -> Unit
+) {
+    Text(
+        text = formatTotpCode(code),
+        modifier = Modifier
+            .weight(1f)
+            .clickable { onCopy(code) },
+        style = MaterialTheme.typography.headlineSmall,
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary
+    )
+    CountdownRing(
+        secondsRemaining = secondsRemaining,
+        period = account.period
+    )
+    CopyPill(onClick = { onCopy(code) })
 }
 
 @Composable

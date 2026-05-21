@@ -124,7 +124,6 @@ fun TotpApp() {
             }
         }
     )
-    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     var importedOtpAuthUri by remember { mutableStateOf<String?>(null) }
     var foregroundUnlockTick by remember { mutableStateOf(0) }
 
@@ -182,16 +181,6 @@ fun TotpApp() {
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
             runCatching { repository.warmUpCrypto() }
-        }
-    }
-
-    LaunchedEffect(state.currentRoute) {
-        if (state.currentRoute != TotpRoute.Home) {
-            return@LaunchedEffect
-        }
-        while (true) {
-            nowMillis = System.currentTimeMillis()
-            delay(1_000)
         }
     }
 
@@ -430,7 +419,6 @@ fun TotpApp() {
                 ) { padding ->
                     HomeScreen(
                         vault = vault,
-                        nowMillis = nowMillis,
                         syncStatusMessage = homeSyncStatus(),
                         copyStatusMessage = syncState.homeCopyStatusMessage,
                         errorMessage = syncState.homeErrorStatusMessage,

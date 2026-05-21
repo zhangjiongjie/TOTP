@@ -5,17 +5,21 @@ import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.File
 
 class VaultRepository(
     context: Context,
     private val vaultCipher: VaultCipher = VaultCipher(),
-    private val localEnvelopeCodec: LocalVaultEnvelopeCodec = LocalVaultEnvelopeCodec(AndroidKeystoreWrappingKeyProvider())
+    private val localEnvelopeCodec: LocalVaultEnvelopeCodec = LocalVaultEnvelopeCodec(AndroidKeystoreWrappingKeyProvider()),
+    private val localVaultStorage: LocalVaultStorage = FileLocalVaultStorage(
+        File(context.filesDir, "vault/local_vault_envelope.json")
+    )
 ) {
-    private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val legacyPreferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val vaultMutex = Mutex()
 
     fun hasVault(): Boolean {
-        return preferences.contains(KEY_ENCRYPTED_VAULT)
+        return localVaultStorage.exists() || legacyPreferences.contains(KEY_ENCRYPTED_VAULT)
     }
 
     fun warmUpCrypto() {
@@ -123,7 +127,7 @@ class VaultRepository(
     }
 
     private fun saveLocked(vault: LocalVault, password: String, keyEnvelopeOverride: EncryptedVaultEnvelope? = null): EncryptedVaultEnvelope {
-        val existingEnvelope = keyEnvelopeOverride ?: preferences.getString(KEY_ENCRYPTED_VAULT, null)
+        val existingEnvelope = keyEnvelopeOverride ?: readLocalEnvelopeStorageLocked()
             ?.let { localEnvelopeCodec.decodeFromStorage(it).envelope }
         val envelope = if (existingEnvelope == null) {
             vaultCipher.encrypt(vault, password)
@@ -159,7 +163,8 @@ class VaultRepository(
     }
 
     suspend fun clear() = vaultMutex.withLock {
-        preferences.edit()
+        localVaultStorage.delete()
+        legacyPreferences.edit()
             .remove(KEY_ENCRYPTED_VAULT)
             .commit()
     }
@@ -171,21 +176,30 @@ class VaultRepository(
     }
 
     private fun readLocalEnvelopeLocked(): DecodedLocalVaultEnvelope {
-        val encoded = preferences.getString(KEY_ENCRYPTED_VAULT, null)
+        val encoded = readLocalEnvelopeStorageLocked()
             ?: throw VaultNotFoundException()
         return localEnvelopeCodec.decodeFromStorage(encoded)
     }
 
+    private fun readLocalEnvelopeStorageLocked(): String? {
+        val stored = localVaultStorage.read()
+        if (stored != null) {
+            return stored
+        }
+        val legacyStored = legacyPreferences.getString(KEY_ENCRYPTED_VAULT, null) ?: return null
+        localVaultStorage.write(legacyStored)
+        legacyPreferences.edit()
+            .remove(KEY_ENCRYPTED_VAULT)
+            .apply()
+        return legacyStored
+    }
+
     private fun writeLocalEnvelopeLocked(envelope: EncryptedVaultEnvelope) {
-        preferences.edit()
-            .putString(KEY_ENCRYPTED_VAULT, localEnvelopeCodec.encodeForStorage(envelope))
-            .commit()
+        localVaultStorage.write(localEnvelopeCodec.encodeForStorage(envelope))
     }
 
     private fun migrateLocalEnvelopeLocked(envelope: EncryptedVaultEnvelope) {
-        preferences.edit()
-            .putString(KEY_ENCRYPTED_VAULT, localEnvelopeCodec.encodeForStorage(envelope))
-            .apply()
+        localVaultStorage.write(localEnvelopeCodec.encodeForStorage(envelope))
     }
 
     private fun migrateLocalEnvelopeIfNeeded(decodedEnvelope: DecodedLocalVaultEnvelope) {

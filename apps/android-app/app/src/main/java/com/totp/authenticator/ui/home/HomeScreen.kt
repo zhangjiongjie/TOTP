@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,19 +18,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.totp.authenticator.core.account.AccountSorter
+import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.core.totp.TotpGenerator
 import com.totp.authenticator.data.vault.LocalVault
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
     vault: LocalVault,
-    nowMillis: Long,
     syncStatusMessage: String,
     copyStatusMessage: String,
     errorMessage: String,
@@ -39,7 +46,7 @@ fun HomeScreen(
     onCopy: (String, com.totp.authenticator.core.account.TotpAccount) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accounts = AccountSorter.sort(vault.accounts)
+    val accounts = remember(vault.accounts) { AccountSorter.sort(vault.accounts) }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -80,19 +87,8 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(accounts, key = { it.id }) { account ->
-                        val code = runCatching {
-                            TotpGenerator.generate(
-                                secret = account.secret,
-                                timestampMillis = nowMillis,
-                                period = account.period,
-                                digits = account.digits,
-                                algorithm = account.algorithm
-                            )
-                        }.getOrDefault("------")
                         AccountCard(
                             account = account,
-                            code = code,
-                            secondsRemaining = secondsRemaining(nowMillis, account.period),
                             onCopy = { copiedCode -> onCopy(copiedCode, account) },
                             onEdit = onEdit
                         )
@@ -101,6 +97,35 @@ fun HomeScreen(
             }
         }
     }
+}
+
+@Composable
+fun RowScope.AccountOtpTicker(
+    account: TotpAccount,
+    onCopy: (String) -> Unit
+) {
+    var nowMillis by remember(account.id) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(account.id, account.period) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    val code = runCatching {
+        TotpGenerator.generate(
+            secret = account.secret,
+            timestampMillis = nowMillis,
+            period = account.period,
+            digits = account.digits,
+            algorithm = account.algorithm
+        )
+    }.getOrDefault("------")
+    AccountCodeRow(
+        account = account,
+        code = code,
+        secondsRemaining = secondsRemaining(nowMillis, account.period),
+        onCopy = onCopy
+    )
 }
 
 @Composable
