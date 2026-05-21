@@ -4,7 +4,7 @@ import {
   clearEncryptedVault
 } from '@totp/core';
 import { accountService } from './account-service';
-import type { BackupMode, ExportVaultResult, ImportVaultResult } from './settings-service';
+import type { BackupMode, ExportVaultResult, ImportVaultResult } from './settings-types';
 import { syncStore, vaultStorage } from './settings-storage';
 
 export const importExportOps = {
