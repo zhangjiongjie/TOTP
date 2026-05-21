@@ -105,10 +105,11 @@ fun RowScope.AccountOtpTicker(
     onCopy: (String) -> Unit
 ) {
     var nowMillis by remember(account.id) { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(account.id, account.period) {
+    LaunchedEffect(account.id) {
         while (true) {
             nowMillis = System.currentTimeMillis()
-            delay(1_000)
+            val nextSecondBoundary = ((nowMillis / 1000L) + 1L) * 1000L
+            delay((nextSecondBoundary - nowMillis).coerceAtLeast(16L))
         }
     }
     val code = runCatching {
