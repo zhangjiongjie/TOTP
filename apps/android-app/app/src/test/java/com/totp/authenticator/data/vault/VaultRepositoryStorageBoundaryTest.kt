@@ -20,4 +20,11 @@ class VaultRepositoryStorageBoundaryTest {
 
         assertTrue("File storage should tolerate parent directories created concurrently", source.contains("!parent.isDirectory && !parent.mkdirs() && !parent.isDirectory"))
     }
+
+    @Test
+    fun saveLockedDoesNotKeepUnusedKeyEnvelopeOverrideParameter() {
+        val source = File("src/main/java/com/totp/authenticator/data/vault/VaultRepository.kt").readText()
+
+        assertFalse("Unused keyEnvelopeOverride parameter should not remain in saveLocked", source.contains("keyEnvelopeOverride"))
+    }
 }

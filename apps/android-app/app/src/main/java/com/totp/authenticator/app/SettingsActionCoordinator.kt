@@ -58,7 +58,7 @@ class SettingsActionCoordinator(
                 val password = appState.activePassword
                 if (refreshedVault != null) {
                     if (password != null && nextVaultKey != null) {
-                        val previousVaultKey = appState.activeVaultKey
+                        val previousVaultKey = appState.activeVaultKey?.copyOf()
                         appState.updateUnlockedVault(refreshedVault, password, nextVaultKey)
                         if (syncResult?.vaultKey != null) {
                             onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
@@ -123,7 +123,7 @@ class SettingsActionCoordinator(
                 syncState.updateMetadata(flowResult.metadata)
                 if (refreshedVault != null) {
                     if (password != null && nextVaultKey != null) {
-                        val previousVaultKey = appState.activeVaultKey
+                        val previousVaultKey = appState.activeVaultKey?.copyOf()
                         appState.updateUnlockedVault(refreshedVault, password, nextVaultKey)
                         if (result.vaultKey != null) {
                             onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
@@ -145,7 +145,7 @@ class SettingsActionCoordinator(
 
     private fun changeQuickUnlock(enabled: Boolean) {
         onRefreshQuickUnlockAvailability()
-        val vaultKey = appState.activeVaultKey
+        val vaultKey = appState.activeVaultKey?.copyOf()
         if (enabled) {
             if (vaultKey == null) {
                 onVaultLocked()

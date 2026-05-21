@@ -126,8 +126,8 @@ class VaultRepository(
         return saveLocked(vault, password)
     }
 
-    private fun saveLocked(vault: LocalVault, password: String, keyEnvelopeOverride: EncryptedVaultEnvelope? = null): EncryptedVaultEnvelope {
-        val existingEnvelope = keyEnvelopeOverride ?: readLocalEnvelopeStorageLocked()
+    private fun saveLocked(vault: LocalVault, password: String): EncryptedVaultEnvelope {
+        val existingEnvelope = readLocalEnvelopeStorageLocked()
             ?.let { localEnvelopeCodec.decodeFromStorage(it).envelope }
         val envelope = if (existingEnvelope == null) {
             vaultCipher.encrypt(vault, password)

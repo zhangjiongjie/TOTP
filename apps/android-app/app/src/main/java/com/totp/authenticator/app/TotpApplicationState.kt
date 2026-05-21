@@ -26,31 +26,31 @@ class TotpApplicationState(
         private set
 
     fun applyUnlockedVault(vault: LocalVault, password: String, vaultKey: ByteArray? = null) {
+        replaceActiveVaultKey(vaultKey)
         this.vault = vault
         activePassword = password
-        activeVaultKey = vaultKey
         isUnlocked = true
         currentRoute = TotpRoute.Home
     }
 
     fun applyUnlockedVaultWithKey(vault: LocalVault, vaultKey: ByteArray) {
+        replaceActiveVaultKey(vaultKey)
         this.vault = vault
         activePassword = null
-        activeVaultKey = vaultKey
         isUnlocked = true
         currentRoute = TotpRoute.Home
     }
 
     fun updateUnlockedVault(vault: LocalVault, password: String, vaultKey: ByteArray? = activeVaultKey) {
+        replaceActiveVaultKey(vaultKey)
         this.vault = vault
         activePassword = password
-        activeVaultKey = vaultKey
         isUnlocked = true
     }
 
     fun updateUnlockedVaultWithKey(vault: LocalVault, vaultKey: ByteArray) {
+        replaceActiveVaultKey(vaultKey)
         this.vault = vault
-        activeVaultKey = vaultKey
         isUnlocked = true
     }
 
@@ -62,10 +62,19 @@ class TotpApplicationState(
     }
 
     fun lock() {
+        activeVaultKey?.fill(0)
         vault = null
         activePassword = null
         activeVaultKey = null
         isUnlocked = false
         currentRoute = TotpRoute.Unlock
+    }
+
+    private fun replaceActiveVaultKey(nextVaultKey: ByteArray?) {
+        val previousVaultKey = activeVaultKey
+        if (previousVaultKey !== nextVaultKey) {
+            previousVaultKey?.fill(0)
+        }
+        activeVaultKey = nextVaultKey
     }
 }

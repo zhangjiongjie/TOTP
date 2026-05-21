@@ -20,6 +20,7 @@ class QuickUnlockActionCoordinator(
     private val onSyncAfterUnlock: (String?, ByteArray?) -> Unit
 ) {
     fun enable(vaultKey: ByteArray) {
+        val vaultKeySnapshot = vaultKey.copyOf()
         onRefreshAvailability()
         if (quickUnlockState.setupRequired) {
             onOpenSystemCredentialSettings()
@@ -38,7 +39,7 @@ class QuickUnlockActionCoordinator(
                     task = {
                         withContext(Dispatchers.IO) {
                             val authenticatedCipher = quickUnlockCoordinator.createSetupCipher()
-                            quickUnlockCoordinator.saveCredential(authenticatedCipher, vaultKey)
+                            quickUnlockCoordinator.saveCredential(authenticatedCipher, vaultKeySnapshot)
                         }
                     },
                     onSuccess = {

@@ -25,9 +25,9 @@ class BackupFlowCoordinator(
     }
 
     suspend fun importBackup(raw: String, password: String): BackupImportResult {
-        val vaultKey = repository.exportVaultKey(password)
         val importedVault = backupService.parseImport(raw, password)
         repository.save(importedVault, password)
+        val vaultKey = repository.exportVaultKey(password)
         return BackupImportResult(
             vault = importedVault,
             vaultKey = vaultKey

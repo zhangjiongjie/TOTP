@@ -32,7 +32,7 @@ class HomeSyncActionCoordinator(
                     syncState.showHomeError(syncMessage)
                     backupState.requestRemotePassword()
                 } else {
-                    val previousVaultKey = appState.activeVaultKey
+                    val previousVaultKey = appState.activeVaultKey?.copyOf()
                     appState.updateUnlockedVault(flowResult.refreshedVault ?: vault, password, flowResult.vaultKey)
                     if (flowResult.syncResult.vaultKey != null && flowResult.vaultKey != null) {
                         onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)
@@ -92,7 +92,7 @@ class HomeSyncActionCoordinator(
                 syncState.updateMetadata(flowResult.metadata)
                 val syncMessage = webDavFlowCoordinator.formatResultMessage(flowResult.syncResult)
                 flowResult.syncResult.vaultKey?.let { nextVaultKey ->
-                    val previousVaultKey = appState.activeVaultKey
+                    val previousVaultKey = appState.activeVaultKey?.copyOf()
                     if (password != null) {
                         appState.updateUnlockedVault(vault, password, nextVaultKey)
                         onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, nextVaultKey)
@@ -155,7 +155,7 @@ class HomeSyncActionCoordinator(
             return
         }
         if (password != null && flowResult.vaultKey != null) {
-            val previousVaultKey = appState.activeVaultKey
+            val previousVaultKey = appState.activeVaultKey?.copyOf()
             appState.updateUnlockedVault(flowResult.refreshedVault, password, flowResult.vaultKey)
             if (flowResult.syncResult.vaultKey != null) {
                 onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, flowResult.vaultKey)

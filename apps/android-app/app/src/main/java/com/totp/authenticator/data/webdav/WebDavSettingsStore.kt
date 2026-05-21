@@ -1,14 +1,30 @@
+@file:Suppress("DEPRECATION")
+
 package com.totp.authenticator.data.webdav
 
 import android.content.Context
+import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 class WebDavSettingsStore(context: Context) {
-    private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val preferences: SharedPreferences = EncryptedSharedPreferences.create(
+        context,
+        ENCRYPTED_PREFERENCES_NAME,
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build(),
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+    private val legacyPreferences = context.getSharedPreferences(LEGACY_PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     fun loadSettings(): WebDavSettings {
-        val payload = preferences.getString(KEY_SETTINGS, null) ?: return WebDavSettings()
+        val payload = preferences.getString(KEY_SETTINGS, null)
+            ?: migrateLegacyString(KEY_SETTINGS)
+            ?: return WebDavSettings()
         return runCatching {
             json.decodeFromString<WebDavSettingsDto>(payload).toDomain()
         }.getOrElse { WebDavSettings() }
@@ -22,7 +38,9 @@ class WebDavSettingsStore(context: Context) {
     }
 
     fun loadMetadata(): WebDavSyncMetadata {
-        val payload = preferences.getString(KEY_METADATA, null) ?: return WebDavSyncMetadata()
+        val payload = preferences.getString(KEY_METADATA, null)
+            ?: migrateLegacyString(KEY_METADATA)
+            ?: return WebDavSyncMetadata()
         return runCatching {
             json.decodeFromString<WebDavSyncMetadataDto>(payload).toDomain()
         }.getOrElse { WebDavSyncMetadata() }
@@ -37,10 +55,23 @@ class WebDavSettingsStore(context: Context) {
 
     fun resetMetadata() {
         preferences.edit().remove(KEY_METADATA).apply()
+        legacyPreferences.edit().remove(KEY_METADATA).apply()
+    }
+
+    private fun migrateLegacyString(key: String): String? {
+        val legacyPayload = legacyPreferences.getString(key, null) ?: return null
+        preferences.edit()
+            .putString(key, legacyPayload)
+            .apply()
+        legacyPreferences.edit()
+            .remove(key)
+            .apply()
+        return legacyPayload
     }
 
     private companion object {
-        const val PREFERENCES_NAME = "totp_webdav"
+        const val LEGACY_PREFERENCES_NAME = "totp_webdav"
+        const val ENCRYPTED_PREFERENCES_NAME = "totp_webdav_encrypted"
         const val KEY_SETTINGS = "webdav.settings"
         const val KEY_METADATA = "webdav.sync.metadata"
 
