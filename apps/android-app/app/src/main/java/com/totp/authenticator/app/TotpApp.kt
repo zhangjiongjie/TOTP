@@ -284,24 +284,20 @@ fun TotpApp() {
         backupActions = backupActions
     )
 
-    fun isRemotePasswordError(message: String): Boolean {
-        return message.contains("远端保管库") ||
-            message.contains("远端密码库") ||
-            message.contains("Master password is incorrect") ||
-            message.contains("主密码")
-    }
-
-    fun homeSyncStatus(): String {
-        if (syncState.isBusy) {
-            return "同步中..."
+    LaunchedEffect(
+        state.isUnlocked,
+        syncState.webDavSettings.enabled,
+        syncState.webDavMetadata.lastStatus,
+        syncState.webDavMetadata.lastError,
+        syncState.webDavMetadata.lastSyncedAt
+    ) {
+        if (
+            state.isUnlocked &&
+            syncState.isRemotePasswordBlocked &&
+            backupState.pendingPasswordAction != BackupPasswordAction.WebDavSync
+        ) {
+            backupState.requestRemotePassword()
         }
-        if (!syncState.webDavSettings.enabled) {
-            return "WebDAV 同步未开启，本地模式。"
-        }
-        if (syncState.webDavMetadata.lastStatus == "blocked" || isRemotePasswordError(syncState.webDavMetadata.lastError)) {
-            return "远端保管库需要主密码验证后才能继续同步。"
-        }
-        return "本地与 WebDAV 已经是最新版本。"
     }
 
     fun lastSyncLabel(): String {
@@ -419,7 +415,7 @@ fun TotpApp() {
                 ) { padding ->
                     HomeScreen(
                         vault = vault,
-                        syncStatusMessage = homeSyncStatus(),
+                        syncStatusMessage = syncState.homeSyncStatus,
                         copyStatusMessage = syncState.homeCopyStatusMessage,
                         errorMessage = syncState.homeErrorStatusMessage,
                         lastSyncLabel = lastSyncLabel(),
@@ -551,10 +547,6 @@ fun TotpApp() {
                     onRefreshQuickUnlockAvailability = ::refreshQuickUnlockAvailability,
                     onEnableQuickUnlock = quickUnlockActions::enable,
                     onDisableQuickUnlock = quickUnlockActions::disable,
-                    onResetQuickUnlockAfterPasswordChange = {
-                        quickUnlockCoordinator.disable()
-                        quickUnlockState.updateEnabled(false)
-                    },
                     onRefreshQuickUnlockCredentialIfNeeded = quickUnlockCredentialRefresher::refreshIfNeeded,
                     onRemotePasswordNeeded = backupState::requestRemotePassword,
                     onVaultLocked = { Toast.makeText(context, "保管库未解锁", Toast.LENGTH_SHORT).show() },

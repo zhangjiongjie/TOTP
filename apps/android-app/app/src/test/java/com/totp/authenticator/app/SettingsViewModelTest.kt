@@ -34,6 +34,21 @@ class SettingsViewModelTest {
         assertEquals(SettingsStatusTone.Error, uiModel.webDavStatus.tone)
         assertEquals("已导出 1 个账号。", uiModel.backupStatusMessage)
         assertTrue(uiModel.quickUnlockToggleEnabled)
+        assertTrue(syncState.isRemotePasswordBlocked)
+    }
+
+    @Test
+    fun exposesRemotePasswordBlockedForStatusMessages() {
+        val syncState = SyncViewModel(
+            initialSettings = WebDavSettings(enabled = true),
+            initialMetadata = WebDavSyncMetadata(lastError = "远端保管库需要主密码验证后才能继续同步。")
+        )
+
+        assertTrue(syncState.isRemotePasswordBlocked)
+
+        syncState.updateSettings(WebDavSettings(enabled = false))
+
+        assertEquals(false, syncState.isRemotePasswordBlocked)
     }
 
     @Test

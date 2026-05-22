@@ -55,6 +55,15 @@ class WebDavSyncService(
         }
     }
 
+    suspend fun syncNowWithRemotePassword(localVault: LocalVault, remotePassword: String): WebDavSyncResult = syncMutex.withLock {
+        return try {
+            syncNowChecked(localVault, remotePassword, requireExistingRemote = true)
+        } catch (error: Exception) {
+            saveFailure(error.message ?: "WebDAV sync failed")
+            throw error
+        }
+    }
+
     suspend fun syncLocalChange(password: String): WebDavSyncResult = syncMutex.withLock {
         return try {
             syncLocalChangeChecked(repository.unlock(password), password)
@@ -91,7 +100,11 @@ class WebDavSyncService(
         }
     }
 
-    private suspend fun syncNowChecked(localVault: LocalVault, password: String): WebDavSyncResult {
+    private suspend fun syncNowChecked(
+        localVault: LocalVault,
+        password: String,
+        requireExistingRemote: Boolean = false
+    ): WebDavSyncResult {
         val startedAt = System.currentTimeMillis()
         val settings = settingsStore.loadSettings()
         if (!settings.enabled) {
@@ -107,6 +120,9 @@ class WebDavSyncService(
         val remote = client.download(settings)
         val downloadAt = System.currentTimeMillis()
         val resolvedLocalBeforeRemote = if (remote == null) {
+            if (requireExistingRemote) {
+                return saveResult("blocked", "远端保管库不存在，请检查 WebDAV 保管库路径。")
+            }
             resolveLocalSnapshotIfNeeded(localVault, password, metadata, remoteVault = null)
         } else {
             ResolvedLocalVault(localVault)

@@ -63,7 +63,7 @@ data class SettingsUiModel(
                     setupRequired = quickUnlockSetupRequired
                 ),
                 quickUnlockToggleEnabled = !isBiometricBusy && (biometricUnlockAvailable || quickUnlockSetupRequired),
-                isRemotePasswordBlocked = webDavSettings.enabled && webDavMetadata.lastStatus == "blocked",
+                isRemotePasswordBlocked = webDavSettings.enabled && isRemotePasswordStatus(webDavMetadata),
                 webDavSavedSummary = webDavSummary(webDavSettings),
                 showWebDavEnableHint = !webDavSettings.enabled,
                 webDavStatus = resolveWebDavStatus(
@@ -114,7 +114,7 @@ private fun resolveWebDavStatus(
     if (busy) {
         return SettingsStatus("同步中...", SettingsStatusTone.Idle)
     }
-    if (metadata.lastStatus == "blocked") {
+    if (isRemotePasswordStatus(metadata)) {
         return SettingsStatus("远端保管库需要主密码验证后才能继续同步。", SettingsStatusTone.Error)
     }
     val error = metadata.lastError
@@ -131,6 +131,15 @@ private fun resolveWebDavStatus(
         "conflict" -> SettingsStatus("检测到同步冲突，请前往设置页处理。", SettingsStatusTone.Error)
         else -> SettingsStatus("本地与 WebDAV 已经是最新版本。", SettingsStatusTone.Idle)
     }
+}
+
+private fun isRemotePasswordStatus(metadata: WebDavSyncMetadata): Boolean {
+    val message = metadata.lastError
+    return metadata.lastStatus == "blocked" ||
+        message.contains("远端保管库") ||
+        message.contains("远端密码库") ||
+        message.contains("Master password is incorrect") ||
+        message.contains("主密码")
 }
 
 private fun webDavSummary(settings: WebDavSettings): String {

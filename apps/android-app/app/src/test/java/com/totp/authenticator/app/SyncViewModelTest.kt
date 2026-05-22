@@ -68,6 +68,38 @@ class SyncViewModelTest {
     }
 
     @Test
+    fun homeSyncStatusKeepsRemotePasswordBlockedStateAfterTransientMessageClears() {
+        val viewModel = SyncViewModel(
+            WebDavSettings(enabled = true),
+            WebDavSyncMetadata(lastStatus = "blocked")
+        )
+
+        assertEquals("远端保管库需要主密码验证后才能继续同步。", viewModel.homeSyncStatus)
+
+        viewModel.showHomeError("无法解锁。")
+        viewModel.clearHomeMessages()
+
+        assertEquals("远端保管库需要主密码验证后才能继续同步。", viewModel.homeSyncStatus)
+    }
+
+    @Test
+    fun homeSyncStatusShowsLastErrorInsteadOfLatestWhenSyncFailed() {
+        val viewModel = SyncViewModel(
+            WebDavSettings(enabled = true),
+            WebDavSyncMetadata(lastStatus = "error", lastError = "WebDAV 连接失败")
+        )
+
+        assertEquals("同步失败：WebDAV 连接失败", viewModel.homeSyncStatus)
+    }
+
+    @Test
+    fun homeSyncStatusUsesWaitingMessageBeforeFirstSync() {
+        val viewModel = SyncViewModel(WebDavSettings(enabled = true), WebDavSyncMetadata())
+
+        assertEquals("WebDAV 同步已开启，等待首次同步。", viewModel.homeSyncStatus)
+    }
+
+    @Test
     fun launchExclusiveSyncCancelsPreviousOperation() = runTest {
         val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
         var firstCancelled = false

@@ -40,7 +40,10 @@ class WebDavFlowCoordinator(
     }
 
     suspend fun syncWithPassword(currentVault: LocalVault, password: String): WebDavFlowResult {
-        val result = webDavSyncService.syncNow(password)
+        val result = webDavSyncService.syncNowWithRemotePassword(currentVault, password)
+        if (needsMasterPassword(result)) {
+            return WebDavFlowResult(result, currentVault, null, loadMetadata(), loadSettings())
+        }
         val vaultKey = result.vaultKey ?: repository.exportVaultKey(password)
         val refreshedVault = if (result.vaultChanged) repository.unlockWithVaultKey(vaultKey) else currentVault
         return WebDavFlowResult(result, refreshedVault, vaultKey, loadMetadata(), loadSettings())

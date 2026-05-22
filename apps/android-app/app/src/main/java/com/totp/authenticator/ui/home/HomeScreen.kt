@@ -220,6 +220,9 @@ private fun resolveHomeBanner(
         errorMessage.isNotBlank() -> HomeBanner(errorMessage, HomeBannerTone.Error)
         copyStatusMessage.isNotBlank() -> HomeBanner(copyStatusMessage, HomeBannerTone.Success)
         syncStatusMessage.contains("远端保管库需要主密码") -> HomeBanner(syncStatusMessage, HomeBannerTone.Error)
+        syncStatusMessage.startsWith("同步失败：") -> HomeBanner(syncStatusMessage, HomeBannerTone.Error)
+        syncStatusMessage.startsWith("同步冲突：") -> HomeBanner(syncStatusMessage, HomeBannerTone.Error)
+        syncStatusMessage.contains("同步冲突") -> HomeBanner(syncStatusMessage, HomeBannerTone.Error)
         else -> HomeBanner(syncStatusMessage, HomeBannerTone.Idle)
     }
 }

@@ -15,6 +15,18 @@ class WebDavConcurrencyBoundaryTest {
     }
 
     @Test
+    fun remotePasswordSyncUsesUnlockedVaultInsteadOfLocalPasswordUnlock() {
+        val source = File("src/main/java/com/totp/authenticator/data/webdav/WebDavSyncService.kt").readText()
+        val remotePasswordSource = source
+            .substringAfter("suspend fun syncNowWithRemotePassword")
+            .substringBefore("suspend fun syncLocalChange")
+
+        assertTrue(remotePasswordSource.contains("syncMutex.withLock"))
+        assertTrue(remotePasswordSource.contains("syncNowChecked(localVault, remotePassword, requireExistingRemote = true)"))
+        assertFalse(remotePasswordSource.contains("repository.unlock(remotePassword)"))
+    }
+
+    @Test
     fun vaultRepositoryUpdateTransformsAreSynchronous() {
         val source = File("src/main/java/com/totp/authenticator/data/vault/VaultRepository.kt").readText()
 

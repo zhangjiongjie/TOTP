@@ -281,6 +281,20 @@ class TotpAppCoordinatorBoundaryTest {
     }
 
     @Test
+    fun passwordChangeRefreshesQuickUnlockCredentialInsteadOfDisablingIt() {
+        val source = File("src/main/java/com/totp/authenticator/app/SettingsActionCoordinator.kt").readText()
+        val applyPasswordChangeSource = source
+            .substringAfter("private fun applyPasswordChangeResult")
+            .substringBefore("private fun showSyncResult")
+
+        assertTrue(applyPasswordChangeSource.contains("previousVaultKey = appState.activeVaultKey?.copyOf()"))
+        assertTrue(applyPasswordChangeSource.contains("onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, result.vaultKey)"))
+        assertFalse(applyPasswordChangeSource.contains("disable()"))
+        assertFalse(source.contains("onResetQuickUnlockAfterPasswordChange"))
+        assertFalse(source.contains("需要重新开启"))
+    }
+
+    @Test
     fun vaultAccountActionsUseViewModelScopeAndValidateDeletes() {
         val source = File("src/main/java/com/totp/authenticator/app/VaultAccountActionCoordinator.kt").readText()
 
@@ -303,6 +317,18 @@ class TotpAppCoordinatorBoundaryTest {
         ).forEach { syncCall ->
             assertFalse("Backup import should return a sync request instead of calling $syncCall directly", source.contains(syncCall))
         }
+    }
+
+    @Test
+    fun remotePasswordSyncDoesNotExportLocalVaultKeyWhenStillBlocked() {
+        val source = File("src/main/java/com/totp/authenticator/app/WebDavFlowCoordinator.kt").readText()
+        val syncWithPasswordSource = source
+            .substringAfter("suspend fun syncWithPassword")
+            .substringBefore("suspend fun syncUnlocked")
+
+        assertTrue(syncWithPasswordSource.contains("webDavSyncService.syncNowWithRemotePassword(currentVault, password)"))
+        assertFalse(syncWithPasswordSource.contains("webDavSyncService.syncNow(password)"))
+        assertTrue(syncWithPasswordSource.indexOf("needsMasterPassword(result)") in 1 until syncWithPasswordSource.indexOf("repository.exportVaultKey(password)"))
     }
 
     @Test

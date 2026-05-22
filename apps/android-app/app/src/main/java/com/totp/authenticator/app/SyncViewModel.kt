@@ -38,6 +38,40 @@ class SyncViewModel(
     var hasSyncedAfterUnlock: Boolean by mutableStateOf(false)
         private set
 
+    val isRemotePasswordBlocked: Boolean
+        get() = webDavSettings.enabled &&
+            (webDavMetadata.lastStatus == "blocked" ||
+                isRemotePasswordStatus(webDavMetadata.lastError))
+
+    val homeSyncStatus: String
+        get() {
+            if (isBusy) {
+                return "同步中..."
+            }
+            if (!webDavSettings.enabled) {
+                return "WebDAV 同步未开启，本地模式。"
+            }
+            if (isRemotePasswordBlocked) {
+                return "远端保管库需要主密码验证后才能继续同步。"
+            }
+            if (webDavMetadata.lastError.isNotBlank()) {
+                return if (webDavMetadata.lastStatus == "conflict") {
+                    "同步冲突：${webDavMetadata.lastError}"
+                } else {
+                    "同步失败：${webDavMetadata.lastError}"
+                }
+            }
+            return when (webDavMetadata.lastStatus) {
+                "pushed" -> "同步完成，已推送本地最新数据。"
+                "pulled" -> "同步完成，已拉取远端最新数据。"
+                "synced", "noop" -> "本地与 WebDAV 已经是最新版本。"
+                "idle" -> "WebDAV 同步已开启，等待首次同步。"
+                "disabled" -> "WebDAV 同步未开启，本地模式。"
+                "conflict" -> "检测到同步冲突，请前往设置页处理。"
+                else -> "WebDAV 同步已开启，等待首次同步。"
+            }
+        }
+
     private var activeOperations = 0
     private var syncJob: Job? = null
 
@@ -127,5 +161,12 @@ class SyncViewModel(
     fun clearSettingsMessage() {
         webDavStatusMessage = ""
         webDavStatusIsError = false
+    }
+
+    private fun isRemotePasswordStatus(message: String): Boolean {
+        return message.contains("远端保管库") ||
+            message.contains("远端密码库") ||
+            message.contains("Master password is incorrect") ||
+            message.contains("主密码")
     }
 }

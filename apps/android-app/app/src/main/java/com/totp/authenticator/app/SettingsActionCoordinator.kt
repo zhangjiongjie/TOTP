@@ -17,7 +17,6 @@ class SettingsActionCoordinator(
     private val onRefreshQuickUnlockAvailability: () -> Unit,
     private val onEnableQuickUnlock: (ByteArray) -> Unit,
     private val onDisableQuickUnlock: () -> Unit,
-    private val onResetQuickUnlockAfterPasswordChange: () -> Unit,
     private val onRefreshQuickUnlockCredentialIfNeeded: (ByteArray?, ByteArray) -> Unit,
     private val onRemotePasswordNeeded: () -> Unit,
     private val onVaultLocked: () -> Unit,
@@ -110,6 +109,13 @@ class SettingsActionCoordinator(
             syncState.showSettingsError("保管库未解锁")
             return
         }
+        if (syncState.isRemotePasswordBlocked) {
+            val message = "远端保管库需要主密码验证后才能继续同步。"
+            syncState.showHomeError(message)
+            syncState.showSettingsError(message)
+            onRemotePasswordNeeded()
+            return
+        }
         syncState.launchExclusiveSyncTask(
             task = {
                 withContext(Dispatchers.IO) {
@@ -165,7 +171,7 @@ class SettingsActionCoordinator(
             }
         } else {
             passwordChangeState.launchChange(
-                successMessage = "主密码已修改，${quickUnlockTitleForMessage()}需要重新开启。",
+                successMessage = "主密码已修改。",
                 task = {
                     withContext(Dispatchers.IO) {
                         webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
@@ -181,7 +187,7 @@ class SettingsActionCoordinator(
 
     private suspend fun runPasswordChange(currentPassword: String, nextPassword: String) {
         passwordChangeState.runChange(
-            successMessage = "主密码已修改，${quickUnlockTitleForMessage()}需要重新开启。",
+            successMessage = "主密码已修改。",
             task = {
                 withContext(Dispatchers.IO) {
                     webDavFlowCoordinator.changeMasterPassword(currentPassword, nextPassword)
@@ -195,9 +201,10 @@ class SettingsActionCoordinator(
     }
 
     private fun applyPasswordChangeResult(result: MasterPasswordChangeResult, nextPassword: String) {
+        val previousVaultKey = appState.activeVaultKey?.copyOf()
         appState.updateUnlockedVault(result.vault, nextPassword, result.vaultKey)
         syncState.updateMetadata(result.metadata)
-        onResetQuickUnlockAfterPasswordChange()
+        onRefreshQuickUnlockCredentialIfNeeded(previousVaultKey, result.vaultKey)
     }
 
     private fun showSyncResult(result: WebDavSyncResult) {
@@ -212,7 +219,4 @@ class SettingsActionCoordinator(
         }
     }
 
-    private fun quickUnlockTitleForMessage(): String {
-        return if (quickUnlockState.hasStrongBiometric) "生物识别解锁" else "系统凭证解锁"
-    }
 }
