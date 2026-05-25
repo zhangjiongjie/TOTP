@@ -1,6 +1,7 @@
 import { pasteboard } from '@kit.BasicServicesKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { TotpAccount } from '../model/TotpAccount';
+import { requireTotpAlgorithm } from '../shared/TotpAlgorithm';
 
 export class TotpCodeSnapshot {
   accountId: string;
@@ -240,15 +241,7 @@ export class TotpRuntimeService {
   }
 
   private normalizeAlgorithm(value: string): string {
-    let normalized: string = value.trim().toUpperCase();
-    switch (normalized) {
-      case 'SHA1':
-      case 'SHA256':
-      case 'SHA512':
-        return normalized;
-      default:
-        throw new Error(`不支持的算法：${value}`);
-    }
+    return requireTotpAlgorithm(value);
   }
 
   private formatCodeValue(rawCode: string): string {

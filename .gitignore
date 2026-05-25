@@ -1,5 +1,6 @@
 .superpowers/
 .qoder/
+.claude/
 .worktrees/
 dist/
 node_modules/

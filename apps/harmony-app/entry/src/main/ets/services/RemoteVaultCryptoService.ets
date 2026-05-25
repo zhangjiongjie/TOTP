@@ -5,6 +5,7 @@ import { LocalVault } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
 import { resolveIconKey } from './BrandIconMatcher';
 import { UnlockService } from './UnlockService';
+import { resolveTotpAlgorithm } from '../shared/TotpAlgorithm';
 
 const REMOTE_FORMAT_VERSION: number = 2;
 const REMOTE_KDF_NAME: string = 'PBKDF2';
@@ -259,7 +260,6 @@ export class RemoteVaultCryptoService {
   private createLocalAccount(record: Record<string, Object>): TotpAccount {
     let issuer: string = this.readString(record, 'issuer', '');
     let accountName: string = this.readString(record, 'accountName', '');
-    let iconKey: string = this.readNullableString(record, 'iconKey', '');
     let resolvedIconKey: string = resolveIconKey(issuer, accountName);
     return new TotpAccount(
       this.readString(record, 'id', `remote-${Date.now()}`),
@@ -379,11 +379,7 @@ export class RemoteVaultCryptoService {
   }
 
   private normalizeAlgorithm(value: string): string {
-    let normalized: string = value.trim().toUpperCase();
-    if (normalized === 'SHA256' || normalized === 'SHA512') {
-      return normalized;
-    }
-    return 'SHA1';
+    return resolveTotpAlgorithm(value, 'SHA1');
   }
 
   private readString(record: Record<string, Object>, key: string, fallback: string): string {

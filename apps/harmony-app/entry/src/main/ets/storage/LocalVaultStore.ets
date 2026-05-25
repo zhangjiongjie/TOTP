@@ -83,11 +83,15 @@ export class LocalVaultStore {
         return createEmptyLocalVault();
       }
 
+      let record: EncryptedVaultRecord;
       try {
-        return createLocalVaultFromJson(this.decryptPayload(payload));
+        record = this.parseEncryptedPayload(payload);
       } catch (error) {
-        throw new Error(this.readErrorMessage(error));
+        this.backupCorruptSnapshot(store, payload, this.readErrorMessage(error));
+        return createEmptyLocalVault();
       }
+
+      return createLocalVaultFromJson(this.decryptRecord(record));
     } catch (error) {
       throw new Error(`load local vault failed: ${this.readErrorMessage(error)}`);
     }
@@ -216,9 +220,9 @@ export class LocalVaultStore {
     }
   }
 
-  private decryptPayload(payload: string): string {
+  private decryptRecord(record: EncryptedVaultRecord): string {
     try {
-      let record: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
+      this.assertSupportedRecord(record);
       let password: string = UnlockService.getInstance().requireVaultPassword();
       let vaultKeyBytes: Uint8Array = this.unwrapVaultKey(record, password);
       let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
@@ -301,18 +305,15 @@ export class LocalVaultStore {
   }
 
   private parseEncryptedPayload(payload: string): EncryptedVaultRecord {
-    let parsed: Record<string, Object> = JSON.parse(payload) as Record<string, Object>;
-    let kdfValue: Object | undefined = parsed['kdf'];
-    let keyEncryptionValue: Object | undefined = parsed['keyEncryption'];
-    let vaultEncryptionValue: Object | undefined = parsed['vaultEncryption'];
-    if (typeof kdfValue !== 'object' || kdfValue === null || Array.isArray(kdfValue) ||
-      typeof keyEncryptionValue !== 'object' || keyEncryptionValue === null || Array.isArray(keyEncryptionValue) ||
-      typeof vaultEncryptionValue !== 'object' || vaultEncryptionValue === null || Array.isArray(vaultEncryptionValue)) {
-      throw new Error('本地加密保管库格式暂不支持。');
+    let parsed: Record<string, Object>;
+    try {
+      parsed = JSON.parse(payload) as Record<string, Object>;
+    } catch (error) {
+      throw new Error(`本地保管库格式损坏，无法解析：${this.readErrorMessage(error)}`);
     }
-    let kdf: Record<string, Object> = kdfValue as Record<string, Object>;
-    let keyEncryption: Record<string, Object> = keyEncryptionValue as Record<string, Object>;
-    let vaultEncryption: Record<string, Object> = vaultEncryptionValue as Record<string, Object>;
+    let kdf: Record<string, Object> = this.readRecord(parsed, 'kdf');
+    let keyEncryption: Record<string, Object> = this.readRecord(parsed, 'keyEncryption');
+    let vaultEncryption: Record<string, Object> = this.readRecord(parsed, 'vaultEncryption');
     let record: EncryptedVaultRecord = new EncryptedVaultRecord(
       this.readNumber(parsed, 'formatVersion', 0),
       this.readString(parsed, 'vaultId', ''),
@@ -334,8 +335,15 @@ export class LocalVaultStore {
       ),
       this.readString(parsed, 'updatedAt', '')
     );
-    this.assertSupportedRecord(record);
     return record;
+  }
+
+  private readRecord(record: Record<string, Object>, key: string): Record<string, Object> {
+    let value: Object | undefined = record[key];
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return value as Record<string, Object>;
+    }
+    return {};
   }
 
   private assertSupportedRecord(record: EncryptedVaultRecord): void {

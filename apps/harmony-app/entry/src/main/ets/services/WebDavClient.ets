@@ -229,26 +229,15 @@ export class WebDavClient {
   }
 
   private readEtag(response: http.HttpResponse): string {
-    let headerText: string = JSON.stringify(response.header);
-    let lowerText: string = headerText.toLowerCase();
-    let keyIndex: number = lowerText.indexOf('"etag"');
-    if (keyIndex < 0) {
-      return '';
+    let headers: Record<string, Object> = response.header as Record<string, Object>;
+    let keys: string[] = Object.keys(headers);
+    for (let index: number = 0; index < keys.length; index++) {
+      if (keys[index].toLowerCase() === 'etag') {
+        let value: Object | undefined = headers[keys[index]];
+        return typeof value === 'string' ? value.trim() : '';
+      }
     }
-    let colonIndex: number = headerText.indexOf(':', keyIndex);
-    if (colonIndex < 0) {
-      return '';
-    }
-    let tail: string = headerText.substring(colonIndex + 1);
-    let firstQuote: number = tail.indexOf('"');
-    if (firstQuote < 0) {
-      return '';
-    }
-    let secondQuote: number = tail.indexOf('"', firstQuote + 1);
-    if (secondQuote < 0) {
-      return '';
-    }
-    return tail.substring(firstQuote + 1, secondQuote);
+    return '';
   }
 
   private readString(record: Record<string, Object>, key: string, fallback: string): string {

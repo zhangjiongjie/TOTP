@@ -3,6 +3,7 @@ import { LocalVault } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
 import { LocalVaultStore } from '../storage/LocalVaultStore';
 import { resolveIconKey } from './BrandIconMatcher';
+import { resolveTotpAlgorithm } from '../shared/TotpAlgorithm';
 
 export interface AccountDraft {
   issuer: string;
@@ -120,11 +121,7 @@ export class AccountEditorService {
   }
 
   private normalizeAlgorithm(value: string): string {
-    let normalized: string = value.trim().toUpperCase();
-    if (normalized === 'SHA256' || normalized === 'SHA512') {
-      return normalized;
-    }
-    return 'SHA1';
+    return resolveTotpAlgorithm(value, 'SHA1');
   }
 
   private createTimestamp(): string {
@@ -132,6 +129,6 @@ export class AccountEditorService {
   }
 
   private createAccountId(): string {
-    return `local-${Date.now()}`;
+    return `local-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   }
 }
