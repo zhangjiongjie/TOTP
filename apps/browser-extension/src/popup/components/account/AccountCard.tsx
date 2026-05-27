@@ -28,8 +28,9 @@ export function AccountCard({
     issuer: account.issuer,
     accountName: account.accountName
   });
-  const iconKey = resolvedIconKey !== 'default' ? resolvedIconKey : account.iconKey ?? resolvedIconKey;
-  const iconMarkup = iconRegistry[iconKey];
+  const hasPresetIcon = resolvedIconKey !== 'default';
+  const iconMarkup = hasPresetIcon ? iconRegistry[resolvedIconKey] : '';
+  const fallbackInitial = resolveFallbackInitial(account);
 
   async function handleCopy() {
     try {
@@ -81,11 +82,17 @@ export function AccountCard({
         }}
       >
         <span className="brand-icon-plate" style={iconPlateStyle}>
-          <span
-            className="brand-icon-glyph"
-            style={iconGlyphStyle}
-            dangerouslySetInnerHTML={{ __html: iconMarkup }}
-          />
+          {hasPresetIcon ? (
+            <span
+              className="brand-icon-glyph"
+              style={iconGlyphStyle}
+              dangerouslySetInnerHTML={{ __html: iconMarkup }}
+            />
+          ) : (
+            <span className="brand-icon-letter" style={iconLetterStyle}>
+              {fallbackInitial}
+            </span>
+          )}
         </span>
       </div>
       <div
@@ -234,3 +241,20 @@ const iconGlyphStyle = {
   display: 'grid',
   placeItems: 'center'
 } satisfies React.CSSProperties;
+
+const iconLetterStyle = {
+  width: '28px',
+  height: '28px',
+  aspectRatio: '1 / 1',
+  display: 'grid',
+  placeItems: 'center',
+  color: 'var(--color-brand-strong)',
+  fontSize: '24px',
+  lineHeight: 1,
+  fontWeight: 800
+} satisfies React.CSSProperties;
+
+function resolveFallbackInitial(account: DemoAccount): string {
+  const source = (account.issuer.trim() || account.accountName.trim()).trim();
+  return source.slice(0, 1).toUpperCase() || 'T';
+}

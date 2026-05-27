@@ -38,8 +38,21 @@ enum class BrandIcon {
 }
 
 object BrandIconMatcher {
-    fun match(issuer: String): BrandIcon {
-        val normalized = issuer.lowercase()
+    fun match(issuer: String, accountName: String = ""): BrandIcon {
+        listOf(issuer, accountName)
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .forEach { normalized ->
+                val matched = matchCandidate(normalized)
+                if (matched != BrandIcon.Default) {
+                    return matched
+                }
+            }
+
+        return BrandIcon.Default
+    }
+
+    private fun matchCandidate(normalized: String): BrandIcon {
         return when {
             "amazon" in normalized -> BrandIcon.Amazon
             "apple" in normalized -> BrandIcon.Apple

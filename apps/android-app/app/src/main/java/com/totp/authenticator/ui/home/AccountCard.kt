@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.totp.authenticator.R
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.ui.brand.BrandIcon
@@ -62,7 +63,7 @@ fun AccountCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BrandBadge(account.issuer)
+            BrandBadge(account)
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -129,18 +130,15 @@ fun RowScope.AccountCodeRow(
 }
 
 @Composable
-private fun BrandBadge(issuer: String) {
-    val icon = BrandIconMatcher.match(issuer)
+private fun BrandBadge(account: TotpAccount) {
+    val icon = BrandIconMatcher.match(account.issuer, account.accountName)
     val imageRes = icon.drawableResIdOrNull()
-    val label = when (icon.name) {
-        "Default" -> issuer.take(1).uppercase().ifEmpty { "T" }
-        else -> icon.name.take(1)
-    }
+    val label = fallbackBrandInitial(account)
     Surface(
         modifier = Modifier.size(48.dp),
         shape = RoundedCornerShape(14.dp),
         color = Color(0xFFEAF1F8),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        contentColor = Color(0xFF2878C8),
         border = BorderStroke(1.dp, Color(0xFFCFDCEB))
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -154,7 +152,10 @@ private fun BrandBadge(issuer: String) {
             } else {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 32.sp,
+                        lineHeight = 32.sp
+                    ),
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -275,6 +276,11 @@ private fun BrandIcon.drawableResIdOrNull(): Int? {
         BrandIcon.X -> R.drawable.brand_x
         BrandIcon.Yahoo -> R.drawable.brand_yahoo
         BrandIcon.Zoom -> R.drawable.brand_zoom
-        BrandIcon.Default -> R.drawable.brand_default
+        BrandIcon.Default -> null
     }
+}
+
+private fun fallbackBrandInitial(account: TotpAccount): String {
+    val source = account.issuer.ifBlank { account.accountName }.trim()
+    return source.take(1).uppercase().ifEmpty { "T" }
 }

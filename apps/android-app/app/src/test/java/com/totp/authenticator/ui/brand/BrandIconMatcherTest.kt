@@ -18,4 +18,9 @@ class BrandIconMatcherTest {
     fun fallsBackToDefault() {
         assertEquals(BrandIcon.Default, BrandIconMatcher.match("Unknown Service"))
     }
+
+    @Test
+    fun matchesAccountNameWhenIssuerIsUnknown() {
+        assertEquals(BrandIcon.Microsoft, BrandIconMatcher.match("Internal VPN", "alice@microsoft.com"))
+    }
 }

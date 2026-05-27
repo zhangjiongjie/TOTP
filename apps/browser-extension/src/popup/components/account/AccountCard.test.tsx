@@ -137,4 +137,19 @@ describe('AccountCard', () => {
       '#FC6D26'
     );
   });
+
+  it('renders the issuer initial when no preset brand icon matches', () => {
+    render(
+      <AccountCard
+        account={{
+          ...baseProps.account,
+          issuer: 'Internal VPN',
+          iconKey: 'microsoft'
+        }}
+      />
+    );
+
+    expect(document.querySelector('.brand-icon-glyph')).not.toBeInTheDocument();
+    expect(document.querySelector('.brand-icon-letter')).toHaveTextContent('I');
+  });
 });

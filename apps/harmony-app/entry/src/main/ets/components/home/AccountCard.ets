@@ -328,10 +328,29 @@ export struct AccountCard {
 
   @Builder
   private buildBrandIcon(): void {
-    Image(resolveBrandResource(this.resolveBrandKey()))
-      .width(34)
-      .height(34)
-      .objectFit(ImageFit.Contain)
-      .supportSvg2(true)
+    if (this.resolveBrandKey() === 'default') {
+      Text(this.resolveFallbackInitial())
+        .fontSize(32)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.resolvePalette().foregroundColor)
+        .textAlign(TextAlign.Center)
+    } else {
+      Image(resolveBrandResource(this.resolveBrandKey()))
+        .width(34)
+        .height(34)
+        .objectFit(ImageFit.Contain)
+        .supportSvg2(true)
+    }
+  }
+
+  private resolveFallbackInitial(): string {
+    let source: string = this.account.issuer.trim();
+    if (source.length === 0) {
+      source = this.account.accountName.trim();
+    }
+    if (source.length === 0) {
+      return 'T';
+    }
+    return source.substring(0, 1).toUpperCase();
   }
 }
