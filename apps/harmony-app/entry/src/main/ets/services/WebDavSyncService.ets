@@ -9,6 +9,7 @@ import { WebDavClient, WebDavRemoteSnapshot, WebDavUploadResult } from './WebDav
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService } from './RemoteVaultCryptoService';
 import { UnlockService } from './UnlockService';
 import { WebDavVaultSyncAlgorithms } from './WebDavVaultSyncAlgorithms';
+import { WEBDAV_SYNC_TRIGGER_LOCAL_CHANGE, WEBDAV_SYNC_TRIGGER_MANUAL, WebDavSyncTriggerPolicy } from './WebDavSyncTriggerPolicy';
 
 export class WebDavSyncResult {
   status: string;
@@ -60,6 +61,10 @@ export class WebDavSyncService {
   }
 
   private async syncNowLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
+    return await this.syncCoreLocked(context, WEBDAV_SYNC_TRIGGER_MANUAL);
+  }
+
+  private async syncCoreLocked(context: common.UIAbilityContext, trigger: string): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
       return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
@@ -90,7 +95,7 @@ export class WebDavSyncService {
         this.saveMetadata(context, syncProfileKey, localFingerprint, this.createBaseVaultJson(localVault), '', '', 'idle', '');
         return new WebDavSyncResult('idle', '远端还没有保管库，本地也为空。');
       }
-      return await this.pushLocal(context, settings, localVault, localFingerprint, '');
+      return await this.pushLocal(context, settings, localVault, localFingerprint, '', WebDavSyncTriggerPolicy.resolveLocalPushMessage(trigger));
     }
 
     let remoteFingerprint: string = this.createFingerprint(remoteSnapshot.vault);
@@ -114,7 +119,7 @@ export class WebDavSyncService {
       }
       if (localVault.accounts.length > 0 && remoteSnapshot.vault.accounts.length === 0) {
         this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-        return await this.pushLocal(context, settings, localVault, localFingerprint, remoteSnapshot.etag, undefined, remoteSnapshot);
+        return await this.pushLocal(context, settings, localVault, localFingerprint, remoteSnapshot.etag, WebDavSyncTriggerPolicy.resolveLocalPushMessage(trigger), remoteSnapshot);
       }
       this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '首次绑定时本地和远端都有数据。');
       return new WebDavSyncResult('conflict', '首次绑定时本地和远端都有数据，请先决定保留哪一侧。');
@@ -124,7 +129,7 @@ export class WebDavSyncService {
     let remoteChanged: boolean = remoteFingerprint !== metadata.baseFingerprint;
     if (localChanged && !remoteChanged) {
       this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-      return await this.pushLocal(context, settings, localVault, localFingerprint, remoteSnapshot.etag, undefined, remoteSnapshot);
+      return await this.pushLocal(context, settings, localVault, localFingerprint, remoteSnapshot.etag, WebDavSyncTriggerPolicy.resolveLocalPushMessage(trigger), remoteSnapshot);
     }
     if (!localChanged && remoteChanged) {
       return this.pullRemote(context, settings, remoteSnapshot, remoteFingerprint);
@@ -154,41 +159,7 @@ export class WebDavSyncService {
   }
 
   private async syncLocalChangeLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
-    let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
-    if (!settings.enabled) {
-      return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
-    }
-    this.validateSettings(settings);
-
-    let localVault: LocalVault = this.vaultStore.load(context);
-    let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
-    let syncProfileKey: string = this.createSyncProfileKey(settings);
-    if (metadata.syncProfileKey !== syncProfileKey && metadata.syncProfileKey !== this.createLegacySyncProfileKey(settings)) {
-      return await this.syncNowLocked(context);
-    }
-    if (metadata.remoteEtag.length === 0) {
-      return await this.syncNowLocked(context);
-    }
-
-    let remoteDownload: WebDavDownloadResult = await this.downloadOrBlocked(context, settings, metadata, syncProfileKey);
-    if (remoteDownload.blocked) {
-      return new WebDavSyncResult('blocked', '远端保管库需要主密码验证后才能继续同步。');
-    }
-    let remoteSnapshot: WebDavRemoteSnapshot | undefined = remoteDownload.snapshot;
-    if (remoteSnapshot === undefined) {
-      return await this.syncNowLocked(context);
-    }
-
-    let savedLocal: LocalVault = this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-    return await this.pushLocal(
-      context,
-      settings,
-      savedLocal,
-      this.createFingerprint(savedLocal),
-      metadata.remoteEtag,
-      '本地变更已同步到 WebDAV。',
-      remoteSnapshot
-    );
+    return await this.syncCoreLocked(context, WEBDAV_SYNC_TRIGGER_LOCAL_CHANGE);
   }
 
   async keepLocalVersion(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
