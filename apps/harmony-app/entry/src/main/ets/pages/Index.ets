@@ -204,6 +204,11 @@ struct Index {
               if (this.canSync) {
                 this.syncAfterLocalChange();
               }
+            },
+            onPasswordChanged: (vault: LocalVault, message: string) => {
+              this.applyVault(vault);
+              this.syncStatusMessage = message;
+              this.refreshSyncAvailability();
             }
           })
         }

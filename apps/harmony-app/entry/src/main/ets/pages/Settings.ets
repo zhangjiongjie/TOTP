@@ -14,6 +14,7 @@ export struct Settings {
   topInset: number = 0;
   onSaved: (message: string) => void = (_message: string) => {};
   onImported: (vault: LocalVault, message: string) => void = (_vault: LocalVault, _message: string) => {};
+  onPasswordChanged: (vault: LocalVault, message: string) => void = (_vault: LocalVault, _message: string) => {};
 
   @State private webDavEnabled: boolean = false;
   @State private serverUrl: string = '';
@@ -492,6 +493,10 @@ export struct Settings {
       let result: WebDavSyncResult = await this.service.changeMasterPassword(context, this.currentMasterPassword, this.nextMasterPassword);
       this.biometricUnlockEnabled = this.service.loadBiometricUnlockEnabled(context);
       this.passwordChangeMessage = MasterPasswordChangeResultPolicy.resolveSuccessMessage(result);
+      let changedVault: LocalVault | undefined = MasterPasswordChangeResultPolicy.resolveChangedVault(result);
+      if (changedVault !== undefined) {
+        this.onPasswordChanged(changedVault, this.passwordChangeMessage);
+      }
       this.passwordChangeIsError = false;
       setTimeout(() => {
         this.showChangePasswordDialog = false;

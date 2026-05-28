@@ -1,3 +1,4 @@
+import { LocalVault } from '../model/LocalVault';
 import { WebDavSyncResult } from './WebDavSyncService';
 
 export class MasterPasswordChangeResultPolicy {
@@ -12,5 +13,12 @@ export class MasterPasswordChangeResultPolicy {
       return result.message.length > 0 ? result.message : '主密码已修改。';
     }
     throw new Error(result.message.length > 0 ? result.message : '主密码修改失败');
+  }
+
+  static resolveChangedVault(result: WebDavSyncResult): LocalVault | undefined {
+    if (result.status === 'pushed' && result.vault !== undefined) {
+      return result.vault;
+    }
+    return undefined;
   }
 }

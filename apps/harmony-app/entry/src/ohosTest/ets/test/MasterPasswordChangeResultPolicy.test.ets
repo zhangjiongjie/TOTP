@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@ohos/hypium';
+import { LocalVault } from '../../../main/ets/model/LocalVault';
 import { WebDavSyncResult } from '../../../main/ets/services/WebDavSyncService';
 import { MasterPasswordChangeResultPolicy } from '../../../main/ets/services/MasterPasswordChangeResultPolicy';
 
@@ -48,6 +49,23 @@ export default function masterPasswordChangeResultPolicyTest(): void {
       );
 
       expect(message).assertEqual('主密码已修改。');
+    });
+
+    it('returns changed vault from successful password sync result', 0, () => {
+      let vault: LocalVault = new LocalVault(1, '2026-05-28T00:00:00.000Z', []);
+      let changedVault: LocalVault | undefined = MasterPasswordChangeResultPolicy.resolveChangedVault(
+        new WebDavSyncResult('pushed', '主密码已修改并同步到 WebDAV。', vault)
+      );
+
+      expect(changedVault === vault).assertTrue();
+    });
+
+    it('does not return changed vault when password change only rewrites local key', 0, () => {
+      let changedVault: LocalVault | undefined = MasterPasswordChangeResultPolicy.resolveChangedVault(
+        new WebDavSyncResult('local', '主密码已修改。')
+      );
+
+      expect(changedVault === undefined).assertTrue();
     });
   });
 }
