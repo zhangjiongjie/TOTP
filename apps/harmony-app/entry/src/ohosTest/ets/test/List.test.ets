@@ -3,6 +3,7 @@ import masterPasswordChangeResultPolicyTest from './MasterPasswordChangeResultPo
 import remoteVaultCryptoServiceTest from './RemoteVaultCryptoService.test';
 import webDavSyncTriggerPolicyTest from './WebDavSyncTriggerPolicy.test';
 import webDavSyncDecisionTest from './WebDavSyncDecision.test';
+import totpCodeGeneratorTest from './TotpCodeGenerator.test';
 
 export default function testsuite(): void {
   webDavVaultSyncAlgorithmsTest();
@@ -10,5 +11,6 @@ export default function testsuite(): void {
   remoteVaultCryptoServiceTest();
   webDavSyncTriggerPolicyTest();
   webDavSyncDecisionTest();
+  totpCodeGeneratorTest();
 }
 

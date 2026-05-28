@@ -150,7 +150,7 @@ apps/harmony-app
 
 ### 命令行测试
 
-工程包含 `entry@ohosTest` Hypium 测试目标，测试文件位于 `entry/src/ohosTest/ets/test/`。当前已覆盖 WebDAV 保管库指纹和账号级合并的纯逻辑，后续修改同步策略时应先在这里补充失败用例。
+工程包含 `entry@ohosTest` Hypium 测试目标，测试文件位于 `entry/src/ohosTest/ets/test/`。当前已覆盖 WebDAV 保管库指纹、账号级合并、同步/改密决策、远端加密字段保持和 TOTP RFC 6238 向量。后续修改同步策略时应先在这里补充失败用例。
 
 ```powershell
 & 'C:\Program Files\Huawei\DevEco Studio\tools\ohpm\bin\ohpm.bat' install --all
@@ -158,6 +158,8 @@ apps/harmony-app
 & 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' install -r 'entry\build\default\outputs\ohosTest\entry-ohosTest-signed.hap'
 & 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' shell aa test -b com.zhangjiongjie.totp -m entry_test -s unittest OpenHarmonyTestRunner -w 60
 ```
+
+如果设备列表为空，先确认 `hdc list targets` 能看到真机或模拟器，再执行安装和 `aa test`。
 
 ### 签名说明
 
