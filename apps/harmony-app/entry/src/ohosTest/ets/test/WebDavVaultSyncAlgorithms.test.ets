@@ -7,6 +7,21 @@ function createAccount(id: string, issuer: string, updatedAt: string): TotpAccou
   return new TotpAccount(id, issuer, `${issuer}-user`, `${issuer}-secret`, 6, 30, 'SHA1', 'Default', issuer, updatedAt);
 }
 
+function accountWithFields(
+  id: string,
+  issuer: string,
+  accountName: string,
+  secret: string,
+  digits: number,
+  period: number,
+  algorithm: string,
+  groupName: string,
+  iconKey: string,
+  updatedAt: string
+): TotpAccount {
+  return new TotpAccount(id, issuer, accountName, secret, digits, period, algorithm, groupName, iconKey, updatedAt);
+}
+
 function createVault(accounts: TotpAccount[]): LocalVault {
   return new LocalVault(1, '2026-05-28T00:00:00.000Z', accounts);
 }
@@ -64,6 +79,100 @@ export default function webDavVaultSyncAlgorithmsTest(): void {
       );
 
       expect(mergedVault === undefined).assertTrue();
+    });
+
+    it('keeps local deletion when remote did not change the account', 0, () => {
+      let baseAccount: TotpAccount = createAccount('shared', 'Base', '2026-05-28T00:00:00.000Z');
+      let mergedVault: LocalVault | undefined = WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(
+        createVault([baseAccount]),
+        createVault([]),
+        createVault([baseAccount])
+      );
+
+      expect(mergedVault !== undefined).assertTrue();
+      expect(mergedVault?.accounts.length).assertEqual(0);
+    });
+
+    it('keeps remote deletion when local did not change the account', 0, () => {
+      let baseAccount: TotpAccount = createAccount('shared', 'Base', '2026-05-28T00:00:00.000Z');
+      let mergedVault: LocalVault | undefined = WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(
+        createVault([baseAccount]),
+        createVault([baseAccount]),
+        createVault([])
+      );
+
+      expect(mergedVault !== undefined).assertTrue();
+      expect(mergedVault?.accounts.length).assertEqual(0);
+    });
+
+    it('reports a conflict when one side deletes an account changed by the other side', 0, () => {
+      let baseAccount: TotpAccount = createAccount('shared', 'Base', '2026-05-28T00:00:00.000Z');
+      let changedRemote: TotpAccount = createAccount('shared', 'Remote', '2026-05-28T00:01:00.000Z');
+
+      let mergedVault: LocalVault | undefined = WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(
+        createVault([baseAccount]),
+        createVault([]),
+        createVault([changedRemote])
+      );
+
+      expect(mergedVault === undefined).assertTrue();
+    });
+
+    it('merges different field changes on the same account', 0, () => {
+      let baseAccount: TotpAccount = accountWithFields(
+        'shared', 'Issuer', 'base-user', 'secret', 6, 30, 'SHA1', 'Default', 'issuer', '2026-05-28T00:00:00.000Z'
+      );
+      let localAccount: TotpAccount = accountWithFields(
+        'shared', 'Issuer', 'local-user', 'secret', 6, 30, 'SHA1', 'Default', 'issuer', '2026-05-28T00:01:00.000Z'
+      );
+      let remoteAccount: TotpAccount = accountWithFields(
+        'shared', 'Remote Issuer', 'base-user', 'secret', 6, 30, 'SHA1', 'Default', 'issuer', '2026-05-28T00:02:00.000Z'
+      );
+
+      let mergedVault: LocalVault | undefined = WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(
+        createVault([baseAccount]),
+        createVault([localAccount]),
+        createVault([remoteAccount])
+      );
+
+      expect(mergedVault !== undefined).assertTrue();
+      expect(mergedVault?.accounts[0].issuer).assertEqual('Remote Issuer');
+      expect(mergedVault?.accounts[0].accountName).assertEqual('local-user');
+    });
+
+    it('accepts same-id additions when both sides added identical content', 0, () => {
+      let localAccount: TotpAccount = createAccount('new', 'Same', '2026-05-28T00:01:00.000Z');
+      let remoteAccount: TotpAccount = createAccount('new', 'Same', '2026-05-28T00:02:00.000Z');
+
+      let mergedVault: LocalVault | undefined = WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(
+        createVault([]),
+        createVault([localAccount]),
+        createVault([remoteAccount])
+      );
+
+      expect(mergedVault !== undefined).assertTrue();
+      expect(mergedVault?.accounts.length).assertEqual(1);
+      expect(mergedVault?.accounts[0].id).assertEqual('new');
+    });
+
+    it('reports a conflict when both sides added the same id with different content', 0, () => {
+      let localAccount: TotpAccount = createAccount('new', 'Local', '2026-05-28T00:01:00.000Z');
+      let remoteAccount: TotpAccount = createAccount('new', 'Remote', '2026-05-28T00:02:00.000Z');
+
+      let mergedVault: LocalVault | undefined = WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(
+        createVault([]),
+        createVault([localAccount]),
+        createVault([remoteAccount])
+      );
+
+      expect(mergedVault === undefined).assertTrue();
+    });
+
+    it('changes fingerprint when a core account field changes', 0, () => {
+      let first: LocalVault = createVault([createAccount('shared', 'Base', '2026-05-28T00:00:00.000Z')]);
+      let second: LocalVault = createVault([createAccount('shared', 'Changed', '2026-05-28T00:00:00.000Z')]);
+
+      expect(WebDavVaultSyncAlgorithms.createFingerprint(first) !== WebDavVaultSyncAlgorithms.createFingerprint(second)).assertTrue();
     });
   });
 }
