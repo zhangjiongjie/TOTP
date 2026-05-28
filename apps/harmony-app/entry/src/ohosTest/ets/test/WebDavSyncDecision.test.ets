@@ -59,5 +59,37 @@ export default function webDavSyncDecisionTest(): void {
 
       expect(decision.action).assertEqual(WEBDAV_SYNC_DECISION_CONFLICT);
     });
+
+    it('chooses local vault for password change when only local changed', 0, () => {
+      let decision: WebDavSyncDecision = WebDavSyncDecision.decidePasswordChange(
+        createInput('local-next', 'base', 'base', false)
+      );
+
+      expect(decision.action).assertEqual(WEBDAV_SYNC_DECISION_PUSH_LOCAL);
+    });
+
+    it('chooses remote vault for password change when only remote changed', 0, () => {
+      let decision: WebDavSyncDecision = WebDavSyncDecision.decidePasswordChange(
+        createInput('base', 'remote-next', 'base', false)
+      );
+
+      expect(decision.action).assertEqual(WEBDAV_SYNC_DECISION_PULL_REMOTE);
+    });
+
+    it('chooses merged vault for password change when both sides can merge', 0, () => {
+      let decision: WebDavSyncDecision = WebDavSyncDecision.decidePasswordChange(
+        createInput('local-next', 'remote-next', 'base', true)
+      );
+
+      expect(decision.action).assertEqual(WEBDAV_SYNC_DECISION_MERGE_AND_PUSH);
+    });
+
+    it('reports conflict for password change when both sides changed and merge fails', 0, () => {
+      let decision: WebDavSyncDecision = WebDavSyncDecision.decidePasswordChange(
+        createInput('local-next', 'remote-next', 'base', false)
+      );
+
+      expect(decision.action).assertEqual(WEBDAV_SYNC_DECISION_CONFLICT);
+    });
   });
 }

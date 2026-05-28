@@ -422,23 +422,37 @@ export class WebDavSyncService {
 
     let localFingerprint: string = this.createFingerprint(localVault);
     let remoteFingerprint: string = this.createFingerprint(remoteSnapshot.vault);
+    let mergedVault: LocalVault | undefined = undefined;
+    if (metadata.baseFingerprint.length > 0 &&
+      localFingerprint !== metadata.baseFingerprint &&
+      remoteFingerprint !== metadata.baseFingerprint) {
+      mergedVault = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
+    }
+    let decision: WebDavSyncDecision = WebDavSyncDecision.decidePasswordChange(new WebDavSyncDecisionInput(
+      false,
+      true,
+      localFingerprint,
+      remoteFingerprint,
+      metadata.baseFingerprint,
+      localVault.accounts.length,
+      remoteSnapshot.vault.accounts.length,
+      mergedVault !== undefined
+    ));
     let finalVault: LocalVault;
-    if (localFingerprint === remoteFingerprint) {
+    if (decision.action === WEBDAV_SYNC_DECISION_SYNCED) {
       finalVault = localVault;
-    } else if (metadata.baseFingerprint.length === 0) {
+    } else if (decision.action === WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT) {
       this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '首次绑定时本地和远端都有数据。');
       return new WebDavSyncResult('conflict', '主密码未同步：首次绑定时本地和远端都有数据，请先完成数据同步。');
-    } else if (localFingerprint !== metadata.baseFingerprint && remoteFingerprint === metadata.baseFingerprint) {
+    } else if (decision.action === WEBDAV_SYNC_DECISION_PUSH_LOCAL) {
       finalVault = localVault;
-    } else if (localFingerprint === metadata.baseFingerprint && remoteFingerprint !== metadata.baseFingerprint) {
+    } else if (decision.action === WEBDAV_SYNC_DECISION_PULL_REMOTE) {
       finalVault = remoteSnapshot.vault;
-    } else {
-      let mergedVault: LocalVault | undefined = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
-      if (mergedVault === undefined) {
-        this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端都发生了变化。');
-        return new WebDavSyncResult('conflict', '本地和远端都发生了变化，请先解决冲突后再修改主密码。');
-      }
+    } else if (decision.action === WEBDAV_SYNC_DECISION_MERGE_AND_PUSH && mergedVault !== undefined) {
       finalVault = mergedVault;
+    } else {
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端都发生了变化。');
+      return new WebDavSyncResult('conflict', '本地和远端都发生了变化，请先解决冲突后再修改主密码。');
     }
 
     let fingerprint: string = this.createFingerprint(finalVault);

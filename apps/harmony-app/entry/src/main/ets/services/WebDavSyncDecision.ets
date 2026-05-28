@@ -58,6 +58,28 @@ export class WebDavSyncDecision {
     }
     return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_CONFLICT);
   }
+
+  static decidePasswordChange(input: WebDavSyncDecisionInput): WebDavSyncDecision {
+    if (input.localFingerprint === input.remoteFingerprint) {
+      return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_SYNCED);
+    }
+    if (input.baseFingerprint.length === 0) {
+      return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT);
+    }
+
+    let localChanged: boolean = input.localFingerprint !== input.baseFingerprint;
+    let remoteChanged: boolean = input.remoteFingerprint !== input.baseFingerprint;
+    if (localChanged && !remoteChanged) {
+      return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_PUSH_LOCAL);
+    }
+    if (!localChanged && remoteChanged) {
+      return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_PULL_REMOTE);
+    }
+    if (input.mergedVaultAvailable) {
+      return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_MERGE_AND_PUSH);
+    }
+    return new WebDavSyncDecision(WEBDAV_SYNC_DECISION_CONFLICT);
+  }
 }
 
 export class WebDavSyncDecisionInput {
