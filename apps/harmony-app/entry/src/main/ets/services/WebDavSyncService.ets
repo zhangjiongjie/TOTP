@@ -8,6 +8,19 @@ import { SettingsStore } from '../storage/SettingsStore';
 import { WebDavClient, WebDavRemoteSnapshot, WebDavUploadResult } from './WebDavClient';
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService } from './RemoteVaultCryptoService';
 import { UnlockService } from './UnlockService';
+import {
+  WEBDAV_SYNC_DECISION_CONFLICT,
+  WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT,
+  WEBDAV_SYNC_DECISION_IDLE_EMPTY,
+  WEBDAV_SYNC_DECISION_MERGE_AND_PUSH,
+  WEBDAV_SYNC_DECISION_PULL_REMOTE,
+  WEBDAV_SYNC_DECISION_PUSH_LOCAL,
+  WEBDAV_SYNC_DECISION_REFRESH_BASELINE,
+  WEBDAV_SYNC_DECISION_SYNCED,
+  WEBDAV_SYNC_DECISION_SYNCED_EMPTY,
+  WebDavSyncDecision,
+  WebDavSyncDecisionInput
+} from './WebDavSyncDecision';
 import { WebDavVaultSyncAlgorithms } from './WebDavVaultSyncAlgorithms';
 import { WEBDAV_SYNC_TRIGGER_LOCAL_CHANGE, WEBDAV_SYNC_TRIGGER_MANUAL, WebDavSyncTriggerPolicy } from './WebDavSyncTriggerPolicy';
 
@@ -91,7 +104,8 @@ export class WebDavSyncService {
     let localFingerprint: string = this.createFingerprint(localVault);
 
     if (remoteSnapshot === undefined) {
-      if (localVault.accounts.length === 0) {
+      let decision: WebDavSyncDecision = WebDavSyncDecision.decideMissingRemote(localVault.accounts.length);
+      if (decision.action === WEBDAV_SYNC_DECISION_IDLE_EMPTY) {
         this.saveMetadata(context, syncProfileKey, localFingerprint, this.createBaseVaultJson(localVault), '', '', 'idle', '');
         return new WebDavSyncResult('idle', '远端还没有保管库，本地也为空。');
       }
@@ -99,48 +113,49 @@ export class WebDavSyncService {
     }
 
     let remoteFingerprint: string = this.createFingerprint(remoteSnapshot.vault);
-    if (localVaultIsUninitialized && remoteSnapshot.vault.accounts.length > 0) {
+    let mergedVault: LocalVault | undefined = undefined;
+    if (metadata.baseFingerprint.length > 0 &&
+      localFingerprint !== metadata.baseFingerprint &&
+      remoteFingerprint !== metadata.baseFingerprint) {
+      mergedVault = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
+    }
+    let decision: WebDavSyncDecision = WebDavSyncDecision.decideExistingRemote(new WebDavSyncDecisionInput(
+      localVaultIsUninitialized,
+      true,
+      localFingerprint,
+      remoteFingerprint,
+      metadata.baseFingerprint,
+      localVault.accounts.length,
+      remoteSnapshot.vault.accounts.length,
+      mergedVault !== undefined
+    ));
+
+    if (decision.action === WEBDAV_SYNC_DECISION_PULL_REMOTE) {
       return this.pullRemote(context, settings, remoteSnapshot, remoteFingerprint);
     }
-    if (localVaultIsUninitialized && remoteSnapshot.vault.accounts.length === 0) {
+    if (decision.action === WEBDAV_SYNC_DECISION_SYNCED_EMPTY) {
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(remoteSnapshot.vault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
       return new WebDavSyncResult('synced', '本地与 WebDAV 都为空。');
     }
-
-    if (localFingerprint === remoteFingerprint) {
+    if (decision.action === WEBDAV_SYNC_DECISION_SYNCED) {
       this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(localVault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
       return new WebDavSyncResult('synced', '本地与 WebDAV 已是最新版本。');
     }
-
-    if (metadata.baseFingerprint.length === 0) {
-      if (localVault.accounts.length === 0 && remoteSnapshot.vault.accounts.length > 0) {
-        return this.pullRemote(context, settings, remoteSnapshot, remoteFingerprint);
-      }
-      if (localVault.accounts.length > 0 && remoteSnapshot.vault.accounts.length === 0) {
-        this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-        return await this.pushLocal(context, settings, localVault, localFingerprint, remoteSnapshot.etag, WebDavSyncTriggerPolicy.resolveLocalPushMessage(trigger), remoteSnapshot);
-      }
+    if (decision.action === WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT) {
       this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '首次绑定时本地和远端都有数据。');
       return new WebDavSyncResult('conflict', '首次绑定时本地和远端都有数据，请先决定保留哪一侧。');
     }
-
-    let localChanged: boolean = localFingerprint !== metadata.baseFingerprint;
-    let remoteChanged: boolean = remoteFingerprint !== metadata.baseFingerprint;
-    if (localChanged && !remoteChanged) {
+    if (decision.action === WEBDAV_SYNC_DECISION_PUSH_LOCAL) {
       this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       return await this.pushLocal(context, settings, localVault, localFingerprint, remoteSnapshot.etag, WebDavSyncTriggerPolicy.resolveLocalPushMessage(trigger), remoteSnapshot);
     }
-    if (!localChanged && remoteChanged) {
-      return this.pullRemote(context, settings, remoteSnapshot, remoteFingerprint);
-    }
-    if (!localChanged && !remoteChanged) {
+    if (decision.action === WEBDAV_SYNC_DECISION_REFRESH_BASELINE) {
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(localVault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
       return new WebDavSyncResult('synced', '同步基线已刷新。');
     }
 
-    let mergedVault: LocalVault | undefined = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
-    if (mergedVault !== undefined) {
+    if (decision.action === WEBDAV_SYNC_DECISION_MERGE_AND_PUSH && mergedVault !== undefined) {
       let savedMergedVault: LocalVault = this.vaultStore.saveWithRemoteKey(context, mergedVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       let mergedFingerprint: string = this.createFingerprint(savedMergedVault);
       return await this.pushLocal(
@@ -152,6 +167,11 @@ export class WebDavSyncService {
         '本地和远端修改已自动合并并同步到 WebDAV。',
         remoteSnapshot
       );
+    }
+
+    if (decision.action !== WEBDAV_SYNC_DECISION_CONFLICT) {
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '同步决策无法处理。');
+      return new WebDavSyncResult('conflict', '同步决策无法处理，请稍后重试。');
     }
 
     this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '本地和远端都发生了变化。');
