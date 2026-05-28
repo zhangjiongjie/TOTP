@@ -10,6 +10,14 @@ import { BiometricVaultCredentialService } from './BiometricVaultCredentialServi
 import { UnlockService } from './UnlockService';
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService, RemoteVaultDecryption } from './RemoteVaultCryptoService';
 import { WebDavSyncResult, WebDavSyncService } from './WebDavSyncService';
+import {
+  VAULT_IMPORT_FORMAT_ENCRYPTED_V1,
+  VAULT_IMPORT_FORMAT_LOCAL_JSON,
+  VAULT_IMPORT_FORMAT_PLAIN,
+  VAULT_IMPORT_FORMAT_REMOTE_V2,
+  VaultImportParser,
+  VaultImportParseResult
+} from './VaultImportParser';
 import { LocalVaultStore } from '../storage/LocalVaultStore';
 import { SettingsStore } from '../storage/SettingsStore';
 
@@ -268,50 +276,23 @@ export class SettingsService {
   }
 
   private parseImportContent(context: common.UIAbilityContext, raw: string): LocalVault {
-    let parsed: Record<string, Object> = JSON.parse(raw) as Record<string, Object>;
-    let modeValue: Object | undefined = parsed['mode'];
-    if (modeValue === 'encrypted') {
-      let encryptedVaultValue: Object | undefined = parsed['encryptedVault'];
-      if (typeof encryptedVaultValue !== 'object' || encryptedVaultValue === null || Array.isArray(encryptedVaultValue)) {
-        throw new Error('加密备份内容无效。');
+    let parsed: VaultImportParseResult = VaultImportParser.parse(raw);
+    if (parsed.format === VAULT_IMPORT_FORMAT_PLAIN || parsed.format === VAULT_IMPORT_FORMAT_LOCAL_JSON) {
+      if (parsed.vault === undefined) {
+        throw new Error('备份文件中没有账号列表。');
       }
-      let encryptedVault: Record<string, Object> = encryptedVaultValue as Record<string, Object>;
-      if (this.readNumber(encryptedVault, 'formatVersion', 0) === 2 && typeof encryptedVault['keyEncryption'] === 'object') {
-        let remoteBlob: EncryptedRemoteVaultBlob = this.remoteCrypto.parseEncryptedBlob(encryptedVault);
-        let decrypted: RemoteVaultDecryption = this.remoteCrypto.decryptWithKey(remoteBlob);
-        this.vaultStore.saveWithRemoteKey(context, decrypted.vault, remoteBlob, decrypted.vaultKey);
-        return decrypted.vault;
-      }
-      return this.createLocalVaultFromWebPayload(this.decryptWebVaultPayload(encryptedVault));
+      return parsed.vault;
     }
-
-    if (modeValue === 'plain') {
-      let vaultValue: Object | undefined = parsed['vault'];
-      if (typeof vaultValue !== 'object' || vaultValue === null || Array.isArray(vaultValue)) {
-        throw new Error('明文备份内容无效。');
-      }
-      return this.createLocalVaultFromWebPayload(vaultValue as Record<string, Object>);
+    if (parsed.format === VAULT_IMPORT_FORMAT_REMOTE_V2 && parsed.encryptedVault !== undefined) {
+      let remoteBlob: EncryptedRemoteVaultBlob = this.remoteCrypto.parseEncryptedBlob(parsed.encryptedVault);
+      let decrypted: RemoteVaultDecryption = this.remoteCrypto.decryptWithKey(remoteBlob);
+      this.vaultStore.saveWithRemoteKey(context, decrypted.vault, remoteBlob, decrypted.vaultKey);
+      return decrypted.vault;
     }
-
+    if (parsed.format === VAULT_IMPORT_FORMAT_ENCRYPTED_V1 && parsed.encryptedVault !== undefined) {
+      return VaultImportParser.createLocalVaultFromWebPayload(this.decryptWebVaultPayload(parsed.encryptedVault));
+    }
     return createLocalVaultFromJson(raw);
-  }
-
-  private createLocalVaultFromWebPayload(payload: Record<string, Object>): LocalVault {
-    let accountsValue: Object | undefined = payload['accounts'];
-    if (!Array.isArray(accountsValue)) {
-      throw new Error('备份文件中没有账号列表。');
-    }
-
-    let now: string = new Date().toISOString();
-    let accounts: TotpAccount[] = [];
-    for (let index: number = 0; index < accountsValue.length; index++) {
-      let item: Object = accountsValue[index];
-      if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-        accounts.push(this.createLocalAccountFromWebRecord(item as Record<string, Object>, index, now));
-      }
-    }
-
-    return new LocalVault(1, now, accounts);
   }
 
   private encryptWebVaultPayload(payload: string): WebEncryptedVaultBlob {
@@ -417,35 +398,12 @@ export class SettingsService {
     };
   }
 
-  private createLocalAccountFromWebRecord(record: Record<string, Object>, index: number, now: string): TotpAccount {
-    return new TotpAccount(
-      this.readString(record, 'id', `imported-${new Date().getTime()}-${index}`),
-      this.readString(record, 'issuer', ''),
-      this.readString(record, 'accountName', ''),
-      this.readString(record, 'secret', ''),
-      this.readNumber(record, 'digits', 6),
-      this.readNumber(record, 'period', 30),
-      this.readString(record, 'algorithm', 'SHA1'),
-      this.readGroupName(record),
-      this.readString(record, 'iconKey', ''),
-      this.readString(record, 'updatedAt', now)
-    );
-  }
-
   private toWebAccountRecords(accounts: TotpAccount[]): WebAccountExportRecord[] {
     let records: WebAccountExportRecord[] = [];
     for (let index: number = 0; index < accounts.length; index++) {
       records.push(new WebAccountExportRecord(accounts[index]));
     }
     return records;
-  }
-
-  private readGroupName(record: Record<string, Object>): string {
-    let tagsValue: Object | undefined = record['tags'];
-    if (Array.isArray(tagsValue) && tagsValue.length > 0 && typeof tagsValue[0] === 'string') {
-      return tagsValue[0] as string;
-    }
-    return 'Default';
   }
 
   private createBackupFilename(): string {
