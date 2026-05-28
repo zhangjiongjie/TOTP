@@ -3,6 +3,7 @@ import { LocalVault } from '../model/LocalVault';
 import { DEFAULT_WEBDAV_FILE_PATH, WebDavSettings } from '../model/WebDavSettings';
 import { ExportVaultResult, ImportVaultResult, SettingsService, WebDavSettingsDraft } from '../services/SettingsService';
 import { WebDavSyncResult, WebDavSyncService } from '../services/WebDavSyncService';
+import { MasterPasswordChangeResultPolicy } from '../services/MasterPasswordChangeResultPolicy';
 
 @Component
 export struct Settings {
@@ -490,9 +491,7 @@ export struct Settings {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let result: WebDavSyncResult = await this.service.changeMasterPassword(context, this.currentMasterPassword, this.nextMasterPassword);
       this.biometricUnlockEnabled = this.service.loadBiometricUnlockEnabled(context);
-      this.passwordChangeMessage = result.status === 'pushed'
-        ? '主密码已修改并同步到 WebDAV。'
-        : '主密码已修改。';
+      this.passwordChangeMessage = MasterPasswordChangeResultPolicy.resolveSuccessMessage(result);
       this.passwordChangeIsError = false;
       setTimeout(() => {
         this.showChangePasswordDialog = false;
@@ -613,6 +612,7 @@ export struct Settings {
       message.indexOf('同步基线已刷新') >= 0 ||
       message.indexOf('主密码已修改并同步到 WebDAV') >= 0 ||
       message.indexOf('本地修改已同步到 WebDAV') >= 0 ||
+      message.indexOf('本地变更已同步到 WebDAV') >= 0 ||
       message.indexOf('自动合并并同步到 WebDAV') >= 0;
   }
 

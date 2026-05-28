@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_test_desc",
+      "value": "TOTP test module"
+    },
+    {
+      "name": "TestAbility_desc",
+      "value": "TOTP test ability"
+    },
+    {
+      "name": "TestAbility_label",
+      "value": "TOTP Tests"
+    }
+  ]
+}

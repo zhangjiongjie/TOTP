@@ -877,7 +877,51 @@ struct Index {
   }
 
   private syncAfterLocalChange(): void {
-    this.handleManualSync();
+    this.handleLocalChangeSync();
+  }
+
+  private async handleLocalChangeSync(): Promise<void> {
+    if (this.isSyncing) {
+      return;
+    }
+
+    this.refreshSyncAvailability();
+    if (!this.canSync) {
+      this.syncStatusMessage = 'WebDAV 同步未开启，本地模式。';
+      return;
+    }
+
+    this.isSyncing = true;
+    this.syncStatusMessage = '同步本地变更中...';
+    this.startSyncAnimation();
+    try {
+      let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      let result: WebDavSyncResult = await WebDavSyncService.getInstance().syncLocalChange(context);
+      if (result.vault !== undefined) {
+        this.applyVault(result.vault);
+      }
+      this.hasSyncConflict = result.status === 'conflict';
+      this.syncStatusMessage = result.message;
+      if (result.status === 'blocked') {
+        this.showHomeError(result.message);
+        this.showRemotePasswordDialog = this.isUnlocked && this.activeRoute !== 'unlock';
+      } else if (result.status === 'conflict') {
+        this.showHomeError(result.message);
+      } else {
+        this.showHomeSuccess(result.message);
+      }
+      this.refreshLastSyncLabel(context);
+    } catch (error) {
+      let businessError: BusinessError = error as BusinessError;
+      let message: string = businessError && businessError.message && businessError.message.length > 0
+        ? `同步本地变更失败：${businessError.message}`
+        : '同步本地变更失败，请稍后重试。';
+      this.syncStatusMessage = message;
+      this.showHomeError(message);
+    } finally {
+      this.isSyncing = false;
+      this.stopSyncAnimation();
+    }
   }
 
   private syncOnOpenOnce(): void {

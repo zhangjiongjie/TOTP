@@ -48,7 +48,8 @@
 - 设置页通过启用勾选项开启同步；必填项不完整时不会启用。
 - 支持 WebDAV 服务器地址、保管库路径、用户名、密码和同步间隔配置。
 - 首页提供手动同步按钮，同步过程中会展示加载状态。
-- 打开应用和本地账号变更后会主动执行同步；当前版本不做后台常驻同步。
+- 打开应用和手动同步会执行完整 WebDAV 判断；本地账号新增、编辑、删除后会走本地变更同步入口，优先推送当前本地变更。
+- 当前版本不做后台常驻同步。
 - 支持 v2 key envelope，远端 `vaultKey` 是权威源。
 - 支持远端主密码验证：其他端修改主密码后，本端会进入 `BlockedRemotePassword`，验证远端主密码成功后再做账号级合并。
 - 支持空库初始化策略：本地空且远端有数据时恢复远端，本地有数据且远端空时推送本地。
@@ -68,8 +69,9 @@
 ### 修改主密码
 
 - WebDAV 未启用时，只重包本地 `vaultKey`，账号数据密钥保持不变。
-- WebDAV 已启用时，修改前会先确认远端可解锁 / 可同步；修改成功后立即上传远端 envelope。
-- 如果当前处于 `BlockedRemotePassword`，不允许直接修改本地主密码，需要先验证远端主密码。
+- WebDAV 已启用时，修改前会先确认远端可解锁，并按本地、远端和同步基线确定最终账号数据；本地/远端存在未解决冲突时会阻止改密。
+- 修改成功后，本地与远端会采用同一份最终保管库并立即上传新的远端 envelope。
+- 如果当前处于 `BlockedRemotePassword` 或冲突状态，不允许直接修改本地主密码，需要先验证远端主密码或解决同步冲突。
 - 生物识别凭据保存的是主密码的本机安全副本，远端主密码验证成功后会更新本机解锁态，后续不需要用户手动重新开启生物识别。
 
 ### 界面与交互
@@ -114,6 +116,7 @@ apps/harmony-app
 │   │   ├── services/                 # TOTP、同步、安全、导入导出等业务服务
 │   │   └── storage/                  # Preferences 本地持久化封装
 │   └── src/main/resources/           # 图标、品牌资源、颜色和页面配置
+│   └── src/ohosTest/                 # Hypium 单元测试模块
 ├── build-profile.json5               # 工程构建与签名配置
 ├── hvigor/                           # hvigor 配置
 ├── hvigorfile.ts                     # 工程级构建入口
@@ -144,6 +147,17 @@ apps/harmony-app
 ```
 
 当前工程在 `hvigor/hvigor-config.json5` 中关闭了 hvigor daemon。这样会略微增加冷启动构建时间，但可以避免 SDK 路径或环境变量调整后被旧 daemon 状态污染。
+
+### 命令行测试
+
+工程包含 `entry@ohosTest` Hypium 测试目标，测试文件位于 `entry/src/ohosTest/ets/test/`。当前已覆盖 WebDAV 保管库指纹和账号级合并的纯逻辑，后续修改同步策略时应先在这里补充失败用例。
+
+```powershell
+& 'C:\Program Files\Huawei\DevEco Studio\tools\ohpm\bin\ohpm.bat' install --all
+& 'C:\Program Files\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.bat' --mode module -p module=entry@ohosTest -p product=default -p buildMode=debug assembleHap
+& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' install -r 'entry\build\default\outputs\ohosTest\entry-ohosTest-signed.hap'
+& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' shell aa test -b com.zhangjiongjie.totp -m entry_test -s unittest OpenHarmonyTestRunner -w 60
+```
 
 ### 签名说明
 

@@ -1,7 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { LocalVault, createLocalVaultFromJson } from '../model/LocalVault';
-import { TotpAccount } from '../model/TotpAccount';
 import { WebDavSettings } from '../model/WebDavSettings';
 import { WebDavSyncMetadata, createDefaultWebDavSyncMetadata } from '../model/WebDavSyncMetadata';
 import { LocalVaultStore } from '../storage/LocalVaultStore';
@@ -9,6 +8,7 @@ import { SettingsStore } from '../storage/SettingsStore';
 import { WebDavClient, WebDavRemoteSnapshot, WebDavUploadResult } from './WebDavClient';
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService } from './RemoteVaultCryptoService';
 import { UnlockService } from './UnlockService';
+import { WebDavVaultSyncAlgorithms } from './WebDavVaultSyncAlgorithms';
 
 export class WebDavSyncResult {
   status: string;
@@ -19,36 +19,6 @@ export class WebDavSyncResult {
     this.status = status;
     this.message = message;
     this.vault = vault;
-  }
-}
-
-class AccountMergeResult {
-  hasConflict: boolean;
-  account: TotpAccount | null;
-
-  constructor(hasConflict: boolean, account: TotpAccount | null) {
-    this.hasConflict = hasConflict;
-    this.account = account;
-  }
-}
-
-class StringMergeResult {
-  hasConflict: boolean;
-  value: string;
-
-  constructor(hasConflict: boolean, value: string) {
-    this.hasConflict = hasConflict;
-    this.value = value;
-  }
-}
-
-class NumberMergeResult {
-  hasConflict: boolean;
-  value: number;
-
-  constructor(hasConflict: boolean, value: number) {
-    this.hasConflict = hasConflict;
-    this.value = value;
   }
 }
 
@@ -68,6 +38,7 @@ export class WebDavSyncService {
   private vaultStore: LocalVaultStore = new LocalVaultStore();
   private client: WebDavClient = new WebDavClient();
   private cryptoService: RemoteVaultCryptoService = new RemoteVaultCryptoService();
+  private operationQueue: Promise<void> = Promise.resolve();
 
   static getInstance(): WebDavSyncService {
     if (WebDavSyncService.instance === undefined) {
@@ -77,6 +48,18 @@ export class WebDavSyncService {
   }
 
   async syncNow(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
+    return await this.runExclusive((): Promise<WebDavSyncResult> => {
+      return this.syncNowLocked(context);
+    });
+  }
+
+  async syncLocalChange(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
+    return await this.runExclusive((): Promise<WebDavSyncResult> => {
+      return this.syncLocalChangeLocked(context);
+    });
+  }
+
+  private async syncNowLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
       return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
@@ -170,7 +153,51 @@ export class WebDavSyncService {
     return new WebDavSyncResult('conflict', '本地和远端都发生了变化，请在首页选择保留本地或使用远端。');
   }
 
+  private async syncLocalChangeLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
+    let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
+    if (!settings.enabled) {
+      return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
+    }
+    this.validateSettings(settings);
+
+    let localVault: LocalVault = this.vaultStore.load(context);
+    let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
+    let syncProfileKey: string = this.createSyncProfileKey(settings);
+    if (metadata.syncProfileKey !== syncProfileKey && metadata.syncProfileKey !== this.createLegacySyncProfileKey(settings)) {
+      return await this.syncNowLocked(context);
+    }
+    if (metadata.remoteEtag.length === 0) {
+      return await this.syncNowLocked(context);
+    }
+
+    let remoteDownload: WebDavDownloadResult = await this.downloadOrBlocked(context, settings, metadata, syncProfileKey);
+    if (remoteDownload.blocked) {
+      return new WebDavSyncResult('blocked', '远端保管库需要主密码验证后才能继续同步。');
+    }
+    let remoteSnapshot: WebDavRemoteSnapshot | undefined = remoteDownload.snapshot;
+    if (remoteSnapshot === undefined) {
+      return await this.syncNowLocked(context);
+    }
+
+    let savedLocal: LocalVault = this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
+    return await this.pushLocal(
+      context,
+      settings,
+      savedLocal,
+      this.createFingerprint(savedLocal),
+      metadata.remoteEtag,
+      '本地变更已同步到 WebDAV。',
+      remoteSnapshot
+    );
+  }
+
   async keepLocalVersion(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
+    return await this.runExclusive((): Promise<WebDavSyncResult> => {
+      return this.keepLocalVersionLocked(context);
+    });
+  }
+
+  private async keepLocalVersionLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
       return new WebDavSyncResult('disabled', '未启用 WebDAV，无法处理同步冲突。');
@@ -202,6 +229,12 @@ export class WebDavSyncService {
   }
 
   async useRemoteVersion(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
+    return await this.runExclusive((): Promise<WebDavSyncResult> => {
+      return this.useRemoteVersionLocked(context);
+    });
+  }
+
+  private async useRemoteVersionLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
       return new WebDavSyncResult('disabled', '未启用 WebDAV，无法处理同步冲突。');
@@ -253,6 +286,12 @@ export class WebDavSyncService {
   }
 
   async verifyRemoteMasterPassword(context: common.UIAbilityContext, remotePassword: string): Promise<WebDavSyncResult> {
+    return await this.runExclusive((): Promise<WebDavSyncResult> => {
+      return this.verifyRemoteMasterPasswordLocked(context, remotePassword);
+    });
+  }
+
+  private async verifyRemoteMasterPasswordLocked(context: common.UIAbilityContext, remotePassword: string): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
       return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
@@ -348,6 +387,12 @@ export class WebDavSyncService {
   }
 
   async changeMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): Promise<WebDavSyncResult> {
+    return await this.runExclusive((): Promise<WebDavSyncResult> => {
+      return this.changeMasterPasswordLocked(context, currentPassword, nextPassword);
+    });
+  }
+
+  private async changeMasterPasswordLocked(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
     if (settings.enabled && metadata.lastStatus === 'blocked') {
@@ -360,20 +405,69 @@ export class WebDavSyncService {
     }
 
     this.validateSettings(settings);
+    let syncProfileKey: string = this.createSyncProfileKey(settings);
+    metadata = metadata.syncProfileKey === syncProfileKey || metadata.syncProfileKey === this.createLegacySyncProfileKey(settings)
+      ? metadata
+      : createDefaultWebDavSyncMetadata();
+    let localVault: LocalVault = this.vaultStore.load(context);
+    this.vaultStore.assertMasterPassword(context, currentPassword);
     let remoteSnapshot: WebDavRemoteSnapshot | undefined = await this.client.downloadWithPassword(settings, currentPassword);
-    this.vaultStore.rewrapMasterPassword(context, currentPassword, nextPassword);
-    UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
     if (remoteSnapshot === undefined) {
-      let localVault: LocalVault = this.vaultStore.load(context);
+      this.vaultStore.rewrapMasterPassword(context, currentPassword, nextPassword);
+      UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
       return await this.pushLocal(context, settings, localVault, this.createFingerprint(localVault), '', '主密码已修改并同步到 WebDAV。');
     }
-    let encryptedVault: EncryptedRemoteVaultBlob = this.cryptoService.rewrapKeyEncryption(remoteSnapshot.encryptedVault, nextPassword, remoteSnapshot.vaultKey);
-    let fingerprint: string = this.createFingerprint(remoteSnapshot.vault);
+
+    let localFingerprint: string = this.createFingerprint(localVault);
+    let remoteFingerprint: string = this.createFingerprint(remoteSnapshot.vault);
+    let finalVault: LocalVault;
+    if (localFingerprint === remoteFingerprint) {
+      finalVault = localVault;
+    } else if (metadata.baseFingerprint.length === 0) {
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '首次绑定时本地和远端都有数据。');
+      return new WebDavSyncResult('conflict', '主密码未修改：首次绑定时本地和远端都有数据，请先完成数据同步。');
+    } else if (localFingerprint !== metadata.baseFingerprint && remoteFingerprint === metadata.baseFingerprint) {
+      finalVault = localVault;
+    } else if (localFingerprint === metadata.baseFingerprint && remoteFingerprint !== metadata.baseFingerprint) {
+      finalVault = remoteSnapshot.vault;
+    } else {
+      let mergedVault: LocalVault | undefined = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
+      if (mergedVault === undefined) {
+        this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端都发生了变化。');
+        return new WebDavSyncResult('conflict', '主密码未修改：本地和远端都发生了变化，请先解决冲突后再修改主密码。');
+      }
+      finalVault = mergedVault;
+    }
+
+    let fingerprint: string = this.createFingerprint(finalVault);
+    let encryptedVault: EncryptedRemoteVaultBlob = fingerprint === remoteFingerprint
+      ? this.cryptoService.rewrapKeyEncryption(remoteSnapshot.encryptedVault, nextPassword, remoteSnapshot.vaultKey)
+      : this.cryptoService.encryptWithVaultKey(
+        finalVault,
+        this.cryptoService.rewrapKeyEncryption(remoteSnapshot.encryptedVault, nextPassword, remoteSnapshot.vaultKey),
+        remoteSnapshot.vaultKey
+      );
     let revision: string = this.createRevision(fingerprint);
     let upload: WebDavUploadResult = await this.client.uploadEncryptedVault(settings, encryptedVault, revision, remoteSnapshot.etag);
-    let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, remoteSnapshot.vault, encryptedVault, remoteSnapshot.vaultKey);
-    this.saveMetadata(context, this.createSyncProfileKey(settings), fingerprint, this.createBaseVaultJson(vault), upload.revision, upload.etag, 'synced', '');
+    let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, finalVault, encryptedVault, remoteSnapshot.vaultKey);
+    UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
+    this.saveMetadata(context, syncProfileKey, fingerprint, this.createBaseVaultJson(vault), upload.revision, upload.etag, 'synced', '');
     return new WebDavSyncResult('pushed', '主密码已修改并同步到 WebDAV。', vault);
+  }
+
+  private async runExclusive(task: () => Promise<WebDavSyncResult>): Promise<WebDavSyncResult> {
+    let previousOperation: Promise<void> = this.operationQueue;
+    let releaseOperation: () => void = (): void => {};
+    this.operationQueue = new Promise<void>((resolve: () => void): void => {
+      releaseOperation = resolve;
+    });
+
+    await previousOperation;
+    try {
+      return await task();
+    } finally {
+      releaseOperation();
+    }
   }
 
   private async downloadOrBlocked(
@@ -480,236 +574,15 @@ export class WebDavSyncService {
     if (baseVault === undefined) {
       return undefined;
     }
-
-    let mergedAccounts: TotpAccount[] | undefined = this.mergeAccountRecords(
-      baseVault.accounts,
-      localVault.accounts,
-      remoteVault.accounts
-    );
-    if (mergedAccounts === undefined) {
-      return undefined;
-    }
-
-    return new LocalVault(
-      Math.max(baseVault.schemaVersion, Math.max(localVault.schemaVersion, remoteVault.schemaVersion)),
-      new Date().toISOString(),
-      mergedAccounts
-    );
-  }
-
-  private mergeAccountRecords(baseAccounts: TotpAccount[], localAccounts: TotpAccount[], remoteAccounts: TotpAccount[]): TotpAccount[] | undefined {
-    let baseMap: Map<string, TotpAccount> = this.createAccountMap(baseAccounts);
-    let localMap: Map<string, TotpAccount> = this.createAccountMap(localAccounts);
-    let remoteMap: Map<string, TotpAccount> = this.createAccountMap(remoteAccounts);
-    let accountIds: string[] = this.collectAccountIds(baseAccounts, localAccounts, remoteAccounts);
-    let mergedAccounts: TotpAccount[] = [];
-
-    for (let index: number = 0; index < accountIds.length; index++) {
-      let accountId: string = accountIds[index];
-      let result: AccountMergeResult = this.mergeSingleAccount(
-        this.readAccount(baseMap, accountId),
-        this.readAccount(localMap, accountId),
-        this.readAccount(remoteMap, accountId)
-      );
-
-      if (result.hasConflict) {
-        return undefined;
-      }
-
-      if (result.account !== null) {
-        mergedAccounts.push(result.account);
-      }
-    }
-
-    mergedAccounts.sort((left: TotpAccount, right: TotpAccount) => right.updatedAt.localeCompare(left.updatedAt));
-    return mergedAccounts;
-  }
-
-  private mergeSingleAccount(baseAccount: TotpAccount | null, localAccount: TotpAccount | null, remoteAccount: TotpAccount | null): AccountMergeResult {
-    if (baseAccount === null) {
-      if (localAccount !== null && remoteAccount !== null) {
-        if (this.accountsEquivalent(localAccount, remoteAccount)) {
-          return new AccountMergeResult(false, this.copyAccount(localAccount));
-        }
-        return new AccountMergeResult(true, null);
-      }
-      if (localAccount !== null) {
-        return new AccountMergeResult(false, this.copyAccount(localAccount));
-      }
-      if (remoteAccount !== null) {
-        return new AccountMergeResult(false, this.copyAccount(remoteAccount));
-      }
-      return new AccountMergeResult(false, null);
-    }
-
-    if (localAccount === null && remoteAccount === null) {
-      return new AccountMergeResult(false, null);
-    }
-
-    if (localAccount === null && remoteAccount !== null) {
-      return new AccountMergeResult(!this.accountsEquivalent(baseAccount, remoteAccount), null);
-    }
-
-    if (localAccount !== null && remoteAccount === null) {
-      return new AccountMergeResult(!this.accountsEquivalent(baseAccount, localAccount), null);
-    }
-
-    if (localAccount === null || remoteAccount === null) {
-      return new AccountMergeResult(false, null);
-    }
-
-    if (this.accountsEquivalent(localAccount, remoteAccount)) {
-      return new AccountMergeResult(false, this.copyAccount(localAccount));
-    }
-
-    let issuer: StringMergeResult = this.mergeStringField(baseAccount.issuer, localAccount.issuer, remoteAccount.issuer);
-    let accountName: StringMergeResult = this.mergeStringField(baseAccount.accountName, localAccount.accountName, remoteAccount.accountName);
-    let secret: StringMergeResult = this.mergeStringField(baseAccount.secret, localAccount.secret, remoteAccount.secret);
-    let digits: NumberMergeResult = this.mergeNumberField(baseAccount.digits, localAccount.digits, remoteAccount.digits);
-    let period: NumberMergeResult = this.mergeNumberField(baseAccount.period, localAccount.period, remoteAccount.period);
-    let algorithm: StringMergeResult = this.mergeStringField(baseAccount.algorithm, localAccount.algorithm, remoteAccount.algorithm);
-    let groupName: StringMergeResult = this.mergeStringField(baseAccount.groupName, localAccount.groupName, remoteAccount.groupName);
-    let iconKey: StringMergeResult = this.mergeStringField(baseAccount.iconKey, localAccount.iconKey, remoteAccount.iconKey);
-
-    if (issuer.hasConflict || accountName.hasConflict || secret.hasConflict || digits.hasConflict ||
-      period.hasConflict || algorithm.hasConflict || groupName.hasConflict || iconKey.hasConflict) {
-      return new AccountMergeResult(true, null);
-    }
-
-    return new AccountMergeResult(false, new TotpAccount(
-      baseAccount.id,
-      issuer.value,
-      accountName.value,
-      secret.value,
-      digits.value,
-      period.value,
-      algorithm.value,
-      groupName.value,
-      iconKey.value,
-      this.pickLatestTimestamp(baseAccount.updatedAt, localAccount.updatedAt, remoteAccount.updatedAt)
-    ));
-  }
-
-  private mergeStringField(baseValue: string, localValue: string, remoteValue: string): StringMergeResult {
-    if (localValue === remoteValue) {
-      return new StringMergeResult(false, localValue);
-    }
-    if (localValue === baseValue) {
-      return new StringMergeResult(false, remoteValue);
-    }
-    if (remoteValue === baseValue) {
-      return new StringMergeResult(false, localValue);
-    }
-    return new StringMergeResult(true, '');
-  }
-
-  private mergeNumberField(baseValue: number, localValue: number, remoteValue: number): NumberMergeResult {
-    if (localValue === remoteValue) {
-      return new NumberMergeResult(false, localValue);
-    }
-    if (localValue === baseValue) {
-      return new NumberMergeResult(false, remoteValue);
-    }
-    if (remoteValue === baseValue) {
-      return new NumberMergeResult(false, localValue);
-    }
-    return new NumberMergeResult(true, 0);
-  }
-
-  private createAccountMap(accounts: TotpAccount[]): Map<string, TotpAccount> {
-    let accountMap: Map<string, TotpAccount> = new Map<string, TotpAccount>();
-    for (let index: number = 0; index < accounts.length; index++) {
-      accountMap.set(accounts[index].id, accounts[index]);
-    }
-    return accountMap;
-  }
-
-  private collectAccountIds(baseAccounts: TotpAccount[], localAccounts: TotpAccount[], remoteAccounts: TotpAccount[]): string[] {
-    let accountIds: string[] = [];
-    this.appendAccountIds(accountIds, baseAccounts);
-    this.appendAccountIds(accountIds, localAccounts);
-    this.appendAccountIds(accountIds, remoteAccounts);
-    return accountIds;
-  }
-
-  private appendAccountIds(accountIds: string[], accounts: TotpAccount[]): void {
-    for (let index: number = 0; index < accounts.length; index++) {
-      if (accountIds.indexOf(accounts[index].id) < 0) {
-        accountIds.push(accounts[index].id);
-      }
-    }
-  }
-
-  private readAccount(accountMap: Map<string, TotpAccount>, accountId: string): TotpAccount | null {
-    let account: TotpAccount | undefined = accountMap.get(accountId);
-    return account === undefined ? null : account;
-  }
-
-  private accountsEquivalent(left: TotpAccount, right: TotpAccount): boolean {
-    return left.id === right.id &&
-      left.issuer === right.issuer &&
-      left.accountName === right.accountName &&
-      left.secret === right.secret &&
-      left.digits === right.digits &&
-      left.period === right.period &&
-      left.algorithm === right.algorithm &&
-      left.groupName === right.groupName &&
-      left.iconKey === right.iconKey;
-  }
-
-  private copyAccount(account: TotpAccount): TotpAccount {
-    return new TotpAccount(
-      account.id,
-      account.issuer,
-      account.accountName,
-      account.secret,
-      account.digits,
-      account.period,
-      account.algorithm,
-      account.groupName,
-      account.iconKey,
-      account.updatedAt
-    );
-  }
-
-  private pickLatestTimestamp(baseUpdatedAt: string, localUpdatedAt: string, remoteUpdatedAt: string): string {
-    let latest: string = baseUpdatedAt;
-    if (localUpdatedAt > latest) {
-      latest = localUpdatedAt;
-    }
-    if (remoteUpdatedAt > latest) {
-      latest = remoteUpdatedAt;
-    }
-    return latest;
+    return WebDavVaultSyncAlgorithms.mergeAccountLevelChanges(baseVault, localVault, remoteVault);
   }
 
   private createFingerprint(vault: LocalVault): string {
-    let accountPayloads: string[] = [];
-    for (let index: number = 0; index < vault.accounts.length; index++) {
-      let account = vault.accounts[index];
-      accountPayloads.push(JSON.stringify({
-        id: account.id,
-        issuer: account.issuer,
-        accountName: account.accountName,
-        secret: account.secret,
-        digits: account.digits,
-        period: account.period,
-        algorithm: account.algorithm,
-        groupName: account.groupName,
-        iconKey: account.iconKey
-      }));
-    }
-    accountPayloads.sort();
-    return this.hashText(JSON.stringify(accountPayloads));
+    return WebDavVaultSyncAlgorithms.createFingerprint(vault);
   }
 
   private hashText(text: string): string {
-    let hash: number = 2166136261;
-    for (let index: number = 0; index < text.length; index++) {
-      hash = hash ^ text.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
-    }
-    return `fp:${(hash >>> 0).toString(16)}:${text.length}`;
+    return WebDavVaultSyncAlgorithms.hashText(text);
   }
 
   private createRevision(fingerprint: string): string {

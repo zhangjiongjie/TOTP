@@ -133,6 +133,20 @@ export class LocalVaultStore {
     }
   }
 
+  assertMasterPassword(context: common.UIAbilityContext, password: string): void {
+    try {
+      let store: preferences.Preferences = this.getStore(context);
+      let payload: string = store.getSync(SNAPSHOT_KEY, '') as string;
+      if (payload.length === 0) {
+        return;
+      }
+      let existing: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
+      this.unwrapVaultKeyWithPassword(existing, password);
+    } catch (error) {
+      throw new Error(`当前主密码错误：${this.readErrorMessage(error)}`);
+    }
+  }
+
   rewrapMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): void {
     try {
       let store: preferences.Preferences = this.getStore(context);
