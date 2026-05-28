@@ -27,6 +27,22 @@ class WebDavConcurrencyBoundaryTest {
     }
 
     @Test
+    fun localChangeSyncUsesFullSyncCoreInsteadOfDirectPush() {
+        val source = File("src/main/java/com/totp/authenticator/data/webdav/WebDavSyncService.kt").readText()
+        val passwordLocalChangeSource = source
+            .substringAfter("private suspend fun syncLocalChangeChecked")
+            .substringBefore("private suspend fun syncPasswordChangeChecked")
+        val vaultKeyLocalChangeSource = source
+            .substringAfter("private suspend fun syncLocalChangeWithVaultKeyChecked")
+            .substringBefore("private suspend fun pushLocal(")
+
+        assertTrue(passwordLocalChangeSource.contains("syncCoreChecked(localVault, password, WEBDAV_SYNC_TRIGGER_LOCAL_CHANGE"))
+        assertFalse(passwordLocalChangeSource.contains("pushLocal("))
+        assertTrue(vaultKeyLocalChangeSource.contains("syncCoreWithVaultKeyChecked(localVault, vaultKey, WEBDAV_SYNC_TRIGGER_LOCAL_CHANGE"))
+        assertFalse(vaultKeyLocalChangeSource.contains("pushLocalWithVaultKey("))
+    }
+
+    @Test
     fun vaultRepositoryUpdateTransformsAreSynchronous() {
         val source = File("src/main/java/com/totp/authenticator/data/vault/VaultRepository.kt").readText()
 
