@@ -411,11 +411,22 @@ export class WebDavSyncService {
       : createDefaultWebDavSyncMetadata();
     let localVault: LocalVault = this.vaultStore.load(context);
     this.vaultStore.assertMasterPassword(context, currentPassword);
-    let remoteSnapshot: WebDavRemoteSnapshot | undefined = await this.client.downloadWithPassword(settings, currentPassword);
+    let remoteSnapshot: WebDavRemoteSnapshot | undefined;
+    try {
+      remoteSnapshot = await this.client.downloadWithPassword(settings, currentPassword);
+    } catch (_error) {
+      return new WebDavSyncResult('blocked', '远端保管库需要验证后才能修改主密码。');
+    }
     if (remoteSnapshot === undefined) {
-      this.vaultStore.rewrapMasterPassword(context, currentPassword, nextPassword);
+      let localVaultKey: Uint8Array = this.vaultStore.exportVaultKey(context, currentPassword);
+      let localFingerprint: string = this.createFingerprint(localVault);
+      let encryptedVault: EncryptedRemoteVaultBlob = this.cryptoService.encryptWithPasswordAndVaultKey(localVault, nextPassword, localVaultKey);
+      let revision: string = this.createRevision(localFingerprint);
+      let upload: WebDavUploadResult = await this.client.uploadEncryptedVault(settings, encryptedVault, revision, '');
+      let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, localVault, encryptedVault, localVaultKey);
       UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
-      return await this.pushLocal(context, settings, localVault, this.createFingerprint(localVault), '', '主密码已修改并同步到 WebDAV。');
+      this.saveMetadata(context, syncProfileKey, localFingerprint, this.createBaseVaultJson(vault), upload.revision, upload.etag, 'synced', '');
+      return new WebDavSyncResult('pushed', '主密码已修改并同步到 WebDAV。', vault);
     }
 
     let localFingerprint: string = this.createFingerprint(localVault);
@@ -425,7 +436,7 @@ export class WebDavSyncService {
       finalVault = localVault;
     } else if (metadata.baseFingerprint.length === 0) {
       this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '首次绑定时本地和远端都有数据。');
-      return new WebDavSyncResult('conflict', '主密码未修改：首次绑定时本地和远端都有数据，请先完成数据同步。');
+      return new WebDavSyncResult('conflict', '主密码未同步：首次绑定时本地和远端都有数据，请先完成数据同步。');
     } else if (localFingerprint !== metadata.baseFingerprint && remoteFingerprint === metadata.baseFingerprint) {
       finalVault = localVault;
     } else if (localFingerprint === metadata.baseFingerprint && remoteFingerprint !== metadata.baseFingerprint) {
@@ -434,7 +445,7 @@ export class WebDavSyncService {
       let mergedVault: LocalVault | undefined = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
       if (mergedVault === undefined) {
         this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端都发生了变化。');
-        return new WebDavSyncResult('conflict', '主密码未修改：本地和远端都发生了变化，请先解决冲突后再修改主密码。');
+        return new WebDavSyncResult('conflict', '本地和远端都发生了变化，请先解决冲突后再修改主密码。');
       }
       finalVault = mergedVault;
     }

@@ -147,6 +147,20 @@ export class LocalVaultStore {
     }
   }
 
+  exportVaultKey(context: common.UIAbilityContext, password: string): Uint8Array {
+    try {
+      let store: preferences.Preferences = this.getStore(context);
+      let payload: string = store.getSync(SNAPSHOT_KEY, '') as string;
+      if (payload.length === 0) {
+        throw new Error('本地保管库尚未初始化。');
+      }
+      let existing: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
+      return this.unwrapVaultKeyWithPassword(existing, password);
+    } catch (error) {
+      throw new Error(`导出本地保管库密钥失败：${this.readErrorMessage(error)}`);
+    }
+  }
+
   rewrapMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): void {
     try {
       let store: preferences.Preferences = this.getStore(context);
