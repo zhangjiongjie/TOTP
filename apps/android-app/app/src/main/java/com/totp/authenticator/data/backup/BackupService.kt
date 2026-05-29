@@ -2,12 +2,12 @@ package com.totp.authenticator.data.backup
 
 import com.totp.authenticator.core.account.TotpAccount
 import com.totp.authenticator.core.totp.TotpAlgorithm
+import com.totp.authenticator.data.vault.EncryptedVaultEnvelope
+import com.totp.authenticator.data.vault.LocalVault
 import com.totp.authenticator.data.webdav.EncryptedRemoteVaultBlobDto
 import com.totp.authenticator.data.webdav.RemoteAesGcmDto
 import com.totp.authenticator.data.webdav.RemoteKdfDto
 import com.totp.authenticator.data.webdav.RemoteVaultCrypto
-import com.totp.authenticator.data.vault.EncryptedVaultEnvelope
-import com.totp.authenticator.data.vault.LocalVault
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -34,23 +34,37 @@ class BackupService(
         )
     }
 
-    fun parseImport(raw: String, password: String): LocalVault {
+    fun parseImport(raw: String, password: String, currentVaultKey: ByteArray? = null): BackupImportContent {
         val trimmed = raw.trim()
         val bundle = runCatching { json.decodeFromString<ImportEnvelopeDto>(trimmed) }.getOrNull()
         val payload = when (bundle?.mode) {
             "encrypted" -> {
                 val encrypted = bundle.encryptedVault ?: throw IllegalArgumentException("加密备份内容无效。")
-                return crypto.decrypt(encrypted, password)
+                val fastVault = currentVaultKey?.let {
+                    runCatching { crypto.decryptWithVaultKey(encrypted, currentVaultKey) }.getOrNull()
+                }
+                if (fastVault != null) {
+                    return BackupImportContent(fastVault, currentVaultKey.copyOf())
+                }
+                val decrypted = crypto.decryptWithKey(encrypted, password)
+                return BackupImportContent(decrypted.vault, decrypted.vaultKey)
             }
             "plain" -> bundle.vault ?: throw IllegalArgumentException("明文备份内容无效。")
             else -> throw IllegalArgumentException("导入文件格式暂不支持，请先使用迁移工具转换为新版备份。")
         }
         val now = System.currentTimeMillis()
-        return LocalVault(
-            schemaVersion = 1,
-            accounts = payload.accounts.mapIndexed { index, account -> account.toDomain(index, now) },
-            updatedAt = now
+        return BackupImportContent(
+            vault = LocalVault(
+                schemaVersion = 1,
+                accounts = payload.accounts.mapIndexed { index, account -> account.toDomain(index, now) },
+                updatedAt = now
+            ),
+            vaultKey = null
         )
+    }
+
+    fun parseImportVault(raw: String, password: String): LocalVault {
+        return parseImport(raw, password).vault
     }
 
     fun createBackupFilename(nowMillis: Long = System.currentTimeMillis()): String {
@@ -66,6 +80,11 @@ class BackupService(
         }
     }
 }
+
+data class BackupImportContent(
+    val vault: LocalVault,
+    val vaultKey: ByteArray?
+)
 
 private fun EncryptedVaultEnvelope.toRemoteDto(): EncryptedRemoteVaultBlobDto {
     return EncryptedRemoteVaultBlobDto(

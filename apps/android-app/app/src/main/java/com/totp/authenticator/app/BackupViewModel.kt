@@ -14,6 +14,9 @@ class BackupViewModel : ViewModel() {
     var errorMessage: String by mutableStateOf("")
         private set
 
+    var messageVersion: Int by mutableStateOf(0)
+        private set
+
     var isBusy: Boolean by mutableStateOf(false)
         private set
 
@@ -45,10 +48,27 @@ class BackupViewModel : ViewModel() {
     fun showSuccess(message: String) {
         statusMessage = message
         errorMessage = ""
+        messageVersion += 1
     }
 
     fun showError(message: String) {
+        statusMessage = ""
         errorMessage = message
+        messageVersion += 1
+    }
+
+    fun clearMessageIfVersion(version: Int) {
+        if (messageVersion != version) {
+            return
+        }
+        statusMessage = ""
+        errorMessage = ""
+    }
+
+    fun clearMessage() {
+        statusMessage = ""
+        errorMessage = ""
+        messageVersion += 1
     }
 
     fun prepareExport(payload: BackupExportPayload) {
@@ -63,11 +83,23 @@ class BackupViewModel : ViewModel() {
         return filename
     }
 
+    fun pendingExportFilenameForPicker(): String? {
+        return pendingExportFilename
+    }
+
     fun consumePendingExportContent(): String? {
         val content = pendingExportContent
         pendingExportContent = null
         pendingExportFilename = null
         return content
+    }
+
+    fun consumePendingExportPayload(): BackupExportPayload? {
+        val content = pendingExportContent ?: return null
+        val filename = pendingExportFilename ?: return null
+        pendingExportContent = null
+        pendingExportFilename = null
+        return BackupExportPayload(content = content, filename = filename)
     }
 
     fun markExternalPickerActive(active: Boolean) {
@@ -105,6 +137,9 @@ class BackupViewModel : ViewModel() {
     }
 
     fun requestRemotePassword() {
+        if (pendingPasswordAction != null || statusMessage.isNotBlank() || errorMessage.isNotBlank()) {
+            return
+        }
         pendingPasswordAction = BackupPasswordAction.WebDavSync
     }
 

@@ -22,8 +22,7 @@ class WebDavFlowCoordinator(
     }
 
     fun canUseFastSync(vaultKey: ByteArray?): Boolean {
-        val metadata = webDavSyncService.loadMetadata()
-        return vaultKey != null && metadata.remoteEtag.isNotBlank() && metadata.lastStatus != "blocked"
+        return vaultKey != null
     }
 
     fun needsMasterPassword(result: WebDavSyncResult): Boolean = result.status == "blocked"
@@ -55,7 +54,7 @@ class WebDavFlowCoordinator(
         localChange: Boolean = false
     ): WebDavFlowResult {
         val result = when {
-            canUseFastSync(vaultKey) && localChange -> webDavSyncService.syncLocalChangeWithVaultKey(vaultKey!!)
+            vaultKey != null && localChange -> webDavSyncService.syncLocalChangeWithVaultKey(vaultKey)
             canUseFastSync(vaultKey) -> webDavSyncService.syncNowWithVaultKey(vaultKey!!)
             password != null && localChange -> webDavSyncService.syncLocalChange(password)
             password != null -> webDavSyncService.syncNow(password)

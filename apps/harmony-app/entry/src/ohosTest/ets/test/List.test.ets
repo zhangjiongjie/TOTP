@@ -5,6 +5,7 @@ import webDavSyncTriggerPolicyTest from './WebDavSyncTriggerPolicy.test';
 import webDavSyncDecisionTest from './WebDavSyncDecision.test';
 import totpCodeGeneratorTest from './TotpCodeGenerator.test';
 import vaultImportParserTest from './VaultImportParser.test';
+import transientInlineMessagePolicyTest from './TransientInlineMessagePolicy.test';
 
 export default function testsuite(): void {
   webDavVaultSyncAlgorithmsTest();
@@ -14,5 +15,6 @@ export default function testsuite(): void {
   webDavSyncDecisionTest();
   totpCodeGeneratorTest();
   vaultImportParserTest();
+  transientInlineMessagePolicyTest();
 }
 

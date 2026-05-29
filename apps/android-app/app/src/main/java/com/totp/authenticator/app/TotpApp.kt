@@ -209,6 +209,15 @@ fun TotpApp() {
         syncState.clearSettingsMessage()
     }
 
+    LaunchedEffect(backupState.messageVersion) {
+        val version = backupState.messageVersion
+        if (version == 0 || (backupState.statusMessage.isBlank() && backupState.errorMessage.isBlank())) {
+            return@LaunchedEffect
+        }
+        delay(2_500)
+        backupState.clearMessageIfVersion(version)
+    }
+
     fun showPersistenceError(message: String) {
         unlockState.showError(message)
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

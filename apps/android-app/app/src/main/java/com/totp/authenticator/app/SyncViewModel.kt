@@ -76,7 +76,9 @@ class SyncViewModel(
     private var syncJob: Job? = null
 
     fun launchExclusiveSync(block: suspend () -> Unit) {
-        syncJob?.cancel()
+        if (syncJob?.isActive == true) {
+            return
+        }
         val nextJob = viewModelScope.launch {
             beginOperation()
             try {

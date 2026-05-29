@@ -84,4 +84,36 @@ class SettingsViewModelTest {
         assertEquals("", screenState.masterPasswordErrorMessage)
         assertEquals("生物识别解锁", screenState.uiModel.quickUnlockTitle)
     }
+
+    @Test
+    fun exposesBackupImportSuccessMessageInSettingsScreenState() {
+        val syncState = SyncViewModel(
+            initialSettings = WebDavSettings(),
+            initialMetadata = WebDavSyncMetadata()
+        )
+        val backupState = BackupViewModel()
+        val quickUnlockState = QuickUnlockViewModel(
+            QuickUnlockState(
+                enabled = false,
+                availability = QuickUnlockAvailability.Available,
+                available = true,
+                hasStrongBiometric = true
+            )
+        )
+        val passwordChangeState = PasswordChangeViewModel()
+        val viewModel = SettingsViewModel()
+
+        backupState.showSuccess("已导入 2 个账号")
+
+        val screenState = viewModel.buildScreenState(
+            syncState = syncState,
+            backupState = backupState,
+            quickUnlockState = quickUnlockState,
+            passwordChangeState = passwordChangeState
+        )
+
+        assertEquals("已导入 2 个账号", screenState.uiModel.backupStatusMessage)
+        assertEquals("", screenState.uiModel.backupErrorMessage)
+        assertEquals(false, screenState.uiModel.showBackupDefaultHint)
+    }
 }

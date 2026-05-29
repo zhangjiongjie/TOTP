@@ -154,6 +154,59 @@ class TotpAppCoordinatorBoundaryTest {
     }
 
     @Test
+    fun backupPickerReadsAndWritesDocumentsInsideIoTasks() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupPickerBridge.kt").readText()
+        val exportCallback = source.substringAfter("val backupExportLauncher").substringBefore("val backupImportLauncher")
+        val importCallback = source.substringAfter("val backupImportLauncher").substringBefore("LaunchedEffect(backupState.pendingExportFilename)")
+
+        assertTrue("Backup export document writes should run inside BackupViewModel.launchTask", exportCallback.contains("backupState.launchTask("))
+        assertTrue("Backup export document writes should use Dispatchers.IO", exportCallback.contains("withContext(Dispatchers.IO)"))
+        assertTrue("Backup import document reads should run inside BackupViewModel.launchTask", importCallback.contains("backupState.launchTask("))
+        assertTrue("Backup import document reads should use Dispatchers.IO", importCallback.contains("withContext(Dispatchers.IO)"))
+        assertFalse("Backup import callback should not synchronously read the selected document before launching a task", importCallback.contains("val content = runCatching { readTextFromUri(uri) }"))
+    }
+
+    @Test
+    fun backupImportSuccessMessageMatchesHarmonyCopy() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupActionCoordinator.kt").readText()
+
+        assertTrue(source.contains("backupState.showSuccess(\"已导入 \${result.vault.accounts.size} 个账号\")"))
+        assertFalse(source.contains("backupState.showSuccess(\"已导入 \${result.vault.accounts.size} 个账号。\")"))
+    }
+
+    @Test
+    fun backupImportSuccessMessageIsPublishedBeforeLocalChangeHook() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupActionCoordinator.kt").readText()
+        val importSource = source.substringAfter("fun importContent").substringBefore("onFailure = { error ->")
+
+        assertTrue(
+            "Import success should stay visible even when local-change sync side effects run afterwards",
+            importSource.indexOf("backupState.showSuccess(\"已导入 \${result.vault.accounts.size} 个账号\")") <
+                importSource.indexOf("onLocalChange(result.vault, password, result.vaultKey)")
+        )
+    }
+
+    @Test
+    fun backupImportShowsImmediateProgressBeforeRunningTask() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupActionCoordinator.kt").readText()
+        val importSource = source.substringAfter("fun importContent").substringBefore("fun exportWithPassword", missingDelimiterValue = source.substringAfter("fun importContent"))
+
+        assertTrue(importSource.contains("backupState.showSuccess(\"正在导入...\")"))
+        assertTrue(
+            "Import progress should be visible before the async import task starts",
+            importSource.indexOf("backupState.showSuccess(\"正在导入...\")") < importSource.indexOf("backupState.launchTask(")
+        )
+    }
+
+    @Test
+    fun backupExportSuccessMessageMatchesHarmonyCopy() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupPickerBridge.kt").readText()
+
+        assertTrue(source.contains("backupState.showSuccess(\"已导出 \${appState.vault?.accounts?.size ?: 0} 个账号：\${payload.filename}\")"))
+        assertFalse(source.contains("backupState.showSuccess(\"已导出 \${appState.vault?.accounts?.size ?: 0} 个账号。\")"))
+    }
+
+    @Test
     fun passwordUnlockFlowLivesOutsideTotpApp() {
         val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
 
@@ -329,6 +382,31 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(syncWithPasswordSource.contains("webDavSyncService.syncNowWithRemotePassword(currentVault, password)"))
         assertFalse(syncWithPasswordSource.contains("webDavSyncService.syncNow(password)"))
         assertTrue(syncWithPasswordSource.indexOf("needsMasterPassword(result)") in 1 until syncWithPasswordSource.indexOf("repository.exportVaultKey(password)"))
+    }
+
+    @Test
+    fun unlockedLocalChangeSyncPrefersVaultKeyBeforePasswordKdf() {
+        val source = File("src/main/java/com/totp/authenticator/app/WebDavFlowCoordinator.kt").readText()
+        val syncUnlockedSource = source
+            .substringAfter("suspend fun syncUnlocked")
+            .substringBefore("suspend fun saveSettingsAndSyncIfUnlocked")
+        val fastPathIndex = syncUnlockedSource.indexOf("vaultKey != null && localChange -> webDavSyncService.syncLocalChangeWithVaultKey(vaultKey)")
+        val passwordPathIndex = syncUnlockedSource.indexOf("password != null && localChange -> webDavSyncService.syncLocalChange(password)")
+
+        assertTrue("Local-change sync should try the current vaultKey before falling back to password KDF", fastPathIndex >= 0)
+        assertTrue("Vault-key sync should be attempted before the password KDF path", fastPathIndex < passwordPathIndex)
+        assertFalse("Fast sync should not require a cached remote ETag before trying the current vaultKey", syncUnlockedSource.contains("canUseFastSync(vaultKey) && localChange"))
+    }
+
+    @Test
+    fun unlockedSyncTriesVaultKeyEvenWhenPreviousMetadataWasBlocked() {
+        val source = File("src/main/java/com/totp/authenticator/app/WebDavFlowCoordinator.kt").readText()
+        val canUseFastSyncSource = source
+            .substringAfter("fun canUseFastSync")
+            .substringBefore("fun needsMasterPassword")
+
+        assertTrue(canUseFastSyncSource.contains("return vaultKey != null"))
+        assertFalse("Previous blocked metadata should not force password KDF before trying the current vaultKey", canUseFastSyncSource.contains("lastStatus"))
     }
 
     @Test

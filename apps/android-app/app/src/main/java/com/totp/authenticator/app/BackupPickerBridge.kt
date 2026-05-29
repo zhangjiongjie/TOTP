@@ -35,19 +35,19 @@ fun BackupPickerBridge(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         backupState.markExternalPickerActive(false)
-        val content = backupState.consumePendingExportContent()
-        if (uri == null || content == null) {
+        val payload = backupState.consumePendingExportPayload()
+        if (uri == null || payload == null) {
             backupState.updateBusy(false)
             return@rememberLauncherForActivityResult
         }
         backupState.launchTask(
             task = {
                 withContext(Dispatchers.IO) {
-                    writeTextToUri(uri, content)
+                    writeTextToUri(uri, payload.content)
                 }
             },
             onSuccess = {
-                backupState.showSuccess("已导出 ${appState.vault?.accounts?.size ?: 0} 个账号。")
+                backupState.showSuccess("已导出 ${appState.vault?.accounts?.size ?: 0} 个账号：${payload.filename}")
             },
             onFailure = { error ->
                 backupState.showError(error.message ?: "导出备份失败，请稍后重试。")
@@ -58,28 +58,50 @@ fun BackupPickerBridge(
     val backupImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
+        val selectedAt = BackupPerfLogger.now()
+        BackupPerfLogger.log("import picker result uriPresent=${uri != null}")
         backupState.markExternalPickerActive(false)
         if (uri == null) {
             backupState.updateBusy(false)
+            BackupPerfLogger.log("import picker canceled elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms")
             return@rememberLauncherForActivityResult
         }
         val password = appState.activePassword
-        val content = runCatching { readTextFromUri(uri) }
-            .onFailure { error ->
+        backupState.launchTask(
+            finishBusyOnSuccess = false,
+            task = {
+                withContext(Dispatchers.IO) {
+                    val readStartedAt = BackupPerfLogger.now()
+                    BackupPerfLogger.log("import picker read start elapsed=${readStartedAt - selectedAt}ms")
+                    readTextFromUri(uri)
+                        .also { content ->
+                            val readFinishedAt = BackupPerfLogger.now()
+                            BackupPerfLogger.log(
+                                "import picker read complete elapsed=${readFinishedAt - selectedAt}ms read=${readFinishedAt - readStartedAt}ms bytes=${content.length}"
+                            )
+                        }
+                }
+            },
+            onSuccess = { content ->
+                BackupPerfLogger.log("import picker content delivered elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms hasPassword=${password != null}")
+                if (password == null) {
+                    backupState.requestImportPassword(content)
+                    backupState.updateBusy(false)
+                    BackupPerfLogger.log("import picker password requested elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms")
+                } else {
+                    backupState.prepareReadyImport(content, password)
+                    BackupPerfLogger.log("import picker ready import prepared elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms")
+                }
+            },
+            onFailure = { error ->
+                BackupPerfLogger.log("import picker failed elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms error=${error::class.java.simpleName}")
                 backupState.showError(error.message ?: "导入备份失败，请稍后重试。")
-                backupState.updateBusy(false)
             }
-            .getOrNull() ?: return@rememberLauncherForActivityResult
-        if (password == null) {
-            backupState.requestImportPassword(content)
-            backupState.updateBusy(false)
-            return@rememberLauncherForActivityResult
-        }
-        backupState.prepareReadyImport(content, password)
+        )
     }
 
     LaunchedEffect(backupState.pendingExportFilename) {
-        val filename = backupState.consumePendingExportFilename() ?: return@LaunchedEffect
+        val filename = backupState.pendingExportFilenameForPicker() ?: return@LaunchedEffect
         backupExportLauncher.launch(filename)
     }
 
@@ -91,6 +113,7 @@ fun BackupPickerBridge(
 
     LaunchedEffect(backupState.pendingReadyImport) {
         val request = backupState.consumeReadyImport() ?: return@LaunchedEffect
+        BackupPerfLogger.log("import picker launching ready import bytes=${request.content.length}")
         backupActions.importContent(request.content, request.password)
     }
 }

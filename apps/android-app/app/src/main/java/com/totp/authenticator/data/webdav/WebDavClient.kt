@@ -31,7 +31,14 @@ class WebDavClient {
         if (response.body.isBlank()) {
             return null
         }
-        val envelope = json.decodeFromString<WebDavRemoteEnvelopeDto>(response.body)
+        val envelope = runCatching {
+            json.decodeFromString<WebDavRemoteEnvelopeDto>(response.body)
+        }.getOrElse { error ->
+            throw WebDavException(
+                "WebDAV 远端保管库文件格式无效，请检查同步路径是否指向应用的 WebDAV 同步文件。",
+                error
+            )
+        }
         return WebDavRemoteSnapshot(
             revision = envelope.revision,
             updatedAt = envelope.updatedAt,
@@ -82,12 +89,31 @@ class WebDavClient {
         body: String = "",
         previousEtag: String = ""
     ): WebDavResponse {
+        return requestUrl(
+            settings = settings,
+            url = URL(buildVaultUrl(settings)),
+            method = method,
+            body = body,
+            previousEtag = previousEtag,
+            redirectCount = 0
+        )
+    }
+
+    private fun requestUrl(
+        settings: WebDavSettings,
+        url: URL,
+        method: String,
+        body: String,
+        previousEtag: String,
+        redirectCount: Int
+    ): WebDavResponse {
         val startedAt = System.currentTimeMillis()
-        val connection = (URL(buildVaultUrl(settings)).openConnection() as HttpURLConnection).apply {
+        val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 15_000
             readTimeout = 15_000
             useCaches = false
+            instanceFollowRedirects = false
             setRequestProperty("Cache-Control", "no-cache")
             setRequestProperty("Pragma", "no-cache")
             if (settings.username.isNotBlank() || settings.password.isNotBlank()) {
@@ -109,12 +135,26 @@ class WebDavClient {
             val bodyWrittenAt = System.currentTimeMillis()
             val code = connection.responseCode
             val responseCodeAt = System.currentTimeMillis()
+            val redirectLocation = connection.getHeaderField("Location")
+            if (isRedirect(code) && redirectLocation != null) {
+                if (redirectCount >= MAX_REDIRECTS) {
+                    throw WebDavException("WebDAV request failed: too many redirects")
+                }
+                logDebug("http $method redirect code=$code count=${redirectCount + 1}")
+                return requestUrl(
+                    settings = settings,
+                    url = URL(url, redirectLocation),
+                    method = redirectMethod(method, code),
+                    body = redirectBody(method, code, body),
+                    previousEtag = previousEtag,
+                    redirectCount = redirectCount + 1
+                )
+            }
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val responseBody = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             val finishedAt = System.currentTimeMillis()
             val etag = connection.getHeaderField("ETag").orEmpty()
-            Log.d(
-                "TotpWebDavPerf",
+            logDebug(
                 "http $method total=${finishedAt - startedAt}ms write=${bodyWrittenAt - startedAt}ms response=${responseCodeAt - bodyWrittenAt}ms read=${finishedAt - responseCodeAt}ms code=$code requestBytes=${body.toByteArray(Charsets.UTF_8).size} responseBytes=${responseBody.toByteArray(Charsets.UTF_8).size} etag=${etag.isNotBlank()}"
             )
             WebDavResponse(code, responseBody, etag)
@@ -131,11 +171,35 @@ class WebDavClient {
         return server + path
     }
 
+    private fun isRedirect(code: Int): Boolean {
+        return code == HttpURLConnection.HTTP_MOVED_PERM ||
+            code == HttpURLConnection.HTTP_MOVED_TEMP ||
+            code == HttpURLConnection.HTTP_SEE_OTHER ||
+            code == HTTP_TEMPORARY_REDIRECT ||
+            code == HTTP_PERMANENT_REDIRECT
+    }
+
+    private fun redirectMethod(method: String, code: Int): String {
+        return if (code == HttpURLConnection.HTTP_SEE_OTHER) "GET" else method
+    }
+
+    private fun redirectBody(method: String, code: Int, body: String): String {
+        return if (method != redirectMethod(method, code)) "" else body
+    }
+
     private fun basicAuth(username: String, password: String): String {
         return Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
     }
 
+    private fun logDebug(message: String) {
+        runCatching { Log.d("TotpWebDavPerf", message) }
+    }
+
     private companion object {
+        const val MAX_REDIRECTS = 5
+        const val HTTP_TEMPORARY_REDIRECT = 307
+        const val HTTP_PERMANENT_REDIRECT = 308
+
         val json = Json {
             encodeDefaults = true
             ignoreUnknownKeys = true

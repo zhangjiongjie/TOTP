@@ -4,6 +4,9 @@ import { DEFAULT_WEBDAV_FILE_PATH, WebDavSettings } from '../model/WebDavSetting
 import { ExportVaultResult, ImportVaultResult, SettingsService, WebDavSettingsDraft } from '../services/SettingsService';
 import { WebDavSyncResult, WebDavSyncService } from '../services/WebDavSyncService';
 import { MasterPasswordChangeResultPolicy } from '../services/MasterPasswordChangeResultPolicy';
+import { InlineMessageState, TransientInlineMessagePolicy } from '../services/TransientInlineMessagePolicy';
+
+const BACKUP_MESSAGE_VISIBLE_MS: number = 2500;
 
 @Component
 export struct Settings {
@@ -36,6 +39,7 @@ export struct Settings {
   @State private webDavErrorMessage: string = '';
   @State private backupStatusMessage: string = '';
   @State private backupErrorMessage: string = '';
+  @State private backupMessageVersion: number = 0;
   @State private isBackupBusy: boolean = false;
   private service: SettingsService = SettingsService.getInstance();
 
@@ -526,14 +530,14 @@ export struct Settings {
     if (this.isBackupBusy) {
       return;
     }
-    this.backupErrorMessage = '';
+    this.applyBackupMessage(new InlineMessageState('', '', this.backupMessageVersion));
     this.isBackupBusy = true;
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let result: ExportVaultResult = await this.service.exportVault(context);
-      this.backupStatusMessage = `已导出 ${result.exportedCount} 个账号：${result.filename}`;
+      this.showBackupStatus(`已导出 ${result.exportedCount} 个账号：${result.filename}`);
     } catch (error) {
-      this.backupErrorMessage = this.readErrorMessage(error, '导出备份失败，请稍后重试。');
+      this.showBackupError(this.readErrorMessage(error, '导出备份失败，请稍后重试。'));
     } finally {
       this.isBackupBusy = false;
     }
@@ -543,19 +547,45 @@ export struct Settings {
     if (this.isBackupBusy) {
       return;
     }
-    this.backupErrorMessage = '';
+    this.applyBackupMessage(new InlineMessageState('', '', this.backupMessageVersion));
     this.isBackupBusy = true;
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let result: ImportVaultResult = await this.service.importVault(context);
       let message: string = `已导入 ${result.importedCount} 个账号`;
-      this.backupStatusMessage = message;
+      this.showBackupStatus(message);
       this.onImported(result.vault, message);
     } catch (error) {
-      this.backupErrorMessage = this.readErrorMessage(error, '导入备份失败，请稍后重试。');
+      this.showBackupError(this.readErrorMessage(error, '导入备份失败，请稍后重试。'));
     } finally {
       this.isBackupBusy = false;
     }
+  }
+
+  private showBackupStatus(message: string): void {
+    this.applyBackupMessage(TransientInlineMessagePolicy.showStatus(this.currentBackupMessage(), message));
+    this.scheduleBackupMessageClear(this.backupMessageVersion);
+  }
+
+  private showBackupError(message: string): void {
+    this.applyBackupMessage(TransientInlineMessagePolicy.showError(this.currentBackupMessage(), message));
+    this.scheduleBackupMessageClear(this.backupMessageVersion);
+  }
+
+  private scheduleBackupMessageClear(version: number): void {
+    setTimeout(() => {
+      this.applyBackupMessage(TransientInlineMessagePolicy.clearIfVersion(this.currentBackupMessage(), version));
+    }, BACKUP_MESSAGE_VISIBLE_MS);
+  }
+
+  private currentBackupMessage(): InlineMessageState {
+    return new InlineMessageState(this.backupStatusMessage, this.backupErrorMessage, this.backupMessageVersion);
+  }
+
+  private applyBackupMessage(state: InlineMessageState): void {
+    this.backupStatusMessage = state.statusMessage;
+    this.backupErrorMessage = state.errorMessage;
+    this.backupMessageVersion = state.version;
   }
 
   private applySettings(settings: WebDavSettings): void {

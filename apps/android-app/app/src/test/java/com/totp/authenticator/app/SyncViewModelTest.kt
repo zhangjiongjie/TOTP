@@ -2,9 +2,9 @@ package com.totp.authenticator.app
 
 import com.totp.authenticator.data.webdav.WebDavSettings
 import com.totp.authenticator.data.webdav.WebDavSyncMetadata
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -100,17 +100,15 @@ class SyncViewModelTest {
     }
 
     @Test
-    fun launchExclusiveSyncCancelsPreviousOperation() = runTest {
+    fun launchExclusiveSyncKeepsCurrentOperationWhenAnotherSyncIsRequested() = runTest {
         val viewModel = SyncViewModel(WebDavSettings(), WebDavSyncMetadata())
-        var firstCancelled = false
+        val firstCanFinish = CompletableDeferred<Unit>()
+        var firstCompleted = false
         var secondRan = false
 
         viewModel.launchExclusiveSync {
-            try {
-                awaitCancellation()
-            } finally {
-                firstCancelled = true
-            }
+            firstCanFinish.await()
+            firstCompleted = true
         }
         dispatcher.scheduler.runCurrent()
 
@@ -120,10 +118,16 @@ class SyncViewModelTest {
             secondRan = true
         }
         dispatcher.scheduler.runCurrent()
+
+        assertFalse(secondRan)
+        assertFalse(firstCompleted)
+        assertTrue(viewModel.isBusy)
+
+        firstCanFinish.complete(Unit)
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertTrue(firstCancelled)
-        assertTrue(secondRan)
+        assertTrue(firstCompleted)
+        assertFalse(secondRan)
         assertFalse(viewModel.isBusy)
     }
 
