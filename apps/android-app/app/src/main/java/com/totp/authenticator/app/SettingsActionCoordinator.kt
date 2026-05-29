@@ -109,13 +109,6 @@ class SettingsActionCoordinator(
             syncState.showSettingsError("保管库未解锁")
             return
         }
-        if (syncState.isRemotePasswordBlocked) {
-            val message = "远端保管库需要主密码验证后才能继续同步。"
-            syncState.showHomeError(message)
-            syncState.showSettingsError(message)
-            onRemotePasswordNeeded()
-            return
-        }
         syncState.launchExclusiveSyncTask(
             task = {
                 withContext(Dispatchers.IO) {

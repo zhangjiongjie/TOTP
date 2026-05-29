@@ -316,9 +316,6 @@ class WebDavSyncService(
         }
         val remote = client.download(settings)
             ?: return saveResult("blocked", "远端保管库尚未初始化，请输入主密码后再同步。")
-        if (!remoteKeyEnvelopeMatchesLocal(remote.vaultEnvelope.encryptedVault)) {
-            return saveResult("blocked", "远端保管库需要主密码验证后才能继续同步。")
-        }
         val remoteVault = runCatching {
             crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)
         }.getOrElse {

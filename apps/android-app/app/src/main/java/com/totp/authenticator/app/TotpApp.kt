@@ -293,22 +293,6 @@ fun TotpApp() {
         backupActions = backupActions
     )
 
-    LaunchedEffect(
-        state.isUnlocked,
-        syncState.webDavSettings.enabled,
-        syncState.webDavMetadata.lastStatus,
-        syncState.webDavMetadata.lastError,
-        syncState.webDavMetadata.lastSyncedAt
-    ) {
-        if (
-            state.isUnlocked &&
-            syncState.isRemotePasswordBlocked &&
-            backupState.pendingPasswordAction != BackupPasswordAction.WebDavSync
-        ) {
-            backupState.requestRemotePassword()
-        }
-    }
-
     fun lastSyncLabel(): String {
         val lastSyncedAt = syncState.webDavMetadata.lastSyncedAt
         if (lastSyncedAt <= 0L) {

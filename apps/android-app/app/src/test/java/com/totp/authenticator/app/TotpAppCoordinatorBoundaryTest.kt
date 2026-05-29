@@ -410,6 +410,48 @@ class TotpAppCoordinatorBoundaryTest {
     }
 
     @Test
+    fun vaultKeyWebDavSyncAttemptsDecryptBeforeRemotePasswordPrompt() {
+        val source = File("src/main/java/com/totp/authenticator/data/webdav/WebDavSyncService.kt").readText()
+        val syncWithVaultKeySource = source
+            .substringAfter("private suspend fun syncCoreWithVaultKeyChecked")
+            .substringBefore("private suspend fun syncLocalChangeWithVaultKeyChecked")
+
+        assertTrue(
+            "Vault-key sync should try decrypting the remote vault with the current vault key",
+            syncWithVaultKeySource.contains("crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)")
+        )
+        assertFalse(
+            "Vault-key sync should not require local and remote key-encryption envelopes to match before trying the vault key",
+            syncWithVaultKeySource.contains("remoteKeyEnvelopeMatchesLocal(remote.vaultEnvelope.encryptedVault)")
+        )
+    }
+
+    @Test
+    fun staleRemotePasswordBlockDoesNotOpenPasswordDialogBeforeFastSyncRetry() {
+        val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
+
+        assertFalse(
+            "A persisted blocked WebDAV status should not immediately open the remote password dialog before vault-key sync can retry",
+            source.contains("syncState.isRemotePasswordBlocked &&\n            backupState.pendingPasswordAction != BackupPasswordAction.WebDavSync")
+        )
+    }
+
+    @Test
+    fun manualWebDavSyncRetriesVaultKeyWhenPreviousMetadataWasBlocked() {
+        val homeSource = File("src/main/java/com/totp/authenticator/app/HomeSyncActionCoordinator.kt").readText()
+        val settingsSource = File("src/main/java/com/totp/authenticator/app/SettingsActionCoordinator.kt").readText()
+
+        assertFalse(
+            "Home sync should not open the remote password dialog from stale blocked metadata before retrying vault-key sync",
+            homeSource.substringAfter("fun syncFromHome").substringBefore("syncState.launchExclusiveSyncTask(").contains("syncState.isRemotePasswordBlocked")
+        )
+        assertFalse(
+            "Settings sync should not open the remote password dialog from stale blocked metadata before retrying vault-key sync",
+            settingsSource.substringAfter("private fun syncWebDav").substringBefore("syncState.launchExclusiveSyncTask(").contains("syncState.isRemotePasswordBlocked")
+        )
+    }
+
+    @Test
     fun qrImportServiceUsesApplicationContext() {
         val source = File("src/main/java/com/totp/authenticator/app/TotpApp.kt").readText()
         val bridgeSource = File("src/main/java/com/totp/authenticator/app/QrImportBridge.kt").readText()

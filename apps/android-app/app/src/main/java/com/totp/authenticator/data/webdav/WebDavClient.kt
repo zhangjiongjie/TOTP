@@ -5,7 +5,13 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Base64
+import kotlin.math.min
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class WebDavRemoteSnapshot(
     val revision: String,
@@ -21,6 +27,10 @@ data class WebDavUploadResult(
 
 class WebDavClient {
     fun download(settings: WebDavSettings): WebDavRemoteSnapshot? {
+        return download(settings, allowFormatRetry = true)
+    }
+
+    private fun download(settings: WebDavSettings, allowFormatRetry: Boolean): WebDavRemoteSnapshot? {
         val response = request(settings, method = "GET")
         if (response.code == HttpURLConnection.HTTP_NOT_FOUND || response.code == HttpURLConnection.HTTP_GONE) {
             return null
@@ -32,8 +42,13 @@ class WebDavClient {
             return null
         }
         val envelope = runCatching {
-            json.decodeFromString<WebDavRemoteEnvelopeDto>(response.body)
+            parseRemoteEnvelope(response.body)
         }.getOrElse { error ->
+            logInvalidFormat(response, error)
+            if (allowFormatRetry) {
+                Thread.sleep(FORMAT_RETRY_DELAY_MS)
+                return download(settings, allowFormatRetry = false)
+            }
             throw WebDavException(
                 "WebDAV 远端保管库文件格式无效，请检查同步路径是否指向应用的 WebDAV 同步文件。",
                 error
@@ -171,6 +186,22 @@ class WebDavClient {
         return server + path
     }
 
+    private fun parseRemoteEnvelope(body: String): WebDavRemoteEnvelopeDto {
+        val root = json.parseToJsonElement(body).jsonObject
+        val encryptedVaultElement = root["encryptedVault"] ?: throw IllegalArgumentException("Missing encryptedVault")
+        val encryptedVault = json.decodeFromJsonElement<EncryptedRemoteVaultBlobDto>(encryptedVaultElement)
+        return WebDavRemoteEnvelopeDto(
+            revision = root.stringOrBlank("revision").ifBlank { encryptedVault.vaultId },
+            updatedAt = root.stringOrBlank("updatedAt"),
+            encryptedVault = encryptedVault
+        )
+    }
+
+    private fun JsonObject.stringOrBlank(key: String): String {
+        val element: JsonElement = this[key] ?: return ""
+        return runCatching { element.jsonPrimitive.content }.getOrDefault("")
+    }
+
     private fun isRedirect(code: Int): Boolean {
         return code == HttpURLConnection.HTTP_MOVED_PERM ||
             code == HttpURLConnection.HTTP_MOVED_TEMP ||
@@ -195,10 +226,20 @@ class WebDavClient {
         runCatching { Log.d("TotpWebDavPerf", message) }
     }
 
+    private fun logInvalidFormat(response: WebDavResponse, error: Throwable) {
+        val previewLength = min(response.body.length, RESPONSE_PREVIEW_CHARS)
+        val preview = response.body.take(previewLength).replace('\n', ' ').replace('\r', ' ')
+        logDebug(
+            "invalid remote format code=${response.code} responseBytes=${response.body.toByteArray(Charsets.UTF_8).size} etag=${response.etag.isNotBlank()} error=${error::class.java.simpleName} preview=$preview"
+        )
+    }
+
     private companion object {
         const val MAX_REDIRECTS = 5
         const val HTTP_TEMPORARY_REDIRECT = 307
         const val HTTP_PERMANENT_REDIRECT = 308
+        const val FORMAT_RETRY_DELAY_MS = 300L
+        const val RESPONSE_PREVIEW_CHARS = 120
 
         val json = Json {
             encodeDefaults = true

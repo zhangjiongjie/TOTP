@@ -126,12 +126,6 @@ class HomeSyncActionCoordinator(
             syncState.showHomeCopy("WebDAV 同步未开启，本地模式。")
             return
         }
-        if (syncState.isRemotePasswordBlocked) {
-            val message = "远端保管库需要主密码验证后才能继续同步。"
-            syncState.showHomeError(message)
-            backupState.requestRemotePassword()
-            return
-        }
         syncState.launchExclusiveSyncTask(
             task = {
                 withContext(Dispatchers.IO) {

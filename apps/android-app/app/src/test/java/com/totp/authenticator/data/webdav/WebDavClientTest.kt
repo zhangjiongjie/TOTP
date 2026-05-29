@@ -30,6 +30,44 @@ class WebDavClientTest {
     }
 
     @Test
+    fun downloadAcceptsRemoteVaultFileWithMissingEnvelopeMetadata() {
+        val settings = serveText(
+            """
+                {
+                  "mode": "encrypted",
+                  "encryptedVault": {
+                    "formatVersion": 2,
+                    "vaultId": "remote-vault",
+                    "kdf": { "name": "PBKDF2", "iterations": 310000, "hash": "SHA-256", "salt": "salt" },
+                    "keyEncryption": { "cipher": "AES-GCM", "iv": "key-iv", "ciphertext": "key-cipher" },
+                    "vaultEncryption": { "cipher": "AES-GCM", "iv": "vault-iv", "ciphertext": "vault-cipher" }
+                  }
+                }
+            """.trimIndent()
+        )
+
+        val snapshot = WebDavClient().download(settings)
+
+        assertEquals("test-etag", snapshot?.etag)
+        assertEquals("remote-vault", snapshot?.revision)
+        assertEquals("", snapshot?.updatedAt)
+    }
+
+    @Test
+    fun downloadRetriesOnceWhenRemoteVaultFormatIsTransientlyInvalid() {
+        val validBody = remoteVaultEnvelopeBody(revision = "retry-revision")
+        val settings = serveSequentialText(
+            firstBody = """{"temporary":"not-ready"}""",
+            secondBody = validBody
+        )
+
+        val snapshot = WebDavClient().download(settings)
+
+        assertEquals("retry-revision", snapshot?.revision)
+        assertEquals("test-etag-2", snapshot?.etag)
+    }
+
+    @Test
     fun downloadFollowsTemporaryRedirectToRemoteVaultFile() {
         val previousFollowRedirects = HttpURLConnection.getFollowRedirects()
         HttpURLConnection.setFollowRedirects(false)
@@ -96,5 +134,42 @@ class WebDavClientTest {
             serverUrl = "http://127.0.0.1:${nextServer.address.port}",
             filePath = "/vault.json"
         )
+    }
+
+    private fun serveSequentialText(firstBody: String, secondBody: String): WebDavSettings {
+        val nextServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        var requestCount = 0
+        nextServer.createContext("/vault.json") { exchange ->
+            requestCount += 1
+            val body = if (requestCount == 1) firstBody else secondBody
+            val bytes = body.toByteArray(Charsets.UTF_8)
+            exchange.responseHeaders.add("ETag", "test-etag-$requestCount")
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        nextServer.start()
+        server = nextServer
+        return WebDavSettings(
+            enabled = true,
+            serverUrl = "http://127.0.0.1:${nextServer.address.port}",
+            filePath = "/vault.json"
+        )
+    }
+
+    private fun remoteVaultEnvelopeBody(revision: String): String {
+        return """
+            {
+              "schemaVersion": 1,
+              "revision": "$revision",
+              "updatedAt": "2026-05-29T00:00:00Z",
+              "encryptedVault": {
+                "formatVersion": 2,
+                "vaultId": "remote-vault",
+                "kdf": { "name": "PBKDF2", "iterations": 310000, "hash": "SHA-256", "salt": "salt" },
+                "keyEncryption": { "cipher": "AES-GCM", "iv": "key-iv", "ciphertext": "key-cipher" },
+                "vaultEncryption": { "cipher": "AES-GCM", "iv": "vault-iv", "ciphertext": "vault-cipher" }
+              }
+            }
+        """.trimIndent()
     }
 }
