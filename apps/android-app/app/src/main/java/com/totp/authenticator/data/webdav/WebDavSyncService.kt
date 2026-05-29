@@ -321,6 +321,9 @@ class WebDavSyncService(
         }.getOrElse {
             return saveResult("blocked", "远端保管库需要主密码验证后才能继续同步。")
         }
+        if (!remoteKeyEnvelopeMatchesLocal(remote.vaultEnvelope.encryptedVault)) {
+            return saveResult("blocked", "远端保管库需要主密码验证后才能继续同步。")
+        }
         val localFingerprint = fingerprint(localVault)
         val remoteFingerprint = fingerprint(remoteVault)
         if (localFingerprint == remoteFingerprint) {

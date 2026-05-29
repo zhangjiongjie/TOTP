@@ -420,10 +420,26 @@ class TotpAppCoordinatorBoundaryTest {
             "Vault-key sync should try decrypting the remote vault with the current vault key",
             syncWithVaultKeySource.contains("crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)")
         )
-        assertFalse(
-            "Vault-key sync should not require local and remote key-encryption envelopes to match before trying the vault key",
-            syncWithVaultKeySource.contains("remoteKeyEnvelopeMatchesLocal(remote.vaultEnvelope.encryptedVault)")
+        assertTrue(
+            "Vault-key sync should only check local and remote key-encryption envelopes after trying the vault key",
+            syncWithVaultKeySource.indexOf("remoteKeyEnvelopeMatchesLocal(remote.vaultEnvelope.encryptedVault)") >
+                syncWithVaultKeySource.indexOf("crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)")
         )
+    }
+
+    @Test
+    fun vaultKeyWebDavSyncBlocksAfterDecryptWhenRemotePasswordEnvelopeChanged() {
+        val source = File("src/main/java/com/totp/authenticator/data/webdav/WebDavSyncService.kt").readText()
+        val syncWithVaultKeySource = source
+            .substringAfter("private suspend fun syncCoreWithVaultKeyChecked")
+            .substringBefore("private suspend fun syncLocalChangeWithVaultKeyChecked")
+        val decryptIndex = syncWithVaultKeySource.indexOf("crypto.decryptWithVaultKey(remote.vaultEnvelope.encryptedVault, vaultKey)")
+        val envelopeCheckIndex = syncWithVaultKeySource.indexOf("remoteKeyEnvelopeMatchesLocal(remote.vaultEnvelope.encryptedVault)")
+        val blockedIndex = syncWithVaultKeySource.indexOf("远端保管库需要主密码验证后才能继续同步。", startIndex = envelopeCheckIndex.coerceAtLeast(0))
+
+        assertTrue("Vault-key sync should decrypt remote data before checking password envelope drift", decryptIndex >= 0)
+        assertTrue("Vault-key sync should check for remote password envelope drift after decrypt succeeds", envelopeCheckIndex > decryptIndex)
+        assertTrue("Remote password envelope drift should block and prompt for remote password verification", blockedIndex > envelopeCheckIndex)
     }
 
     @Test
