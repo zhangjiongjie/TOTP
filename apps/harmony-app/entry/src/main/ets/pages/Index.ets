@@ -6,7 +6,7 @@ import {
   HdsTabsController,
   hdsMaterial
 } from '@kit.UIDesignKit';
-import { AccountCard } from '../components/home/AccountCard';
+import { HomeAccountSection } from '../components/home/HomeAccountSection';
 import { HomeStatusCard } from '../components/home/HomeStatusCard';
 import { RemotePasswordDialog } from '../components/home/RemotePasswordDialog';
 import { LocalVault } from '../model/LocalVault';
@@ -24,6 +24,11 @@ import {
   HomeStatusPresentationInput,
   HomeStatusPresentationPolicy
 } from '../policies/HomeStatusPresentationPolicy';
+import {
+  ACCOUNT_COPY_KIND_ERROR,
+  AccountCopyPresentation,
+  AccountCopyPresentationPolicy
+} from '../policies/AccountCopyPresentationPolicy';
 import { HomeBackAction, HomeRoutePolicy } from '../policies/HomeRoutePolicy';
 import { SettingsService } from '../services/SettingsService';
 import {
@@ -428,35 +433,18 @@ struct Index {
 
   @Builder
   private buildAccountSection(): void {
-    Column({ space: 10 }) {
-      if (this.isLoading) {
-        Text('加载中...')
-          .fontSize(13)
-          .fontColor($r('sys.color.font_secondary'))
-          .width('100%')
-      } else if (this.accounts.length === 0) {
-        this.buildEmptyState()
-      } else {
-        ForEach(this.accounts, (account: TotpAccount) => {
-          AccountCard({
-            account: account,
-            codeValue: this.resolveSnapshot(account.id).codeValue,
-            codeHint: this.resolveSnapshot(account.id).codeHint,
-            countdownLabel: this.resolveSnapshot(account.id).countdownLabel,
-            statusLabel: this.resolveSnapshot(account.id).statusLabel,
-            onCopy: (accountId: string) => {
-              this.handleCopy(accountId);
-            },
-            onEdit: (accountId: string) => {
-              this.activeAccountId = accountId;
-              this.activeRoute = 'edit';
-            }
-          })
-        }, (account: TotpAccount) => account.id)
+    HomeAccountSection({
+      isLoading: this.isLoading,
+      accounts: this.accounts,
+      snapshots: this.codeSnapshots,
+      onCopy: (accountId: string) => {
+        this.handleCopy(accountId);
+      },
+      onEdit: (accountId: string) => {
+        this.activeAccountId = accountId;
+        this.activeRoute = 'edit';
       }
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
+    })
   }
 
   @Builder
@@ -485,26 +473,6 @@ struct Index {
     .onClick(() => {
       this.handleManualSync();
     })
-  }
-
-  @Builder
-  private buildEmptyState(): void {
-    Column({ space: 10 }) {
-      Text('还没有账号')
-        .fontSize(18)
-        .fontWeight(FontWeight.Medium)
-        .fontColor($r('sys.color.font_primary'))
-
-      Text('点击底部添加按钮录入账号。')
-        .fontSize(14)
-        .lineHeight(22)
-        .fontColor($r('sys.color.font_secondary'))
-        .textAlign(TextAlign.Center)
-    }
-    .width('100%')
-    .padding({ left: 20, right: 20, top: 28, bottom: 28 })
-    .backgroundColor($r('sys.color.comp_background_tertiary'))
-    .borderRadius(24)
   }
 
   private async loadHome(): Promise<void> {
@@ -662,16 +630,16 @@ struct Index {
   private handleCopy(accountId: string): void {
     let snapshot: TotpCodeSnapshot = this.resolveSnapshot(accountId);
     let account: TotpAccount | undefined = this.findAccount(accountId);
+    let presentation: AccountCopyPresentation = AccountCopyPresentationPolicy.resolve(snapshot, account);
 
-    if (snapshot.rawCode.length === 0) {
-      this.showHomeError('当前账号验证码不可复制，请先修正密钥或算法配置。');
+    if (presentation.kind === ACCOUNT_COPY_KIND_ERROR) {
+      this.showHomeError(presentation.message);
       return;
     }
 
     try {
       TotpRuntimeService.getInstance().copyCodeToClipboard(snapshot.rawCode);
-      let label: string = account !== undefined && account.issuer.length > 0 ? account.issuer : '当前账号';
-      this.showHomeSuccess(`已复制 ${label} 的验证码到系统剪贴板。`);
+      this.showHomeSuccess(presentation.message);
       this.statusMessage = '';
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
