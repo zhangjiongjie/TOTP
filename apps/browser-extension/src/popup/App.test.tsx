@@ -45,6 +45,18 @@ describe('App', () => {
     expect(screen.queryByRole('heading', { name: '设置' })).not.toBeInTheDocument();
   });
 
+  it('creates the initial vault without enforcing a minimum master password length', async () => {
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText('主密码'), {
+      target: { value: '1' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: '创建并继续' }));
+
+    expect(await screen.findByRole('button', { name: 'Sync' })).toBeInTheDocument();
+    await expect(__readStoredVaultForTests('1')).resolves.toMatchObject({ accounts: [] });
+  });
+
   it('routes existing vaults into the unlock flow before showing protected pages', async () => {
     await __seedStoredVaultForTests();
 

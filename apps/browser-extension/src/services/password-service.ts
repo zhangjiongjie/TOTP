@@ -26,8 +26,6 @@ import {
 } from './sync-service';
 import { syncStore, vaultStorage, webDavClient } from './settings-storage';
 
-const MIN_PASSWORD_LENGTH = 12;
-
 export const passwordOps = {
   async changeMasterPassword(currentPassword: string, nextPassword: string): Promise<void> {
     if (!currentPassword || !nextPassword) {
@@ -36,10 +34,6 @@ export const passwordOps = {
 
     if (currentPassword === nextPassword) {
       throw new Error('新主密码不能和当前主密码相同。');
-    }
-
-    if (nextPassword.length < MIN_PASSWORD_LENGTH) {
-      throw new Error(`新主密码至少需要 ${MIN_PASSWORD_LENGTH} 位字符。`);
     }
 
     const metadata = await syncStore.load();

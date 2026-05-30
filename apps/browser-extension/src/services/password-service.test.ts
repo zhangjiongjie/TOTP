@@ -39,6 +39,33 @@ const emptyMetadata = {
   pendingConflict: null
 };
 
+describe('passwordOps.changeMasterPassword', () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    accountService.__resetForTests?.();
+    clearCurrentMasterPassword();
+    await clearEncryptedVault(vaultStorage);
+    await syncStore.replace(emptyMetadata);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    clearCurrentMasterPassword();
+  });
+
+  it('allows changing to a short master password', async () => {
+    const vault: VaultPayload = { version: 1, accounts: [] };
+    await saveEncryptedVault(await encryptVault(vault, 'old-password'), vaultStorage);
+    setCurrentMasterPassword('old-password');
+
+    await passwordOps.changeMasterPassword('old-password', '1');
+
+    const storedVault = await loadEncryptedVault(vaultStorage);
+    await expect(decryptVault(storedVault!, '1')).resolves.toMatchObject({ accounts: [] });
+    await expect(decryptVault(storedVault!, 'old-password')).rejects.toThrow();
+  });
+});
+
 describe('passwordOps.verifyRemoteMasterPassword', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();

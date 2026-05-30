@@ -85,7 +85,6 @@ let autoSyncGeneration = 0;
 let pendingAutoSyncRuns = 0;
 let isApplyingRemoteSyncUpdate = false;
 let syncClientOverride: WebDavClient | null = null;
-const MIN_PASSWORD_LENGTH = 12;
 let localMutationVersion = 0;
 let currentVaultKey: Uint8Array | null = null;
 let appState = createAppState();
@@ -208,10 +207,6 @@ export async function submitUnlock(password: string) {
   emit();
 
   try {
-    if (!hasStoredVault && password.length < MIN_PASSWORD_LENGTH) {
-      throw new Error(`主密码至少需要 ${MIN_PASSWORD_LENGTH} 位字符。`);
-    }
-
     if (hasStoredVault) {
       await unlockStoredVaultWithPassword(password);
       return;

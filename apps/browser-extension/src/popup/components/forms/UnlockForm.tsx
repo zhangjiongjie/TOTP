@@ -64,7 +64,7 @@ export function UnlockForm({ mode, onSubmit, children }: UnlockFormProps) {
         主密码
         <input
           type="password"
-          placeholder={mode === 'setup' ? '至少 12 位' : '输入你的主密码'}
+          placeholder={mode === 'setup' ? '设置你的主密码' : '输入你的主密码'}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           style={{
