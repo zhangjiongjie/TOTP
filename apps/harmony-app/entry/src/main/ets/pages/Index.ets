@@ -6,7 +6,9 @@ import {
   HdsTabsController,
   hdsMaterial
 } from '@kit.UIDesignKit';
+import { EditAccountPage } from '../components/home/EditAccountPage';
 import { HomeAccountSection } from '../components/home/HomeAccountSection';
+import { HomeFixedHeader } from '../components/home/HomeFixedHeader';
 import { HomeStatusCard } from '../components/home/HomeStatusCard';
 import { RemotePasswordDialog } from '../components/home/RemotePasswordDialog';
 import { LocalVault } from '../model/LocalVault';
@@ -14,7 +16,6 @@ import { TotpAccount } from '../model/TotpAccount';
 import { WebDavSettings } from '../model/WebDavSettings';
 import { WebDavSyncMetadata } from '../model/WebDavSyncMetadata';
 import { AddAccount } from './AddAccount';
-import { EditAccount } from './EditAccount';
 import { Settings } from './Settings';
 import { Unlock } from './Unlock';
 import { UnlockService } from '../services/UnlockService';
@@ -278,70 +279,22 @@ struct Index {
 
   @Builder
   private buildFixedHeader(): void {
-    Row() {
-      Text(this.resolveRootTitle())
-        .fontSize(25)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('sys.color.font_primary'))
-        .layoutWeight(1)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-      if (this.activeTabIndex === 1) {
-        Row({ space: 12 }) {
-          this.buildHeaderIconButton($r('app.media.action_photo'), () => {
-            this.addPhotoRequestToken++;
-          })
-          this.buildHeaderIconButton($r('app.media.action_scan'), () => {
-            this.addScanRequestToken++;
-          })
-        }
-      } else if (this.activeTabIndex === 0) {
-        this.buildHeaderSyncButton()
+    HomeFixedHeader({
+      title: this.resolveRootTitle(),
+      activeTabIndex: this.activeTabIndex,
+      heightValue: this.resolveHeaderHeight(),
+      isDarkMode: this.isDarkMode(),
+      canSync: this.canSync,
+      syncSpinAngle: this.syncSpinAngle,
+      onPhoto: () => {
+        this.addPhotoRequestToken++;
+      },
+      onScan: () => {
+        this.addScanRequestToken++;
+      },
+      onSync: () => {
+        this.handleManualSync();
       }
-    }
-    .width('100%')
-    .height(this.resolveHeaderHeight())
-    .alignItems(VerticalAlign.Top)
-    .padding({ left: 20, right: 20, top: 14 })
-    .backgroundColor($r('sys.color.ohos_id_color_background'))
-  }
-
-  @Builder
-  private buildHeaderIconButton(icon: Resource, action: () => void): void {
-    Button() {
-      Image(icon)
-        .width(22)
-        .height(22)
-        .objectFit(ImageFit.Contain)
-    }
-    .width(40)
-    .height(40)
-    .type(ButtonType.Circle)
-    .backgroundColor(this.isDarkMode() ? '#1C1C1E' : '#EEF3F8')
-    .border({ width: 1, color: this.isDarkMode() ? '#2F333A' : '#D5DFEA' })
-    .onClick(() => {
-      action();
-    })
-  }
-
-  @Builder
-  private buildHeaderSyncButton(): void {
-    Button() {
-      Image($r('app.media.nav_sync'))
-        .width(22)
-        .height(22)
-        .objectFit(ImageFit.Contain)
-        .rotate({ angle: this.syncSpinAngle })
-        .opacity(this.canSync ? 1 : 0.42)
-    }
-    .width(40)
-    .height(40)
-    .type(ButtonType.Circle)
-    .backgroundColor(this.isDarkMode() ? '#1C1C1E' : '#EEF3F8')
-    .border({ width: 1, color: this.isDarkMode() ? '#2F333A' : '#D5DFEA' })
-    .onClick(() => {
-      this.handleManualSync();
     })
   }
 
@@ -358,71 +311,28 @@ struct Index {
   @Builder
   private buildEditPage(): void {
     if (this.hasActiveAccount()) {
-      Column() {
-        this.buildEditFixedHeader()
-        EditAccount({
-          account: this.requireActiveAccount(),
-          topInset: 0,
-          bottomInset: 116,
-          onSaved: (vault: LocalVault) => {
-            this.applyVault(vault);
-            this.activeRoute = 'home';
-            this.syncStatusMessage = '同步中...';
-            this.syncAfterLocalChange();
-          },
-          onDeleted: (vault: LocalVault) => {
-            this.applyVault(vault);
-            this.activeRoute = 'home';
-            this.syncStatusMessage = '同步中...';
-            this.syncAfterLocalChange();
-          },
-          onBack: () => {
-            this.activeRoute = 'home';
-          }
-        })
-      }
-      .width('100%')
-      .height('100%')
+      EditAccountPage({
+        account: this.requireActiveAccount(),
+        headerHeight: this.resolveHeaderHeight(),
+        onSaved: (vault: LocalVault) => {
+          this.applyVault(vault);
+          this.activeRoute = 'home';
+          this.syncStatusMessage = '同步中...';
+          this.syncAfterLocalChange();
+        },
+        onDeleted: (vault: LocalVault) => {
+          this.applyVault(vault);
+          this.activeRoute = 'home';
+          this.syncStatusMessage = '同步中...';
+          this.syncAfterLocalChange();
+        },
+        onBack: () => {
+          this.activeRoute = 'home';
+        }
+      })
     } else {
       this.buildHomePage()
     }
-  }
-
-  @Builder
-  private buildEditFixedHeader(): void {
-    Row({ space: 10 }) {
-      this.buildHeaderBackButton()
-
-      Text('编辑账号')
-        .fontSize(25)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('sys.color.font_primary'))
-        .layoutWeight(1)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .width('100%')
-    .height(this.resolveHeaderHeight())
-    .alignItems(VerticalAlign.Top)
-    .padding({ left: 12, right: 20, top: 14 })
-    .backgroundColor($r('sys.color.ohos_id_color_background'))
-  }
-
-  @Builder
-  private buildHeaderBackButton(): void {
-    Button() {
-      Image($r('app.media.action_back'))
-        .width(24)
-        .height(24)
-        .objectFit(ImageFit.Contain)
-    }
-    .width(44)
-    .height(44)
-    .type(ButtonType.Circle)
-    .backgroundColor(Color.Transparent)
-    .onClick(() => {
-      this.activeRoute = 'home';
-    })
   }
 
   @Builder
