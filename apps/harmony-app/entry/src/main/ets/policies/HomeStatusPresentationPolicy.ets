@@ -99,11 +99,14 @@ export class HomeStatusPresentationPolicy {
   }
 
   private static resolveTone(errorMessage: string, copyStatusMessage: string, message: string): string {
-    if (errorMessage.length > 0 || HomeStatusPresentationPolicy.isRemotePasswordStatus(message)) {
+    if (errorMessage.length > 0) {
       return HOME_STATUS_TONE_ERROR;
     }
     if (copyStatusMessage.length > 0) {
       return HOME_STATUS_TONE_SUCCESS;
+    }
+    if (HomeStatusPresentationPolicy.isRemotePasswordStatus(message)) {
+      return HOME_STATUS_TONE_ERROR;
     }
     return HOME_STATUS_TONE_SECONDARY;
   }

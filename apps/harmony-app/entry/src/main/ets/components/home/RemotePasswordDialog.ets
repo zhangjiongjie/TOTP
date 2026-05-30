@@ -1,8 +1,8 @@
 @Component
 export struct RemotePasswordDialog {
-  password: string = '';
-  errorMessage: string = '';
-  isBusy: boolean = false;
+  @Prop password: string = '';
+  @Prop errorMessage: string = '';
+  @Prop isBusy: boolean = false;
   onPasswordChange: (value: string) => void = (_value: string) => {};
   onVerify: () => void = () => {};
   onCancel: () => void = () => {};

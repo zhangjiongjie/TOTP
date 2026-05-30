@@ -1,20 +1,21 @@
 import {
   HOME_STATUS_TONE_ERROR,
   HOME_STATUS_TONE_SUCCESS,
-  HomeStatusPresentation
+  HOME_STATUS_TONE_SECONDARY
 } from '../../policies/HomeStatusPresentationPolicy';
 
 @Component
 export struct HomeStatusCard {
-  presentation: HomeStatusPresentation = new HomeStatusPresentation(false, '', HOME_STATUS_TONE_SUCCESS);
-  hasSyncConflict: boolean = false;
-  isDarkMode: boolean = false;
+  @Prop message: string = '';
+  @Prop tone: string = HOME_STATUS_TONE_SECONDARY;
+  @Prop hasSyncConflict: boolean = false;
+  @Prop isDarkMode: boolean = false;
   onKeepLocal: () => void = () => {};
   onUseRemote: () => void = () => {};
 
   build() {
     Column({ space: 12 }) {
-      Text(this.presentation.message)
+      Text(this.message)
         .fontSize(13)
         .lineHeight(20)
         .fontColor(this.resolveBannerColor())
@@ -79,10 +80,10 @@ export struct HomeStatusCard {
   }
 
   private resolveBannerColor(): ResourceColor {
-    if (this.presentation.tone === HOME_STATUS_TONE_ERROR) {
+    if (this.tone === HOME_STATUS_TONE_ERROR) {
       return this.isDarkMode ? '#FF6B6B' : '#C53D3D';
     }
-    if (this.presentation.tone === HOME_STATUS_TONE_SUCCESS) {
+    if (this.tone === HOME_STATUS_TONE_SUCCESS) {
       return this.isDarkMode ? '#58C18F' : '#2D7A59';
     }
     return $r('sys.color.font_secondary');

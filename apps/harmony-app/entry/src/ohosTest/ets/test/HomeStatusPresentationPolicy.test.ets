@@ -41,6 +41,21 @@ export default function homeStatusPresentationPolicyTest(): void {
       expect(presentation.tone).assertEqual(HOME_STATUS_TONE_SUCCESS);
     });
 
+    it('keeps remote password success messages green', 0, () => {
+      let presentation: HomeStatusPresentation = HomeStatusPresentationPolicy.resolve(new HomeStatusPresentationInput(
+        false,
+        false,
+        '',
+        '',
+        '远端密码已解锁，同步到最新。',
+        '本地与 WebDAV 已经是最新版本。'
+      ));
+
+      expect(presentation.shouldShow).assertTrue();
+      expect(presentation.message).assertEqual('远端密码已解锁，同步到最新。');
+      expect(presentation.tone).assertEqual(HOME_STATUS_TONE_SUCCESS);
+    });
+
     it('marks remote password regular status as error tone', 0, () => {
       let presentation: HomeStatusPresentation = HomeStatusPresentationPolicy.resolve(new HomeStatusPresentationInput(
         false,

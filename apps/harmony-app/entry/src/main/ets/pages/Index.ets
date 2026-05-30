@@ -164,9 +164,7 @@ struct Index {
           Scroll() {
             Column({ space: 14 }) {
               this.buildHomeMetaLine()
-              if (this.resolveHomeStatusPresentation().shouldShow) {
-                this.buildStatusCard()
-              }
+              this.buildStatusCard()
               this.buildAccountSection()
               Blank()
                 .height(140)
@@ -337,17 +335,20 @@ struct Index {
 
   @Builder
   private buildStatusCard(): void {
-    HomeStatusCard({
-      presentation: this.resolveHomeStatusPresentation(),
-      hasSyncConflict: this.hasSyncConflict,
-      isDarkMode: this.isDarkMode(),
-      onKeepLocal: () => {
-        this.resolveSyncConflict(true);
-      },
-      onUseRemote: () => {
-        this.resolveSyncConflict(false);
-      }
-    })
+    if (this.resolveHomeStatusPresentation().shouldShow) {
+      HomeStatusCard({
+        message: this.resolveHomeStatusPresentation().message,
+        tone: this.resolveHomeStatusPresentation().tone,
+        hasSyncConflict: this.hasSyncConflict,
+        isDarkMode: this.isDarkMode(),
+        onKeepLocal: () => {
+          this.resolveSyncConflict(true);
+        },
+        onUseRemote: () => {
+          this.resolveSyncConflict(false);
+        }
+      })
+    }
   }
 
   @Builder
