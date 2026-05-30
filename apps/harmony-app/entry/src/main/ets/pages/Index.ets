@@ -25,6 +25,15 @@ import {
   HomeStatusPresentationPolicy
 } from '../policies/HomeStatusPresentationPolicy';
 import {
+  HOME_SYNC_OPERATION_CONFLICT_KEEP_LOCAL,
+  HOME_SYNC_OPERATION_CONFLICT_USE_REMOTE,
+  HOME_SYNC_OPERATION_LOCAL_CHANGE,
+  HOME_SYNC_OPERATION_MANUAL,
+  HomeSyncAvailabilityResult,
+  HomeSyncOperationStartResult,
+  HomeSyncUiStatePolicy
+} from '../policies/HomeSyncUiStatePolicy';
+import {
   ACCOUNT_COPY_KIND_ERROR,
   AccountCopyPresentation,
   AccountCopyPresentationPolicy
@@ -648,20 +657,15 @@ struct Index {
   }
 
   private async handleManualSync(): Promise<void> {
-    if (this.isSyncing) {
-      this.showHomeError('同步正在进行中，请稍后再试。');
-      return;
-    }
-
     this.refreshSyncAvailability();
-    if (!this.canSync) {
-      this.showHomeSuccess('WebDAV 同步未开启，本地模式。');
+    let startResult: HomeSyncOperationStartResult = HomeSyncUiStatePolicy.resolveOperationStart(
+      HOME_SYNC_OPERATION_MANUAL,
+      this.isSyncing,
+      this.canSync
+    );
+    if (!this.startSyncOperation(startResult)) {
       return;
     }
-
-    this.isSyncing = true;
-    this.syncStatusMessage = '同步中...';
-    this.startSyncAnimation();
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.manualSync(context, this.isUnlocked, this.activeRoute);
@@ -723,19 +727,15 @@ struct Index {
   }
 
   private async handleLocalChangeSync(): Promise<void> {
-    if (this.isSyncing) {
-      return;
-    }
-
     this.refreshSyncAvailability();
-    if (!this.canSync) {
-      this.syncStatusMessage = 'WebDAV 同步未开启，本地模式。';
+    let startResult: HomeSyncOperationStartResult = HomeSyncUiStatePolicy.resolveOperationStart(
+      HOME_SYNC_OPERATION_LOCAL_CHANGE,
+      this.isSyncing,
+      this.canSync
+    );
+    if (!this.startSyncOperation(startResult)) {
       return;
     }
-
-    this.isSyncing = true;
-    this.syncStatusMessage = '同步本地变更中...';
-    this.startSyncAnimation();
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.syncLocalChange(context, this.isUnlocked, this.activeRoute);
@@ -761,14 +761,11 @@ struct Index {
   }
 
   private async resolveSyncConflict(keepLocal: boolean): Promise<void> {
-    if (this.isSyncing) {
-      this.showHomeError('同步正在进行中，请稍后再试。');
+    let operation: string = keepLocal ? HOME_SYNC_OPERATION_CONFLICT_KEEP_LOCAL : HOME_SYNC_OPERATION_CONFLICT_USE_REMOTE;
+    let startResult: HomeSyncOperationStartResult = HomeSyncUiStatePolicy.resolveOperationStart(operation, this.isSyncing, true);
+    if (!this.startSyncOperation(startResult)) {
       return;
     }
-
-    this.isSyncing = true;
-    this.syncStatusMessage = keepLocal ? '正在用本地版本覆盖远端...' : '正在使用远端版本覆盖本地...';
-    this.startSyncAnimation();
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.resolveConflict(context, keepLocal);
@@ -786,15 +783,42 @@ struct Index {
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let settings: WebDavSettings = SettingsService.getInstance().loadWebDavSettings(context);
-      this.canSync = settings.enabled && settings.serverUrl.trim().length > 0 && settings.filePath.trim().length > 0;
-      if (!this.canSync && !this.isSyncing && !this.hasSyncConflict) {
-        this.syncStatusMessage = 'WebDAV 同步未开启，本地模式。';
-      }
+      this.applySyncAvailability(settings.enabled && settings.serverUrl.trim().length > 0 && settings.filePath.trim().length > 0, false);
     } catch (_error) {
-      this.canSync = false;
-      if (!this.isSyncing && !this.hasSyncConflict) {
-        this.syncStatusMessage = '同步设置暂不可用。';
+      this.applySyncAvailability(false, true);
+    }
+  }
+
+  private startSyncOperation(startResult: HomeSyncOperationStartResult): boolean {
+    if (!startResult.canStart) {
+      if (startResult.errorMessage.length > 0) {
+        this.showHomeError(startResult.errorMessage);
       }
+      if (startResult.successMessage.length > 0) {
+        this.showHomeSuccess(startResult.successMessage);
+      }
+      if (startResult.syncStatusMessage.length > 0) {
+        this.syncStatusMessage = startResult.syncStatusMessage;
+      }
+      return false;
+    }
+
+    this.isSyncing = true;
+    this.syncStatusMessage = startResult.syncStatusMessage;
+    this.startSyncAnimation();
+    return true;
+  }
+
+  private applySyncAvailability(canSync: boolean, hasSettingsError: boolean): void {
+    let availability: HomeSyncAvailabilityResult = HomeSyncUiStatePolicy.resolveAvailability(
+      canSync,
+      this.isSyncing,
+      this.hasSyncConflict,
+      hasSettingsError
+    );
+    this.canSync = availability.canSync;
+    if (availability.syncStatusMessage.length > 0) {
+      this.syncStatusMessage = availability.syncStatusMessage;
     }
   }
 
