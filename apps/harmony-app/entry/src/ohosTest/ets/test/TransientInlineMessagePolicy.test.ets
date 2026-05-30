@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@ohos/hypium';
-import { InlineMessageState, TransientInlineMessagePolicy } from '../../../main/ets/services/TransientInlineMessagePolicy';
+import { InlineMessageState, TransientInlineMessagePolicy } from '../../../main/ets/policies/TransientInlineMessagePolicy';
 
 export default function transientInlineMessagePolicyTest(): void {
   describe('TransientInlineMessagePolicy', () => {

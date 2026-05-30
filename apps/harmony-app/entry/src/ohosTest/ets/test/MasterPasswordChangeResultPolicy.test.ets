@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@ohos/hypium';
 import { LocalVault } from '../../../main/ets/model/LocalVault';
 import { WebDavSyncResult } from '../../../main/ets/services/WebDavSyncService';
-import { MasterPasswordChangeResultPolicy } from '../../../main/ets/services/MasterPasswordChangeResultPolicy';
+import { MasterPasswordChangeResultPolicy } from '../../../main/ets/policies/MasterPasswordChangeResultPolicy';
 
 function captureErrorMessage(action: () => void): string {
   try {

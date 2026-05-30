@@ -1,5 +1,5 @@
 import { LocalVault } from '../model/LocalVault';
-import { WebDavSyncResult } from './WebDavSyncService';
+import { WebDavSyncResult } from '../services/WebDavSyncService';
 
 export class MasterPasswordChangeResultPolicy {
   static resolveSuccessMessage(result: WebDavSyncResult): string {

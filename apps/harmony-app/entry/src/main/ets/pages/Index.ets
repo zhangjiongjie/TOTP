@@ -7,6 +7,8 @@ import {
   hdsMaterial
 } from '@kit.UIDesignKit';
 import { AccountCard } from '../components/home/AccountCard';
+import { HomeStatusCard } from '../components/home/HomeStatusCard';
+import { RemotePasswordDialog } from '../components/home/RemotePasswordDialog';
 import { LocalVault } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
 import { WebDavSettings } from '../model/WebDavSettings';
@@ -16,10 +18,23 @@ import { EditAccount } from './EditAccount';
 import { Settings } from './Settings';
 import { Unlock } from './Unlock';
 import { UnlockService } from '../services/UnlockService';
+import {
+  HomeRegularSyncStatusInput,
+  HomeStatusPresentation,
+  HomeStatusPresentationInput,
+  HomeStatusPresentationPolicy
+} from '../policies/HomeStatusPresentationPolicy';
+import { HomeBackAction, HomeRoutePolicy } from '../policies/HomeRoutePolicy';
 import { SettingsService } from '../services/SettingsService';
+import {
+  HOME_MESSAGE_KIND_ERROR,
+  REMOTE_PASSWORD_DIALOG_HIDE,
+  REMOTE_PASSWORD_DIALOG_SHOW,
+  SyncResultPresentation
+} from '../policies/SyncResultPresentationPolicy';
 import { TotpHomeService } from '../services/TotpHomeService';
 import { TotpCodeSnapshot, TotpRuntimeService } from '../services/TotpRuntimeService';
-import { WebDavSyncResult, WebDavSyncService } from '../services/WebDavSyncService';
+import { WebDavSyncActionOutcome, WebDavSyncCoordinator } from '../services/WebDavSyncCoordinator';
 import { SettingsStore } from '../storage/SettingsStore';
 
 const VAULT_SESSION_LOCKED_EVENT: string = 'totpVaultSessionLocked';
@@ -61,6 +76,7 @@ struct Index {
   };
   private tabsController: HdsTabsController = new HdsTabsController();
   private settingsStore: SettingsStore = new SettingsStore();
+  private syncCoordinator: WebDavSyncCoordinator = new WebDavSyncCoordinator();
 
   aboutToAppear(): void {
     Environment.envProp('colorMode', ColorMode.LIGHT);
@@ -133,7 +149,7 @@ struct Index {
           Scroll() {
             Column({ space: 14 }) {
               this.buildHomeMetaLine()
-              if (this.shouldShowStatusCard()) {
+              if (this.resolveHomeStatusPresentation().shouldShow) {
                 this.buildStatusCard()
               }
               this.buildAccountSection()
@@ -181,7 +197,10 @@ struct Index {
             lastUpdatedLabel: this.lastUpdatedLabel,
             bottomInset: 116,
             topInset: 0,
-            onSaved: (message: string) => {
+            onSaved: (message: string, vault: LocalVault | undefined, alreadySynced: boolean) => {
+              if (vault !== undefined) {
+                this.applyVault(vault);
+              }
               this.syncStatusMessage = message;
               this.refreshSyncAvailability();
               if (message === 'WebDAV 同步未开启，本地模式。') {
@@ -193,7 +212,7 @@ struct Index {
                 this.errorMessage = '';
                 return;
               }
-              if (this.canSync) {
+              if (this.canSync && !alreadySynced) {
                 this.handleManualSync();
               }
             },
@@ -394,23 +413,17 @@ struct Index {
 
   @Builder
   private buildStatusCard(): void {
-    Column({ space: 12 }) {
-      Text(this.resolveHomeBannerMessage())
-        .fontSize(13)
-        .lineHeight(20)
-        .fontColor(this.resolveHomeBannerColor())
-        .width('100%')
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-      if (this.hasSyncConflict) {
-        this.buildSyncConflictActions()
+    HomeStatusCard({
+      presentation: this.resolveHomeStatusPresentation(),
+      hasSyncConflict: this.hasSyncConflict,
+      isDarkMode: this.isDarkMode(),
+      onKeepLocal: () => {
+        this.resolveSyncConflict(true);
+      },
+      onUseRemote: () => {
+        this.resolveSyncConflict(false);
       }
-    }
-    .width('100%')
-    .padding(18)
-    .backgroundColor($r('sys.color.comp_background_tertiary'))
-    .borderRadius(24)
+    })
   }
 
   @Builder
@@ -472,52 +485,6 @@ struct Index {
     .onClick(() => {
       this.handleManualSync();
     })
-  }
-
-  @Builder
-  private buildSyncConflictActions(): void {
-    Column({ space: 10 }) {
-      Text('同步冲突')
-        .fontSize(15)
-        .fontWeight(FontWeight.Medium)
-        .fontColor('#8B3A1F')
-        .width('100%')
-
-      Text('本地和远端都有变化，请选择保留哪一侧。')
-        .fontSize(13)
-        .lineHeight(20)
-        .fontColor('#6B4C3E')
-        .width('100%')
-
-      Row({ space: 10 }) {
-        Button('保留本地')
-          .layoutWeight(1)
-          .height(42)
-          .type(ButtonType.Capsule)
-          .fontSize(14)
-          .fontColor(Color.White)
-          .backgroundColor('#1E5AA8')
-          .onClick(() => {
-            this.resolveSyncConflict(true);
-          })
-
-        Button('使用远端')
-          .layoutWeight(1)
-          .height(42)
-          .type(ButtonType.Capsule)
-          .fontSize(14)
-          .fontColor('#2F5E95')
-          .backgroundColor('#E6EEF8')
-          .onClick(() => {
-            this.resolveSyncConflict(false);
-          })
-      }
-      .width('100%')
-    }
-    .width('100%')
-    .padding(14)
-    .backgroundColor('#FFF4E8')
-    .borderRadius(18)
   }
 
   @Builder
@@ -729,121 +696,35 @@ struct Index {
     this.startSyncAnimation();
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      let result: WebDavSyncResult = await WebDavSyncService.getInstance().syncNow(context);
-      if (result.vault !== undefined) {
-        this.applyVault(result.vault);
+      let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.manualSync(context, this.isUnlocked, this.activeRoute);
+      this.applySyncActionOutcome(outcome);
+      if (!outcome.hasError()) {
+        this.refreshLastSyncLabel(context);
       }
-      this.hasSyncConflict = result.status === 'conflict';
-      this.syncStatusMessage = result.message;
-      if (result.status === 'blocked') {
-        this.showHomeError(result.message);
-        this.showRemotePasswordDialog = this.isUnlocked && this.activeRoute !== 'unlock';
-      } else if (result.status === 'conflict') {
-        this.showHomeError(result.message);
-      } else {
-        this.showHomeSuccess(result.message);
-      }
-      this.refreshLastSyncLabel(context);
-    } catch (error) {
-      let businessError: BusinessError = error as BusinessError;
-      let message: string = businessError && businessError.message && businessError.message.length > 0
-        ? `同步失败：${businessError.message}`
-        : '同步失败，请稍后重试。';
-      this.syncStatusMessage = message;
-      this.showHomeError(message);
     } finally {
       this.isSyncing = false;
       this.stopSyncAnimation();
     }
   }
 
-  private shouldShowStatusCard(): boolean {
-    return this.hasSyncConflict ||
-      this.isSyncing ||
-      this.errorMessage.length > 0 ||
-      this.statusMessage.length > 0 ||
-      this.copyStatusMessage.length > 0 ||
-      this.resolveRegularHomeSyncStatus().length > 0;
-  }
-
   @Builder
   private buildRemotePasswordDialog(): void {
-    Stack({ alignContent: Alignment.Center }) {
-      Column({ space: 14 }) {
-        Text('验证远端密码库')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('sys.color.font_primary'))
-          .width('100%')
-
-        Text('远端主密码已变化，请输入新的远端主密码后继续同步。')
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor($r('sys.color.font_secondary'))
-          .width('100%')
-
-        Text('验证通过后，本地保管库和当前解锁密码会同步更新为远端密码。')
-          .fontSize(13)
-          .lineHeight(20)
-          .fontColor($r('app.color.dialog_accent_text'))
-          .width('100%')
-
-        TextInput({ text: this.remotePassword, placeholder: '远端主密码' })
-          .type(InputType.Password)
-          .height(46)
-          .fontSize(15)
-          .backgroundColor($r('sys.color.comp_background_gray'))
-          .borderRadius(14)
-          .padding({ left: 14, right: 14 })
-          .enabled(!this.isRemotePasswordBusy)
-          .onChange((value: string) => {
-            this.remotePassword = value;
-          })
-
-        if (this.remotePasswordError.length > 0) {
-          Text(this.remotePasswordError)
-            .fontSize(13)
-            .lineHeight(20)
-            .fontColor('#C53D3D')
-            .width('100%')
-        }
-
-        Row({ space: 10 }) {
-          Button('稍后处理')
-            .height(42)
-            .layoutWeight(1)
-            .enabled(!this.isRemotePasswordBusy)
-            .backgroundColor($r('sys.color.comp_background_gray'))
-            .fontColor($r('sys.color.font_primary'))
-            .onClick(() => {
-              this.showRemotePasswordDialog = false;
-              this.remotePassword = '';
-              this.remotePasswordError = '';
-            })
-
-          Button(this.isRemotePasswordBusy ? '验证中...' : '验证')
-            .height(42)
-            .layoutWeight(1)
-            .enabled(!this.isRemotePasswordBusy)
-            .backgroundColor('#2878C8')
-            .fontColor(Color.White)
-            .onClick(() => {
-              this.verifyRemotePassword();
-            })
-        }
-        .width('100%')
+    RemotePasswordDialog({
+      password: this.remotePassword,
+      errorMessage: this.remotePasswordError,
+      isBusy: this.isRemotePasswordBusy,
+      onPasswordChange: (value: string) => {
+        this.remotePassword = value;
+      },
+      onVerify: () => {
+        this.verifyRemotePassword();
+      },
+      onCancel: () => {
+        this.showRemotePasswordDialog = false;
+        this.remotePassword = '';
+        this.remotePasswordError = '';
       }
-      .width('86%')
-      .padding(22)
-      .backgroundColor($r('app.color.dialog_surface'))
-      .border({ width: 1, color: $r('app.color.dialog_border') })
-      .borderRadius(26)
-      .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
-    }
-    .width('100%')
-    .height('100%')
-    .backdropBlur(18)
-    .backgroundColor($r('app.color.dialog_overlay'))
+    })
   }
 
   private async verifyRemotePassword(): Promise<void> {
@@ -855,27 +736,15 @@ struct Index {
     this.remotePasswordError = '';
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      let result: WebDavSyncResult = await WebDavSyncService.getInstance().verifyRemoteMasterPassword(context, this.remotePassword);
-      if (result.vault !== undefined) {
-        this.applyVault(result.vault);
+      let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.verifyRemotePassword(context, this.remotePassword);
+      this.applySyncActionOutcome(outcome);
+      if (outcome.remotePasswordVerified) {
+        this.refreshLastSyncLabel(context);
+        this.showRemotePasswordDialog = false;
+        this.remotePassword = '';
+        this.remotePasswordError = '';
+        this.hasSyncedOnOpen = true;
       }
-      this.hasSyncConflict = result.status === 'conflict';
-      this.syncStatusMessage = result.message;
-      if (result.status === 'conflict') {
-        this.showHomeError(result.message);
-      } else {
-        this.showHomeSuccess(result.message);
-      }
-      this.refreshLastSyncLabel(context);
-      this.showRemotePasswordDialog = false;
-      this.remotePassword = '';
-      this.remotePasswordError = '';
-      this.hasSyncedOnOpen = true;
-    } catch (error) {
-      let businessError: BusinessError = error as BusinessError;
-      this.remotePasswordError = businessError && businessError.message && businessError.message.length > 0
-        ? businessError.message
-        : '远端密码库验证失败。';
     } finally {
       this.isRemotePasswordBusy = false;
     }
@@ -901,28 +770,11 @@ struct Index {
     this.startSyncAnimation();
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      let result: WebDavSyncResult = await WebDavSyncService.getInstance().syncLocalChange(context);
-      if (result.vault !== undefined) {
-        this.applyVault(result.vault);
+      let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.syncLocalChange(context, this.isUnlocked, this.activeRoute);
+      this.applySyncActionOutcome(outcome);
+      if (!outcome.hasError()) {
+        this.refreshLastSyncLabel(context);
       }
-      this.hasSyncConflict = result.status === 'conflict';
-      this.syncStatusMessage = result.message;
-      if (result.status === 'blocked') {
-        this.showHomeError(result.message);
-        this.showRemotePasswordDialog = this.isUnlocked && this.activeRoute !== 'unlock';
-      } else if (result.status === 'conflict') {
-        this.showHomeError(result.message);
-      } else {
-        this.showHomeSuccess(result.message);
-      }
-      this.refreshLastSyncLabel(context);
-    } catch (error) {
-      let businessError: BusinessError = error as BusinessError;
-      let message: string = businessError && businessError.message && businessError.message.length > 0
-        ? `同步本地变更失败：${businessError.message}`
-        : '同步本地变更失败，请稍后重试。';
-      this.syncStatusMessage = message;
-      this.showHomeError(message);
     } finally {
       this.isSyncing = false;
       this.stopSyncAnimation();
@@ -951,27 +803,11 @@ struct Index {
     this.startSyncAnimation();
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      let result: WebDavSyncResult = keepLocal
-        ? await WebDavSyncService.getInstance().keepLocalVersion(context)
-        : await WebDavSyncService.getInstance().useRemoteVersion(context);
-      if (result.vault !== undefined) {
-        this.applyVault(result.vault);
+      let outcome: WebDavSyncActionOutcome = await this.syncCoordinator.resolveConflict(context, keepLocal);
+      this.applySyncActionOutcome(outcome);
+      if (!outcome.hasError()) {
+        this.refreshLastSyncLabel(context);
       }
-      this.hasSyncConflict = result.status === 'conflict';
-      this.syncStatusMessage = result.message;
-      if (result.status === 'blocked' || result.status === 'conflict') {
-        this.showHomeError(result.message);
-      } else {
-        this.showHomeSuccess(result.message);
-      }
-      this.refreshLastSyncLabel(context);
-    } catch (error) {
-      let businessError: BusinessError = error as BusinessError;
-      let message: string = businessError && businessError.message && businessError.message.length > 0
-        ? `处理冲突失败：${businessError.message}`
-        : '处理冲突失败，请稍后重试。';
-      this.syncStatusMessage = message;
-      this.showHomeError(message);
     } finally {
       this.isSyncing = false;
       this.stopSyncAnimation();
@@ -1009,52 +845,38 @@ struct Index {
     return `${this.accountCountLabel} · ${this.lastUpdatedLabel}`;
   }
 
-  private resolveHomeBannerMessage(): string {
-    if (this.errorMessage.length > 0) {
-      return this.errorMessage;
-    }
-    if (this.copyStatusMessage.length > 0) {
-      return this.copyStatusMessage;
-    }
-    return this.resolveRegularHomeSyncStatus();
-  }
-
-  private resolveHomeBannerColor(): ResourceColor {
-    let message: string = this.resolveHomeBannerMessage();
-    if (this.errorMessage.length > 0 || this.isRemotePasswordStatus(message)) {
-      return this.isDarkMode() ? '#FF6B6B' : '#C53D3D';
-    }
-    if (this.copyStatusMessage.length > 0) {
-      return this.isDarkMode() ? '#58C18F' : '#2D7A59';
-    }
-    return $r('sys.color.font_secondary');
+  private resolveHomeStatusPresentation(): HomeStatusPresentation {
+    return HomeStatusPresentationPolicy.resolve(new HomeStatusPresentationInput(
+      this.hasSyncConflict,
+      this.isSyncing,
+      this.errorMessage,
+      this.statusMessage,
+      this.copyStatusMessage,
+      this.resolveRegularHomeSyncStatus()
+    ));
   }
 
   private resolveRegularHomeSyncStatus(): string {
-    if (this.isSyncing) {
-      return '同步中...';
-    }
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let settings: WebDavSettings = SettingsService.getInstance().loadWebDavSettings(context);
-      if (!settings.enabled || settings.serverUrl.trim().length === 0 || settings.filePath.trim().length === 0) {
-        return 'WebDAV 同步未开启，本地模式。';
-      }
       let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
-      if (metadata.lastStatus === 'blocked' || this.isRemotePasswordStatus(metadata.lastError)) {
-        return '远端保管库需要主密码验证后才能继续同步。';
-      }
-      return '本地与 WebDAV 已经是最新版本。';
+      return HomeStatusPresentationPolicy.resolveRegularSyncStatus(new HomeRegularSyncStatusInput(
+        this.isSyncing,
+        settings.enabled && settings.serverUrl.trim().length > 0 && settings.filePath.trim().length > 0,
+        metadata.lastStatus === 'blocked',
+        false,
+        metadata.lastError
+      ));
     } catch (_error) {
-      return '同步设置暂不可用。';
+      return HomeStatusPresentationPolicy.resolveRegularSyncStatus(new HomeRegularSyncStatusInput(
+        this.isSyncing,
+        false,
+        false,
+        true,
+        ''
+      ));
     }
-  }
-
-  private isRemotePasswordStatus(message: string): boolean {
-    return message.indexOf('远端保管库') >= 0 ||
-      message.indexOf('远端密码库') >= 0 ||
-      message.indexOf('Master password is incorrect') >= 0 ||
-      message.indexOf('主密码') >= 0;
   }
 
   private showHomeSuccess(message: string): void {
@@ -1067,6 +889,37 @@ struct Index {
     this.errorMessage = message;
     this.copyStatusMessage = '';
     this.scheduleClearTransientHomeStatus();
+  }
+
+  private applySyncResultPresentation(presentation: SyncResultPresentation): void {
+    this.hasSyncConflict = presentation.hasSyncConflict;
+    this.syncStatusMessage = presentation.syncStatusMessage;
+    if (presentation.remotePasswordDialogAction === REMOTE_PASSWORD_DIALOG_SHOW) {
+      this.showRemotePasswordDialog = true;
+    } else if (presentation.remotePasswordDialogAction === REMOTE_PASSWORD_DIALOG_HIDE) {
+      this.showRemotePasswordDialog = false;
+    }
+    if (presentation.homeMessageKind === HOME_MESSAGE_KIND_ERROR) {
+      this.showHomeError(presentation.homeMessage);
+      return;
+    }
+    this.showHomeSuccess(presentation.homeMessage);
+  }
+
+  private applySyncActionOutcome(outcome: WebDavSyncActionOutcome): void {
+    if (outcome.vault !== undefined) {
+      this.applyVault(outcome.vault);
+    }
+    if (outcome.presentation !== undefined) {
+      this.applySyncResultPresentation(outcome.presentation);
+    }
+    if (outcome.errorMessage.length > 0) {
+      this.syncStatusMessage = outcome.errorMessage;
+      this.showHomeError(outcome.errorMessage);
+    }
+    if (outcome.remotePasswordErrorMessage.length > 0) {
+      this.remotePasswordError = outcome.remotePasswordErrorMessage;
+    }
   }
 
   private scheduleClearTransientHomeStatus(): void {
@@ -1096,16 +949,16 @@ struct Index {
   }
 
   onBackPress(): boolean {
-    if (this.activeRoute === 'edit') {
-      this.activeRoute = 'home';
-      return true;
+    let action: HomeBackAction = HomeRoutePolicy.resolveBackAction(this.activeRoute, this.activeTabIndex);
+    if (!action.shouldHandle) {
+      return false;
     }
-    if (this.activeTabIndex !== 0) {
-      this.activeTabIndex = 0;
-      this.tabsController.changeIndex(0);
-      return true;
+    this.activeRoute = action.nextRoute;
+    if (this.activeTabIndex !== action.nextTabIndex) {
+      this.tabsController.changeIndex(action.nextTabIndex);
     }
-    return false;
+    this.activeTabIndex = action.nextTabIndex;
+    return true;
   }
 
   private resolveHeaderHeight(): number {

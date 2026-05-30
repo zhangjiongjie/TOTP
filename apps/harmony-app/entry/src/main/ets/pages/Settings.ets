@@ -3,8 +3,9 @@ import { LocalVault } from '../model/LocalVault';
 import { DEFAULT_WEBDAV_FILE_PATH, WebDavSettings } from '../model/WebDavSettings';
 import { ExportVaultResult, ImportVaultResult, SettingsService, WebDavSettingsDraft } from '../services/SettingsService';
 import { WebDavSyncResult, WebDavSyncService } from '../services/WebDavSyncService';
-import { MasterPasswordChangeResultPolicy } from '../services/MasterPasswordChangeResultPolicy';
-import { InlineMessageState, TransientInlineMessagePolicy } from '../services/TransientInlineMessagePolicy';
+import { WebDavSettingsSaveOutcome, WebDavSettingsSaveResultPolicy } from '../policies/WebDavSettingsSaveResultPolicy';
+import { MasterPasswordChangeResultPolicy } from '../policies/MasterPasswordChangeResultPolicy';
+import { InlineMessageState, TransientInlineMessagePolicy } from '../policies/TransientInlineMessagePolicy';
 
 const BACKUP_MESSAGE_VISIBLE_MS: number = 2500;
 
@@ -15,7 +16,7 @@ export struct Settings {
   lastUpdatedLabel: string = '';
   bottomInset: number = 116;
   topInset: number = 0;
-  onSaved: (message: string) => void = (_message: string) => {};
+  onSaved: (message: string, vault: LocalVault | undefined, alreadySynced: boolean) => void = (_message: string, _vault: LocalVault | undefined, _alreadySynced: boolean) => {};
   onImported: (vault: LocalVault, message: string) => void = (_vault: LocalVault, _message: string) => {};
   onPasswordChanged: (vault: LocalVault, message: string) => void = (_vault: LocalVault, _message: string) => {};
 
@@ -438,10 +439,9 @@ export struct Settings {
       };
       let settings: WebDavSettings = this.service.saveWebDavSettings(context, draft);
       this.applySettings(settings);
-      let message: string = settings.enabled ? '已启用 WebDAV 同步' : 'WebDAV 同步未开启，本地模式。';
+      let syncResult: WebDavSyncResult | undefined = undefined;
       if (settings.enabled) {
-        let syncResult: WebDavSyncResult = await WebDavSyncService.getInstance().syncNow(context);
-        message = syncResult.message;
+        syncResult = await WebDavSyncService.getInstance().syncNow(context);
         if (syncResult.status === 'blocked' || syncResult.status === 'conflict') {
           this.webDavErrorMessage = syncResult.message;
           this.webDavStatusMessage = '';
@@ -453,7 +453,8 @@ export struct Settings {
         this.webDavErrorMessage = '';
         this.webDavStatusMessage = 'WebDAV 同步未开启，本地模式。';
       }
-      this.onSaved(message);
+      let outcome: WebDavSettingsSaveOutcome = WebDavSettingsSaveResultPolicy.resolve(settings.enabled, syncResult);
+      this.onSaved(outcome.message, outcome.syncedVault, outcome.alreadySynced);
     } catch (error) {
       this.webDavEnabled = !enabled;
       this.webDavErrorMessage = this.readErrorMessage(error, '保存设置失败，请稍后重试。');
