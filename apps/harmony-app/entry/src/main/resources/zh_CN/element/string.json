@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "EntryAbility_label",
-      "value": "Keyring"
+      "value": "密令"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Keyring HarmonyOS entry ability"
+      "value": "密令 HarmonyOS entry ability"
     },
     {
       "name": "module_desc",
-      "value": "Keyring HarmonyOS entry module"
+      "value": "密令 HarmonyOS entry module"
     }
   ]
 }

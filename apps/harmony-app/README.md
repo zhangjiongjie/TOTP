@@ -156,7 +156,7 @@ apps/harmony-app
 & 'C:\Program Files\Huawei\DevEco Studio\tools\ohpm\bin\ohpm.bat' install --all
 & 'C:\Program Files\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.bat' --mode module -p module=entry@ohosTest -p product=default -p buildMode=debug assembleHap
 & 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' install -r 'entry\build\default\outputs\ohosTest\entry-ohosTest-signed.hap'
-& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' shell aa test -b com.zhangjiongjie.totp -m entry_test -s unittest OpenHarmonyTestRunner -w 60
+& 'C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe' shell aa test -b com.totp.authenticator -m entry_test -s unittest OpenHarmonyTestRunner -w 60
 ```
 
 如果设备列表为空，先确认 `hdc list targets` 能看到真机或模拟器，再执行安装和 `aa test`。

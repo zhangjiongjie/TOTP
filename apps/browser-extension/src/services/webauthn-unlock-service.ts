@@ -1,3 +1,5 @@
+import { getAppName } from './app-name';
+
 export interface WebAuthnUnlockCredential {
   credentialId: string;
   createdAt: string;
@@ -21,7 +23,7 @@ export async function registerWebAuthnUnlock(): Promise<WebAuthnUnlockCredential
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge: createChallenge(),
-      rp: { name: '身份验证器' },
+      rp: { name: getAppName() },
       user: {
         id: createChallenge(16),
         name: 'local-user',

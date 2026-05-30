@@ -3,6 +3,7 @@ import { PopupShell } from '../components/layout/PopupShell';
 import { TopBar } from '../components/layout/TopBar';
 import { UnlockForm, type UnlockMode } from '../components/forms/UnlockForm';
 import { canUseWebAuthnUnlock } from '../../services/security-preferences-service';
+import { getAppName } from '../../services/app-name';
 
 interface UnlockPageProps {
   mode: UnlockMode;
@@ -64,7 +65,7 @@ export function UnlockPage({
 
   return (
     <PopupShell
-      topBar={<TopBar title="身份验证器" />}
+      topBar={<TopBar title={getAppName()} />}
     >
       <div
         style={{

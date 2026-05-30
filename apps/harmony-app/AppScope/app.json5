@@ -1,6 +1,6 @@
 {
   "app": {
-    "bundleName": "com.zhangjiongjie.totp",
+    "bundleName": "com.totp.authenticator",
     "vendor": "zhangjiongjie",
     "versionCode": 4,
     "versionName": "0.1.4",

@@ -10,7 +10,7 @@
           "keyAlias": "debugKey",
           "keyPassword": "0000001B244290AAF39B8EA9A6FBD3E563D80024C2CC4BF1A70BEC112905A317E803D72361D6F9C81D9C21",
           "signAlg": "SHA256withECDSA",
-          "profile": "C:/Users/zhang/Downloads/测试Debug.p7b",
+          "profile": "C:/Users/zhang/Downloads/TOTP调试Debug.p7b",
           "certpath": "C:/Users/zhang/Downloads/auto_debug_30086000739843014.cer.cer"
         }
       }

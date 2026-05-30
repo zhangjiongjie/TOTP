@@ -7,6 +7,7 @@ import { TopBar } from '../components/layout/TopBar';
 import { accountService } from '../../services/account-service';
 import { runRuntimeManualSync } from '../../services/runtime-sync-service';
 import { formatDateLabel } from '../../services/date-utils';
+import { getAppName } from '../../services/app-name';
 import { getAppState, subscribeApp, type AppSyncSnapshot } from '../../state/app-store';
 
 interface AccountListPageProps {
@@ -152,7 +153,7 @@ export function AccountListPage({
     <PopupShell
       topBar={
             <TopBar
-              title="身份验证器"
+              title={getAppName()}
               subtitle={`${runtimeAccounts.length} 个账号 · ${formatLastSyncLabel(
                 appState.sync.lastResultStatus,
                 appState.sync.lastSyncedAt

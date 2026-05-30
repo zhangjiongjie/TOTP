@@ -392,7 +392,7 @@ fun TotpApp() {
                 MissingVaultEffect { state.lock() }
             } else {
                 TotpMainScaffold(
-                    title = "身份验证器",
+                    title = context.getString(R.string.app_name),
                     selectedDestination = MainDestination.Home,
                     onHome = { state.navigate(TotpRoute.Home) },
                     onAdd = { state.navigate(TotpRoute.Add) },

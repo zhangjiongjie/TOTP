@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "TOTP App",
+  "name": "__MSG_appName__",
+  "default_locale": "en",
   "version": "0.1.0",
   "icons": {
     "16": "icons/icon-16.png",

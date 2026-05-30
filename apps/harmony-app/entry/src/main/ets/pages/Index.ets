@@ -1085,14 +1085,14 @@ struct Index {
     }
   }
 
-  private resolveRootTitle(): string {
+  private resolveRootTitle(): ResourceStr {
     if (this.activeTabIndex === 1) {
       return '添加账号';
     }
     if (this.activeTabIndex === 2) {
       return '设置';
     }
-    return '身份验证器';
+    return $r('app.string.EntryAbility_label');
   }
 
   onBackPress(): boolean {
