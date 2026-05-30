@@ -182,8 +182,21 @@ class TotpAppCoordinatorBoundaryTest {
         assertTrue(
             "Import success should stay visible even when local-change sync side effects run afterwards",
             importSource.indexOf("backupState.showSuccess(\"已导入 \${result.vault.accounts.size} 个账号\")") <
-                importSource.indexOf("onLocalChange(result.vault, password, result.vaultKey)")
+                importSource.indexOf("onLocalChange(result.vault, localPassword, result.vaultKey)")
         )
+    }
+
+    @Test
+    fun backupImportPromptsForPasswordOnlyAfterCurrentPasswordDecryptFails() {
+        val actionSource = File("src/main/java/com/totp/authenticator/app/BackupActionCoordinator.kt").readText()
+        val pickerSource = File("src/main/java/com/totp/authenticator/app/BackupPickerBridge.kt").readText()
+        val importSource = actionSource.substringAfter("fun importContent").substringBefore("fun exportWithPassword", missingDelimiterValue = actionSource.substringAfter("fun importContent"))
+        val pickerImportSource = pickerSource.substringAfter("val backupImportLauncher").substringBefore("LaunchedEffect(backupState.pendingExportFilename)")
+
+        assertTrue("The picker should prepare a ready import with the current password before asking for backup password", pickerImportSource.contains("prepareReadyImport(content, password.orEmpty())"))
+        assertFalse("The picker should not ask for an import password before trying the current password", pickerImportSource.contains("backupState.requestImportPassword(content)"))
+        assertTrue("Import failure should classify decrypt errors before prompting for backup password", importSource.contains("BackupPasswordPromptPolicy.shouldPromptForImportPassword(error)"))
+        assertTrue("Failed encrypted import should reuse the same selected content for the password retry", importSource.contains("backupState.requestImportPassword(content)"))
     }
 
     @Test

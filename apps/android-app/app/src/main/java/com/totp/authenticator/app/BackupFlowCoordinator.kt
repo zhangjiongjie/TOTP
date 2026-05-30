@@ -24,10 +24,15 @@ class BackupFlowCoordinator(
         )
     }
 
-    suspend fun importBackup(raw: String, password: String, currentVaultKey: ByteArray? = null): BackupImportResult {
+    suspend fun importBackup(
+        raw: String,
+        importPassword: String,
+        localPassword: String?,
+        currentVaultKey: ByteArray? = null
+    ): BackupImportResult {
         val startedAt = BackupPerfLogger.now()
         BackupPerfLogger.log("import flow start bytes=${raw.length}")
-        val importedVault = backupService.parseImport(raw, password, currentVaultKey)
+        val importedVault = backupService.parseImport(raw, importPassword, currentVaultKey)
         val parsedAt = BackupPerfLogger.now()
         BackupPerfLogger.log(
             "import flow parsed elapsed=${parsedAt - startedAt}ms accounts=${importedVault.vault.accounts.size} fastKey=${importedVault.vaultKey != null}"
@@ -36,8 +41,9 @@ class BackupFlowCoordinator(
             repository.saveWithVaultKey(importedVault.vault, currentVaultKey)
             currentVaultKey.copyOf()
         } else {
-            repository.save(importedVault.vault, password)
-            importedVault.vaultKey ?: repository.exportVaultKey(password)
+            val savePassword = localPassword ?: importPassword
+            repository.save(importedVault.vault, savePassword)
+            importedVault.vaultKey ?: repository.exportVaultKey(savePassword)
         }
         val savedAt = BackupPerfLogger.now()
         BackupPerfLogger.log("import flow saved elapsed=${savedAt - startedAt}ms save=${savedAt - parsedAt}ms")

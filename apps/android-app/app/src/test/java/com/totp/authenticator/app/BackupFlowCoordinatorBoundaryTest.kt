@@ -11,12 +11,13 @@ class BackupFlowCoordinatorBoundaryTest {
         val importSource = source.substringAfter("suspend fun importBackup").substringBefore("data class BackupExportPayload")
 
         assertTrue("Import should accept the already-unlocked local vault key", importSource.contains("currentVaultKey: ByteArray?"))
-        assertTrue("Import should pass the active local vault key into backup parsing", importSource.contains("backupService.parseImport(raw, password, currentVaultKey)"))
+        assertTrue("Import should pass the active local vault key into backup parsing", importSource.contains("backupService.parseImport(raw, importPassword, currentVaultKey)"))
         assertTrue("Import should save with the active local vault key when it is available", importSource.contains("repository.saveWithVaultKey(importedVault.vault, currentVaultKey)"))
         assertTrue("The active vault key fast path should return the key without exporting it from the password", importSource.contains("currentVaultKey.copyOf()"))
+        assertTrue("Import should save retries with the current local password instead of adopting the backup password", importSource.contains("val savePassword = localPassword ?: importPassword"))
         assertTrue(
             "Active vault key reuse should happen before the password KDF fallback",
-            importSource.indexOf("currentVaultKey.copyOf()") < importSource.indexOf("repository.exportVaultKey(password)")
+            importSource.indexOf("currentVaultKey.copyOf()") < importSource.indexOf("repository.exportVaultKey(savePassword)")
         )
     }
 
@@ -36,11 +37,15 @@ class BackupFlowCoordinatorBoundaryTest {
     @Test
     fun backupActionPassesActiveVaultKeyIntoImportFlow() {
         val source = File("src/main/java/com/totp/authenticator/app/BackupActionCoordinator.kt").readText()
-        val importSource = source.substringAfter("fun importContent").substringBefore("onSuccess = { result ->")
+        val importSource = source.substringAfter("fun importContent")
 
         assertTrue(
             "Backup import should pass the already-unlocked active vault key so local save avoids password KDF",
-            importSource.contains("backupFlowCoordinator.importBackup(content, password, appState.activeVaultKey?.copyOf())")
+            importSource.contains("backupFlowCoordinator.importBackup(content, importPassword, localPassword, localVaultKey)")
+        )
+        assertTrue(
+            "Backup import should keep local-change sync on the current local password, not the backup password",
+            importSource.contains("onLocalChange(result.vault, localPassword, result.vaultKey)")
         )
     }
 }

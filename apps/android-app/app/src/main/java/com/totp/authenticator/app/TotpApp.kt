@@ -580,10 +580,12 @@ private fun BackupMasterPasswordDialog(
     }
     val passwordLabel = when (action) {
         BackupPasswordAction.WebDavSync -> "远端主密码"
+        BackupPasswordAction.Import -> "备份文件密码"
         else -> "主密码"
     }
     val message = when (action) {
         BackupPasswordAction.WebDavSync -> "远端主密码已变化，请输入新的远端主密码后继续同步。"
+        BackupPasswordAction.Import -> "当前主密码无法解开该加密备份，请输入备份文件密码。导入成功后，本地仍使用当前主密码保存。"
         else -> "请输入主密码以继续。"
     }
     val hint = when (action) {

@@ -63,6 +63,14 @@ export class ImportVaultResult {
   }
 }
 
+export class ImportVaultSelection {
+  raw: string;
+
+  constructor(raw: string) {
+    this.raw = raw;
+  }
+}
+
 class PlainExportBundle {
   mode: string;
   vault: PlainExportVaultPayload;
@@ -233,6 +241,11 @@ export class SettingsService {
   }
 
   async importVault(context: common.UIAbilityContext): Promise<ImportVaultResult> {
+    let selection: ImportVaultSelection = await this.selectImportVault(context);
+    return this.importSelectedVault(context, selection);
+  }
+
+  async selectImportVault(context: common.UIAbilityContext): Promise<ImportVaultSelection> {
     let documentSelectOptions: picker.DocumentSelectOptions = new picker.DocumentSelectOptions();
     let documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(context);
     let selectedUris: string[] = await documentPicker.select(documentSelectOptions);
@@ -241,7 +254,11 @@ export class SettingsService {
     }
 
     let raw: string = this.readTextFile(selectedUris[0]);
-    let vault: LocalVault = this.parseImportContent(context, raw);
+    return new ImportVaultSelection(raw);
+  }
+
+  importSelectedVault(context: common.UIAbilityContext, selection: ImportVaultSelection, importPassword: string | undefined = undefined): ImportVaultResult {
+    let vault: LocalVault = this.parseImportContent(context, selection.raw, importPassword);
     let savedVault: LocalVault = this.vaultStore.save(context, vault);
     return new ImportVaultResult(savedVault, savedVault.accounts.length);
   }
@@ -275,7 +292,7 @@ export class SettingsService {
     return JSON.stringify(new EncryptedExportBundle(encryptedVault), null, 2);
   }
 
-  private parseImportContent(context: common.UIAbilityContext, raw: string): LocalVault {
+  private parseImportContent(context: common.UIAbilityContext, raw: string, importPassword: string | undefined = undefined): LocalVault {
     let parsed: VaultImportParseResult = VaultImportParser.parse(raw);
     if (parsed.format === VAULT_IMPORT_FORMAT_PLAIN || parsed.format === VAULT_IMPORT_FORMAT_LOCAL_JSON) {
       if (parsed.vault === undefined) {
@@ -285,12 +302,13 @@ export class SettingsService {
     }
     if (parsed.format === VAULT_IMPORT_FORMAT_REMOTE_V2 && parsed.encryptedVault !== undefined) {
       let remoteBlob: EncryptedRemoteVaultBlob = this.remoteCrypto.parseEncryptedBlob(parsed.encryptedVault);
-      let decrypted: RemoteVaultDecryption = this.remoteCrypto.decryptWithKey(remoteBlob);
-      this.vaultStore.saveWithRemoteKey(context, decrypted.vault, remoteBlob, decrypted.vaultKey);
+      let decrypted: RemoteVaultDecryption = importPassword === undefined ?
+        this.remoteCrypto.decryptWithKey(remoteBlob) :
+        this.remoteCrypto.decryptWithPassword(remoteBlob, importPassword);
       return decrypted.vault;
     }
     if (parsed.format === VAULT_IMPORT_FORMAT_ENCRYPTED_V1 && parsed.encryptedVault !== undefined) {
-      return VaultImportParser.createLocalVaultFromWebPayload(this.decryptWebVaultPayload(parsed.encryptedVault));
+      return VaultImportParser.createLocalVaultFromWebPayload(this.decryptWebVaultPayload(parsed.encryptedVault, importPassword));
     }
     return createLocalVaultFromJson(raw);
   }
@@ -317,10 +335,10 @@ export class SettingsService {
     }
   }
 
-  private decryptWebVaultPayload(encryptedVault: Record<string, Object>): Record<string, Object> {
+  private decryptWebVaultPayload(encryptedVault: Record<string, Object>, importPassword: string | undefined = undefined): Record<string, Object> {
     try {
       this.validateWebEncryptedVault(encryptedVault);
-      let password: string = UnlockService.getInstance().requireVaultPassword();
+      let password: string = importPassword === undefined ? UnlockService.getInstance().requireVaultPassword() : importPassword;
       let salt: Uint8Array = this.decodeBase64(this.readString(encryptedVault, 'salt', ''));
       let iv: Uint8Array = this.decodeBase64(this.readString(encryptedVault, 'iv', ''));
       let encryptedWithTag: Uint8Array = this.decodeBase64(this.readString(encryptedVault, 'ciphertext', ''));

@@ -12,7 +12,6 @@ export struct DeleteConfirmDialog {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#66000000')
         .onClick(() => {
           this.onCancel();
         })
@@ -21,12 +20,12 @@ export struct DeleteConfirmDialog {
         Text(this.title)
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#15233B')
+          .fontColor($r('sys.color.font_primary'))
 
         Text(this.content)
           .fontSize(14)
           .lineHeight(22)
-          .fontColor('#5A6B83')
+          .fontColor($r('sys.color.font_secondary'))
           .textAlign(TextAlign.Center)
           .width('100%')
 
@@ -36,8 +35,8 @@ export struct DeleteConfirmDialog {
             .height(44)
             .type(ButtonType.Capsule)
             .fontSize(15)
-            .fontColor('#4C607A')
-            .backgroundColor('#EEF3F9')
+            .fontColor($r('sys.color.font_primary'))
+            .backgroundColor($r('sys.color.comp_background_gray'))
             .onClick(() => {
               this.onCancel();
             })
@@ -55,14 +54,18 @@ export struct DeleteConfirmDialog {
         }
         .width('100%')
       }
-      .width('84%')
+      .width('86%')
       .padding(22)
-      .backgroundColor(Color.White)
-      .borderRadius(28)
+      .backgroundColor($r('app.color.dialog_surface'))
+      .border({ width: 1, color: $r('app.color.dialog_border') })
+      .borderRadius(26)
+      .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
       .onClick(() => {})
     }
     .width('100%')
     .height('100%')
     .alignContent(Alignment.Center)
+    .backdropBlur(18)
+    .backgroundColor($r('app.color.dialog_overlay'))
   }
 }

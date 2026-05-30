@@ -1,11 +1,12 @@
 import { common } from '@kit.AbilityKit';
 import { LocalVault } from '../model/LocalVault';
 import { DEFAULT_WEBDAV_FILE_PATH, WebDavSettings } from '../model/WebDavSettings';
-import { ExportVaultResult, ImportVaultResult, SettingsService, WebDavSettingsDraft } from '../services/SettingsService';
+import { ExportVaultResult, ImportVaultResult, ImportVaultSelection, SettingsService, WebDavSettingsDraft } from '../services/SettingsService';
 import { WebDavSyncResult, WebDavSyncService } from '../services/WebDavSyncService';
 import { WebDavSettingsSaveOutcome, WebDavSettingsSaveResultPolicy } from '../policies/WebDavSettingsSaveResultPolicy';
 import { MasterPasswordChangeResultPolicy } from '../policies/MasterPasswordChangeResultPolicy';
 import { InlineMessageState, TransientInlineMessagePolicy } from '../policies/TransientInlineMessagePolicy';
+import { ImportBackupPasswordPromptPolicy } from '../policies/ImportBackupPasswordPromptPolicy';
 
 const BACKUP_MESSAGE_VISIBLE_MS: number = 2500;
 
@@ -42,6 +43,10 @@ export struct Settings {
   @State private backupErrorMessage: string = '';
   @State private backupMessageVersion: number = 0;
   @State private isBackupBusy: boolean = false;
+  @State private showImportPasswordDialog: boolean = false;
+  @State private importBackupPassword: string = '';
+  @State private importPasswordErrorMessage: string = '';
+  @State private pendingImportSelection: ImportVaultSelection | undefined = undefined;
   private service: SettingsService = SettingsService.getInstance();
 
   aboutToAppear(): void {
@@ -69,6 +74,9 @@ export struct Settings {
       .scrollBar(BarState.Auto)
       if (this.showChangePasswordDialog || this.passwordChangeMessage.length > 0 || this.isPasswordChanging) {
         this.buildChangeMasterPasswordDialog()
+      }
+      if (this.showImportPasswordDialog) {
+        this.buildImportPasswordDialog()
       }
     }
     .width('100%')
@@ -544,6 +552,81 @@ export struct Settings {
     }
   }
 
+  @Builder
+  private buildImportPasswordDialog(): void {
+    Stack({ alignContent: Alignment.Top }) {
+      Scroll() {
+        Column() {
+          Column({ space: 12 }) {
+            Text('导入备份')
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('sys.color.font_primary'))
+              .width('100%')
+
+            Text('当前主密码无法解开该加密备份，请输入备份文件密码。导入成功后，本地仍使用当前主密码保存。')
+              .fontSize(14)
+              .lineHeight(21)
+              .fontColor($r('sys.color.font_secondary'))
+              .width('100%')
+
+            this.buildInput('备份文件密码', '备份文件密码', this.importBackupPassword, (value: string) => {
+              this.importBackupPassword = value;
+              this.importPasswordErrorMessage = '';
+            }, true)
+
+            if (this.importPasswordErrorMessage.length > 0) {
+              Text(this.importPasswordErrorMessage)
+                .fontSize(13)
+                .lineHeight(20)
+                .fontColor('#C53D3D')
+                .width('100%')
+            }
+
+            Row({ space: 10 }) {
+              Button('取消')
+                .height(42)
+                .layoutWeight(1)
+                .backgroundColor($r('sys.color.comp_background_gray'))
+                .fontColor($r('sys.color.font_primary'))
+                .onClick(() => {
+                  this.dismissImportPasswordDialog();
+                })
+
+              Button('导入')
+                .height(42)
+                .layoutWeight(1)
+                .backgroundColor('#2878C8')
+                .fontColor(Color.White)
+                .enabled(!this.isBackupBusy)
+                .onClick(() => {
+                  this.retryImportBackupWithPassword();
+                })
+            }
+            .width('100%')
+          }
+          .width('86%')
+          .padding(22)
+          .backgroundColor($r('app.color.dialog_surface'))
+          .border({ width: 1, color: $r('app.color.dialog_border') })
+          .borderRadius(26)
+          .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
+          .alignItems(HorizontalAlign.Center)
+          .margin({ top: 44, bottom: 180 })
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Center)
+      }
+      .width('100%')
+      .height('100%')
+      .scrollBar(BarState.Auto)
+    }
+    .width('100%')
+    .height('100%')
+    .backdropBlur(18)
+    .backgroundColor($r('app.color.dialog_overlay'))
+  }
+
   private async importBackup(): Promise<void> {
     if (this.isBackupBusy) {
       return;
@@ -552,15 +635,69 @@ export struct Settings {
     this.isBackupBusy = true;
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      let result: ImportVaultResult = await this.service.importVault(context);
+      let selection: ImportVaultSelection = await this.service.selectImportVault(context);
+      this.pendingImportSelection = selection;
+      this.importBackupPassword = '';
+      this.importPasswordErrorMessage = '';
+      this.finishSelectedImport(context, selection);
+    } catch (error) {
+      this.showBackupError(this.readErrorMessage(error, '导入备份失败，请稍后重试。'));
+      this.isBackupBusy = false;
+    }
+  }
+
+  private retryImportBackupWithPassword(): void {
+    if (this.isBackupBusy) {
+      return;
+    }
+    let password: string = this.importBackupPassword.trim();
+    if (password.length === 0) {
+      this.importPasswordErrorMessage = '请输入备份文件密码。';
+      return;
+    }
+    let selection: ImportVaultSelection | undefined = this.pendingImportSelection;
+    if (selection === undefined) {
+      this.dismissImportPasswordDialog();
+      this.showBackupError('未选择导入文件。');
+      return;
+    }
+    this.isBackupBusy = true;
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.finishSelectedImport(context, selection, password);
+  }
+
+  private finishSelectedImport(context: common.UIAbilityContext, selection: ImportVaultSelection, importPassword: string | undefined = undefined): void {
+    try {
+      let result: ImportVaultResult = this.service.importSelectedVault(context, selection, importPassword);
       let message: string = `已导入 ${result.importedCount} 个账号`;
+      this.dismissImportPasswordDialog();
+      this.pendingImportSelection = undefined;
       this.showBackupStatus(message);
       this.onImported(result.vault, message);
     } catch (error) {
-      this.showBackupError(this.readErrorMessage(error, '导入备份失败，请稍后重试。'));
+      let message: string = this.readErrorMessage(error, '导入备份失败，请稍后重试。');
+      if (importPassword === undefined && ImportBackupPasswordPromptPolicy.shouldPromptForPassword(message)) {
+        this.showImportPasswordDialog = true;
+        this.importPasswordErrorMessage = '';
+        return;
+      }
+      if (importPassword !== undefined && ImportBackupPasswordPromptPolicy.shouldPromptForPassword(message)) {
+        this.importPasswordErrorMessage = '备份文件密码不正确，请重试。';
+        return;
+      }
+      this.dismissImportPasswordDialog();
+      this.pendingImportSelection = undefined;
+      this.showBackupError(message);
     } finally {
       this.isBackupBusy = false;
     }
+  }
+
+  private dismissImportPasswordDialog(): void {
+    this.showImportPasswordDialog = false;
+    this.importBackupPassword = '';
+    this.importPasswordErrorMessage = '';
+    this.pendingImportSelection = undefined;
   }
 
   private showBackupStatus(message: string): void {

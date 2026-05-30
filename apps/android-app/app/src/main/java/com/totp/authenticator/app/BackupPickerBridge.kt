@@ -84,14 +84,8 @@ fun BackupPickerBridge(
             },
             onSuccess = { content ->
                 BackupPerfLogger.log("import picker content delivered elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms hasPassword=${password != null}")
-                if (password == null) {
-                    backupState.requestImportPassword(content)
-                    backupState.updateBusy(false)
-                    BackupPerfLogger.log("import picker password requested elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms")
-                } else {
-                    backupState.prepareReadyImport(content, password)
-                    BackupPerfLogger.log("import picker ready import prepared elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms")
-                }
+                backupState.prepareReadyImport(content, password.orEmpty())
+                BackupPerfLogger.log("import picker ready import prepared elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms")
             },
             onFailure = { error ->
                 BackupPerfLogger.log("import picker failed elapsed=${BackupPerfLogger.elapsedSince(selectedAt)}ms error=${error::class.java.simpleName}")

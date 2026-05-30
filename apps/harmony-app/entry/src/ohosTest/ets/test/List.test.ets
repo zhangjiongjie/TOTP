@@ -13,6 +13,7 @@ import homeRoutePolicyTest from './HomeRoutePolicy.test';
 import webDavSyncCoordinatorTest from './WebDavSyncCoordinator.test';
 import accountCopyPresentationPolicyTest from './AccountCopyPresentationPolicy.test';
 import homeSyncUiStatePolicyTest from './HomeSyncUiStatePolicy.test';
+import importBackupPasswordPromptPolicyTest from './ImportBackupPasswordPromptPolicy.test';
 
 export default function testsuite(): void {
   webDavVaultSyncAlgorithmsTest();
@@ -30,5 +31,6 @@ export default function testsuite(): void {
   webDavSyncCoordinatorTest();
   accountCopyPresentationPolicyTest();
   homeSyncUiStatePolicyTest();
+  importBackupPasswordPromptPolicyTest();
 }
 

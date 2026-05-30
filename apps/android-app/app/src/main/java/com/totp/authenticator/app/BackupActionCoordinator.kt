@@ -82,34 +82,44 @@ class BackupActionCoordinator(
         )
     }
 
-    fun importContent(content: String, password: String) {
+    fun importContent(content: String, importPassword: String) {
         val requestedAt = BackupPerfLogger.now()
         BackupPerfLogger.log("import action received bytes=${content.length}")
         backupState.clearMessage()
         backupState.showSuccess("正在导入...")
+        val localPassword = appState.activePassword
+        val localVaultKey = appState.activeVaultKey?.copyOf()
         BackupPerfLogger.log("import action progress shown elapsed=${BackupPerfLogger.elapsedSince(requestedAt)}ms")
         backupState.launchTask(
             task = {
                 withContext(Dispatchers.IO) {
-                    backupFlowCoordinator.importBackup(content, password, appState.activeVaultKey?.copyOf())
+                    backupFlowCoordinator.importBackup(content, importPassword, localPassword, localVaultKey)
                 }
             },
             onSuccess = { result ->
                 val successAt = BackupPerfLogger.now()
                 BackupPerfLogger.log("import action worker success elapsed=${successAt - requestedAt}ms")
-                appState.updateUnlockedVault(result.vault, password, result.vaultKey)
+                if (localPassword != null) {
+                    appState.updateUnlockedVault(result.vault, localPassword, result.vaultKey)
+                } else {
+                    appState.updateUnlockedVaultWithKey(result.vault, result.vaultKey)
+                }
                 val stateUpdatedAt = BackupPerfLogger.now()
                 BackupPerfLogger.log("import action app state updated elapsed=${stateUpdatedAt - requestedAt}ms update=${stateUpdatedAt - successAt}ms")
                 backupState.showSuccess("已导入 ${result.vault.accounts.size} 个账号")
                 val messageShownAt = BackupPerfLogger.now()
                 BackupPerfLogger.log("import action success shown elapsed=${messageShownAt - requestedAt}ms show=${messageShownAt - stateUpdatedAt}ms")
-                onLocalChange(result.vault, password, result.vaultKey)
+                onLocalChange(result.vault, localPassword, result.vaultKey)
                 val localChangeAt = BackupPerfLogger.now()
                 BackupPerfLogger.log("import action local change requested elapsed=${localChangeAt - requestedAt}ms hook=${localChangeAt - messageShownAt}ms")
             },
             onFailure = { error ->
                 BackupPerfLogger.log("import action failed elapsed=${BackupPerfLogger.elapsedSince(requestedAt)}ms error=${error::class.java.simpleName}")
-                backupState.showError(error.message ?: "导入备份失败，请稍后重试。")
+                if (BackupPasswordPromptPolicy.shouldPromptForImportPassword(error)) {
+                    backupState.requestImportPassword(content)
+                } else {
+                    backupState.showError(error.message ?: "导入备份失败，请稍后重试。")
+                }
             }
         )
     }
