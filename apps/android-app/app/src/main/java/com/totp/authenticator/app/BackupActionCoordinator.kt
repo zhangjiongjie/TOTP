@@ -19,11 +19,11 @@ class BackupActionCoordinator(
             backupState.showError("保管库未解锁。")
             return
         }
-        if (password == null) {
-            exportWithVaultKey(vaultKey!!)
+        if (vaultKey != null) {
+            exportWithVaultKey(vaultKey.copyOf())
             return
         }
-        exportWithPassword(password)
+        exportWithPassword(password!!)
     }
 
     fun startImport() {

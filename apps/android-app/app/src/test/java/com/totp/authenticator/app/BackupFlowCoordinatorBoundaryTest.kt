@@ -48,4 +48,19 @@ class BackupFlowCoordinatorBoundaryTest {
             importSource.contains("onLocalChange(result.vault, localPassword, result.vaultKey)")
         )
     }
+
+    @Test
+    fun backupExportPrefersActiveVaultKeyBeforePasswordKdf() {
+        val source = File("src/main/java/com/totp/authenticator/app/BackupActionCoordinator.kt").readText()
+        val exportSource = source.substringAfter("fun startExport").substringBefore("fun startImport")
+
+        assertTrue(
+            "Backup export should use the already-unlocked active vault key before password KDF",
+            exportSource.contains("if (vaultKey != null)")
+        )
+        assertTrue(
+            "Vault-key export should be selected before password export when both are available",
+            exportSource.indexOf("exportWithVaultKey(vaultKey.copyOf())") < exportSource.indexOf("exportWithPassword(")
+        )
+    }
 }
