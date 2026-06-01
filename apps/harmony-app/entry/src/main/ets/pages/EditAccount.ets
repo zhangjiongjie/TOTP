@@ -4,6 +4,7 @@ import { DeleteConfirmDialog } from '../components/dialogs/DeleteConfirmDialog';
 import { LocalVault } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
 import { AccountDraft, AccountEditorService } from '../services/AccountEditorService';
+import { AppI18n } from '../utils/AppI18n';
 
 @Component
 export struct EditAccount {
@@ -69,31 +70,31 @@ export struct EditAccount {
           Text(this.errorMessage)
             .fontSize(13)
             .lineHeight(20)
-            .fontColor('#C53D3D')
+            .fontColor($r('app.color.color_danger'))
             .width('100%')
         }
 
         Row({ space: 12 }) {
-          Button('删除')
+          Button($r('app.string.action_delete'))
             .layoutWeight(1)
             .height(50)
             .type(ButtonType.Capsule)
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
-            .fontColor('#B53E3E')
-            .backgroundColor('#FDEDED')
+            .fontColor($r('app.color.color_danger_text'))
+            .backgroundColor($r('app.color.color_danger_soft'))
             .onClick(() => {
               this.showDeleteDialog = true;
             })
 
-          Button('保存')
+          Button($r('app.string.action_save'))
             .layoutWeight(1)
             .height(50)
             .type(ButtonType.Capsule)
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
-            .fontColor(Color.White)
-            .backgroundColor('#1E5AA8')
+            .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
+            .backgroundColor($r('app.color.color_primary'))
             .onClick(() => {
               this.saveAccount();
             })
@@ -106,10 +107,10 @@ export struct EditAccount {
 
       if (this.showDeleteDialog) {
         DeleteConfirmDialog({
-          title: '确认删除',
-          content: '删除后将从本地保管库移除该账号，这个操作无法撤销。',
-          confirmText: '删除',
-          cancelText: '取消',
+          title: $r('app.string.delete_confirm_title'),
+          content: $r('app.string.delete_account_message'),
+          confirmText: $r('app.string.action_delete'),
+          cancelText: $r('app.string.action_cancel'),
           onConfirm: () => {
             this.deleteAccount();
           },
@@ -145,7 +146,7 @@ export struct EditAccount {
       this.onSaved(vault);
     } catch (error) {
       let message: string = this.readErrorMessage(error);
-      this.errorMessage = message.length > 0 ? message : '保存失败，请稍后重试。';
+      this.errorMessage = message.length > 0 ? message : this.appString($r('app.string.error_save_failed'), 'Save failed. Please try again later.');
     }
   }
 
@@ -159,7 +160,7 @@ export struct EditAccount {
       this.onDeleted(vault);
     } catch (error) {
       let message: string = this.readErrorMessage(error);
-      this.errorMessage = message.length > 0 ? message : '删除失败，请稍后重试。';
+      this.errorMessage = message.length > 0 ? message : this.appString($r('app.string.error_delete_failed'), 'Delete failed. Please try again later.');
     }
   }
 
@@ -169,13 +170,13 @@ export struct EditAccount {
     let secret: string = this.secret.trim().replace(/\s+/g, '');
 
     if (issuer.length === 0) {
-      throw new Error('请输入发行方名称');
+      throw new Error(this.appString($r('app.string.error_validate_issuer'), 'Enter an issuer'));
     }
     if (accountName.length === 0) {
-      throw new Error('请输入账号名称');
+      throw new Error(this.appString($r('app.string.error_validate_account_name'), 'Enter an account name'));
     }
     if (secret.length === 0) {
-      throw new Error('请输入 TOTP 密钥');
+      throw new Error(this.appString($r('app.string.error_validate_secret'), 'Enter a TOTP secret'));
     }
 
     return {
@@ -192,7 +193,7 @@ export struct EditAccount {
   private applyOtpauthUri(): void {
     let uri: string = this.otpauthUri.trim();
     if (uri.length === 0) {
-      this.errorMessage = '请先粘贴 otpauth 链接';
+      this.errorMessage = this.appString($r('app.string.error_paste_otpauth_first'), 'Paste an otpauth link first');
       return;
     }
 
@@ -210,7 +211,7 @@ export struct EditAccount {
       this.errorMessage = '';
     } catch (error) {
       let message: string = this.readErrorMessage(error);
-      this.errorMessage = message.length > 0 ? message : 'otpauth 链接解析失败';
+      this.errorMessage = message.length > 0 ? message : this.appString($r('app.string.error_otpauth_parse_failed'), 'Failed to parse the otpauth link');
     }
   }
 
@@ -218,7 +219,7 @@ export struct EditAccount {
     let normalizedUri: string = uri.trim();
     let prefix: string = 'otpauth://totp/';
     if (!normalizedUri.startsWith(prefix)) {
-      throw new Error('仅支持 otpauth://totp/ 链接');
+      throw new Error(this.appString($r('app.string.error_invalid_otpauth_scheme'), 'Only otpauth://totp/ links are supported'));
     }
 
     let content: string = normalizedUri.substring(prefix.length);
@@ -241,13 +242,13 @@ export struct EditAccount {
     let secret: string = this.readParam(params, 'secret', '');
 
     if (issuer.length === 0) {
-      throw new Error('otpauth 链接缺少 issuer');
+      throw new Error(this.appString($r('app.string.error_otpauth_missing_issuer'), 'The otpauth link is missing an issuer'));
     }
     if (accountName.length === 0) {
-      throw new Error('otpauth 链接缺少账号名称');
+      throw new Error(this.appString($r('app.string.error_otpauth_missing_account'), 'The otpauth link is missing an account name'));
     }
     if (secret.length === 0) {
-      throw new Error('otpauth 链接缺少 secret');
+      throw new Error(this.appString($r('app.string.error_otpauth_missing_secret'), 'The otpauth link is missing a secret'));
     }
 
     return {
@@ -306,6 +307,11 @@ export struct EditAccount {
     let label: string = `${labelIssuer}:${labelAccountName}`;
 
     return `otpauth://totp/${encodeURIComponent(label)}?secret=${encodeURIComponent(this.account.secret)}&issuer=${encodeURIComponent(labelIssuer)}&algorithm=${encodeURIComponent(this.account.algorithm)}&digits=${this.account.digits}&period=${this.account.period}`;
+  }
+
+  private appString(resource: Resource, fallback: string): string {
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return AppI18n.string(context, resource, fallback);
   }
 }
 

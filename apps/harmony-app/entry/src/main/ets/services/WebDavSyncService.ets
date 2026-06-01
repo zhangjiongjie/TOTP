@@ -8,6 +8,7 @@ import { SettingsStore } from '../storage/SettingsStore';
 import { WebDavClient, WebDavRemoteSnapshot, WebDavUploadResult } from './WebDavClient';
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService } from './RemoteVaultCryptoService';
 import { UnlockService } from './UnlockService';
+import { AppI18n } from '../utils/AppI18n';
 import {
   WEBDAV_SYNC_DECISION_CONFLICT,
   WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT,
@@ -80,7 +81,7 @@ export class WebDavSyncService {
   private async syncCoreLocked(context: common.UIAbilityContext, trigger: string): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
-      return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
+      return new WebDavSyncResult('disabled', this.appString($r('app.string.webdav_disabled_local_only'), 'WebDAV is not enabled. Sync stays on this device.'));
     }
     this.validateSettings(settings);
 
@@ -98,7 +99,7 @@ export class WebDavSyncService {
       syncProfileKey
     );
     if (remoteDownload.blocked) {
-      return new WebDavSyncResult('blocked', '远端保管库需要主密码验证后才能继续同步。');
+      return new WebDavSyncResult('blocked', this.appString($r('app.string.home_sync_remote_password_required'), 'Verify the remote vault master password to continue syncing.'));
     }
     let remoteSnapshot: WebDavRemoteSnapshot | undefined = remoteDownload.snapshot;
     let localFingerprint: string = this.createFingerprint(localVault);
@@ -107,7 +108,7 @@ export class WebDavSyncService {
       let decision: WebDavSyncDecision = WebDavSyncDecision.decideMissingRemote(localVault.accounts.length);
       if (decision.action === WEBDAV_SYNC_DECISION_IDLE_EMPTY) {
         this.saveMetadata(context, syncProfileKey, localFingerprint, this.createBaseVaultJson(localVault), '', '', 'idle', '');
-        return new WebDavSyncResult('idle', '远端还没有保管库，本地也为空。');
+        return new WebDavSyncResult('idle', this.appString($r('app.string.webdav_remote_empty_local_empty'), 'Remote vault does not exist yet, and local vault is empty.'));
       }
       return await this.pushLocal(context, settings, localVault, localFingerprint, '', WebDavSyncTriggerPolicy.resolveLocalPushMessage(trigger));
     }
@@ -135,16 +136,16 @@ export class WebDavSyncService {
     }
     if (decision.action === WEBDAV_SYNC_DECISION_SYNCED_EMPTY) {
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(remoteSnapshot.vault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
-      return new WebDavSyncResult('synced', '本地与 WebDAV 都为空。');
+      return new WebDavSyncResult('synced', this.appString($r('app.string.webdav_both_empty'), 'Local and WebDAV are both empty.'));
     }
     if (decision.action === WEBDAV_SYNC_DECISION_SYNCED) {
       this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(localVault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
-      return new WebDavSyncResult('synced', '本地与 WebDAV 已是最新版本。');
+      return new WebDavSyncResult('synced', this.appString($r('app.string.webdav_synced_latest'), 'Local and WebDAV are up to date.'));
     }
     if (decision.action === WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT) {
-      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '首次绑定时本地和远端都有数据。');
-      return new WebDavSyncResult('conflict', '首次绑定时本地和远端都有数据，请先决定保留哪一侧。');
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', this.appString($r('app.string.webdav_first_bind_conflict_metadata'), 'Local and remote both contain data during first binding.'));
+      return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_first_bind_conflict'), 'Local and remote both contain data during first binding. Choose which side to keep first.'));
     }
     if (decision.action === WEBDAV_SYNC_DECISION_PUSH_LOCAL) {
       this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
@@ -152,7 +153,7 @@ export class WebDavSyncService {
     }
     if (decision.action === WEBDAV_SYNC_DECISION_REFRESH_BASELINE) {
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(localVault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
-      return new WebDavSyncResult('synced', '同步基线已刷新。');
+      return new WebDavSyncResult('synced', this.appString($r('app.string.webdav_baseline_refreshed'), 'Sync baseline refreshed.'));
     }
 
     if (decision.action === WEBDAV_SYNC_DECISION_MERGE_AND_PUSH && mergedVault !== undefined) {
@@ -164,18 +165,18 @@ export class WebDavSyncService {
         savedMergedVault,
         mergedFingerprint,
         remoteSnapshot.etag,
-        '本地和远端修改已自动合并并同步到 WebDAV。',
+        this.appString($r('app.string.webdav_auto_merged_synced'), 'Local and remote changes were merged automatically and synced to WebDAV.'),
         remoteSnapshot
       );
     }
 
     if (decision.action !== WEBDAV_SYNC_DECISION_CONFLICT) {
-      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '同步决策无法处理。');
-      return new WebDavSyncResult('conflict', '同步决策无法处理，请稍后重试。');
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', this.appString($r('app.string.webdav_decision_unhandled_metadata'), 'Sync decision could not be handled.'));
+      return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_decision_unhandled'), 'Sync decision could not be handled. Please try again later.'));
     }
 
-    this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', '本地和远端都发生了变化。');
-    return new WebDavSyncResult('conflict', '本地和远端都发生了变化，请在首页选择保留本地或使用远端。');
+    this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, metadata.remoteRevision, metadata.remoteEtag, 'conflict', this.appString($r('app.string.webdav_both_changed_metadata'), 'Local and remote both changed.'));
+    return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_both_changed_choose'), 'Local and remote both changed. Choose keep local or use remote on the home page.'));
   }
 
   private async syncLocalChangeLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
@@ -191,7 +192,7 @@ export class WebDavSyncService {
   private async keepLocalVersionLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
-      return new WebDavSyncResult('disabled', '未启用 WebDAV，无法处理同步冲突。');
+      return new WebDavSyncResult('disabled', this.appString($r('app.string.webdav_disabled_conflict'), 'WebDAV is not enabled. Sync conflicts cannot be resolved.'));
     }
     this.validateSettings(settings);
 
@@ -201,7 +202,7 @@ export class WebDavSyncService {
     let syncProfileKey: string = this.createSyncProfileKey(settings);
     let remoteDownload: WebDavDownloadResult = await this.downloadOrBlocked(context, settings, metadata, syncProfileKey);
     if (remoteDownload.blocked) {
-      return new WebDavSyncResult('blocked', '远端保管库需要主密码验证后才能继续同步。');
+      return new WebDavSyncResult('blocked', this.appString($r('app.string.home_sync_remote_password_required'), 'Verify the remote vault master password to continue syncing.'));
     }
     let remoteSnapshot: WebDavRemoteSnapshot | undefined = remoteDownload.snapshot;
     let previousEtag: string = remoteSnapshot === undefined ? '' : remoteSnapshot.etag;
@@ -228,7 +229,7 @@ export class WebDavSyncService {
   private async useRemoteVersionLocked(context: common.UIAbilityContext): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
-      return new WebDavSyncResult('disabled', '未启用 WebDAV，无法处理同步冲突。');
+      return new WebDavSyncResult('disabled', this.appString($r('app.string.webdav_disabled_conflict'), 'WebDAV is not enabled. Sync conflicts cannot be resolved.'));
     }
     this.validateSettings(settings);
 
@@ -239,11 +240,11 @@ export class WebDavSyncService {
       this.createSyncProfileKey(settings)
     );
     if (remoteDownload.blocked) {
-      return new WebDavSyncResult('blocked', '远端保管库需要主密码验证后才能继续同步。');
+      return new WebDavSyncResult('blocked', this.appString($r('app.string.home_sync_remote_password_required'), 'Verify the remote vault master password to continue syncing.'));
     }
     let remoteSnapshot: WebDavRemoteSnapshot | undefined = remoteDownload.snapshot;
     if (remoteSnapshot === undefined) {
-      return new WebDavSyncResult('missing', '远端保管库不存在，无法使用远端版本。');
+      return new WebDavSyncResult('missing', this.appString($r('app.string.webdav_remote_missing_use'), 'Remote vault does not exist. Cannot use the remote version.'));
     }
 
     let remoteFingerprint: string = this.createFingerprint(remoteSnapshot.vault);
@@ -256,7 +257,7 @@ export class WebDavSyncService {
     vault: LocalVault,
     fingerprint: string,
     previousEtag: string,
-    message: string = '本地修改已同步到 WebDAV。',
+    message: string = AppI18n.globalString($r('app.string.webdav_local_modified_synced'), 'Local updates synced to WebDAV.'),
     keySource: WebDavRemoteSnapshot | undefined = undefined
   ): Promise<WebDavSyncResult> {
     let revision: string = this.createRevision(fingerprint);
@@ -273,7 +274,7 @@ export class WebDavSyncService {
   ): WebDavSyncResult {
     let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, snapshot.vault, snapshot.encryptedVault, snapshot.vaultKey);
     this.saveMetadata(context, this.createSyncProfileKey(settings), fingerprint, this.createBaseVaultJson(vault), snapshot.revision, snapshot.etag, 'synced', '');
-    return new WebDavSyncResult('pulled', '已从 WebDAV 恢复远端版本。', vault);
+    return new WebDavSyncResult('pulled', this.appString($r('app.string.webdav_restored_remote'), 'Restored the remote version from WebDAV.'), vault);
   }
 
   async verifyRemoteMasterPassword(context: common.UIAbilityContext, remotePassword: string): Promise<WebDavSyncResult> {
@@ -285,18 +286,18 @@ export class WebDavSyncService {
   private async verifyRemoteMasterPasswordLocked(context: common.UIAbilityContext, remotePassword: string): Promise<WebDavSyncResult> {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     if (!settings.enabled) {
-      return new WebDavSyncResult('disabled', '未启用 WebDAV，同步仅保留在本机。');
+      return new WebDavSyncResult('disabled', this.appString($r('app.string.webdav_disabled_local_only'), 'WebDAV is not enabled. Sync stays on this device.'));
     }
     this.validateSettings(settings);
     if (remotePassword.trim().length === 0) {
-      throw new Error('请输入远端主密码。');
+      throw new Error(this.appString($r('app.string.error_remote_master_password_required'), 'Enter the remote master password.'));
     }
 
     let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
     let syncProfileKey: string = this.createSyncProfileKey(settings);
     let remoteSnapshot: WebDavRemoteSnapshot | undefined = await this.client.downloadWithPassword(settings, remotePassword.trim());
     if (remoteSnapshot === undefined) {
-      throw new Error('远端保管库不存在。');
+      throw new Error(this.appString($r('app.string.webdav_remote_missing_use'), 'Remote vault does not exist. Cannot use the remote version.'));
     }
 
     let localVault: LocalVault = this.vaultStore.load(context);
@@ -313,14 +314,14 @@ export class WebDavSyncService {
       let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, remoteSnapshot.vault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(vault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
       UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
-      return new WebDavSyncResult('synced', '本地与 WebDAV 都为空。', vault);
+      return new WebDavSyncResult('synced', this.appString($r('app.string.webdav_both_empty'), 'Local and WebDAV are both empty.'), vault);
     }
 
     if (localFingerprint === remoteFingerprint) {
       let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, remoteSnapshot.vault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(vault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
       UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
-      return new WebDavSyncResult('pulled', '远端密码库已验证，本地密码已同步更新。', vault);
+      return new WebDavSyncResult('pulled', this.appString($r('app.string.webdav_remote_password_verified_updated'), 'Remote vault password verified. Local password updated.'), vault);
     }
 
     let baseVault: LocalVault | undefined = this.loadBaseVault(metadata);
@@ -329,25 +330,25 @@ export class WebDavSyncService {
         let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, remoteSnapshot.vault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
         this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(vault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
         UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
-        return new WebDavSyncResult('pulled', '已从 WebDAV 恢复远端版本。', vault);
+        return new WebDavSyncResult('pulled', this.appString($r('app.string.webdav_restored_remote'), 'Restored the remote version from WebDAV.'), vault);
       }
       if (remoteSnapshot.vault.accounts.length === 0) {
         let savedLocal: LocalVault = this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-        let pushed: WebDavSyncResult = await this.pushLocal(context, settings, savedLocal, this.createFingerprint(savedLocal), remoteSnapshot.etag, '本地修改已同步到 WebDAV。', remoteSnapshot);
+        let pushed: WebDavSyncResult = await this.pushLocal(context, settings, savedLocal, this.createFingerprint(savedLocal), remoteSnapshot.etag, this.appString($r('app.string.webdav_local_modified_synced'), 'Local updates synced to WebDAV.'), remoteSnapshot);
         UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
         return pushed;
       }
       this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端存在同步冲突，请先解决冲突后再继续同步。');
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', this.appString($r('app.string.webdav_conflict_continue_metadata'), 'Local and remote have a sync conflict. Resolve it before continuing sync.'));
       UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
-      return new WebDavSyncResult('conflict', '本地和远端都有数据，请先处理同步冲突。');
+      return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_conflict_resolve_first_data'), 'Local and remote both contain data. Resolve the sync conflict first.'));
     }
 
     let localChanged: boolean = localFingerprint !== metadata.baseFingerprint;
     let remoteChanged: boolean = remoteFingerprint !== metadata.baseFingerprint;
     if (localChanged && !remoteChanged) {
       let savedLocal: LocalVault = this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-      let pushed: WebDavSyncResult = await this.pushLocal(context, settings, savedLocal, this.createFingerprint(savedLocal), remoteSnapshot.etag, '本地修改已同步到 WebDAV。', remoteSnapshot);
+      let pushed: WebDavSyncResult = await this.pushLocal(context, settings, savedLocal, this.createFingerprint(savedLocal), remoteSnapshot.etag, this.appString($r('app.string.webdav_local_modified_synced'), 'Local updates synced to WebDAV.'), remoteSnapshot);
       UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
       return pushed;
     }
@@ -360,21 +361,21 @@ export class WebDavSyncService {
       let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, remoteSnapshot.vault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
       this.saveMetadata(context, syncProfileKey, remoteFingerprint, this.createBaseVaultJson(vault), remoteSnapshot.revision, remoteSnapshot.etag, 'synced', '');
       UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
-      return new WebDavSyncResult('synced', '同步基线已刷新。', vault);
+      return new WebDavSyncResult('synced', this.appString($r('app.string.webdav_baseline_refreshed'), 'Sync baseline refreshed.'), vault);
     }
 
     let mergedVault: LocalVault | undefined = this.mergeAccountLevelChanges(metadata, localVault, remoteSnapshot.vault);
     if (mergedVault !== undefined) {
       let savedMerged: LocalVault = this.vaultStore.saveWithRemoteKey(context, mergedVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-      let pushed: WebDavSyncResult = await this.pushLocal(context, settings, savedMerged, this.createFingerprint(savedMerged), remoteSnapshot.etag, '本地和远端修改已自动合并并同步到 WebDAV。', remoteSnapshot);
+      let pushed: WebDavSyncResult = await this.pushLocal(context, settings, savedMerged, this.createFingerprint(savedMerged), remoteSnapshot.etag, this.appString($r('app.string.webdav_auto_merged_synced'), 'Local and remote changes were merged automatically and synced to WebDAV.'), remoteSnapshot);
       UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
       return pushed;
     }
 
     this.vaultStore.saveWithRemoteKey(context, localVault, remoteSnapshot.encryptedVault, remoteSnapshot.vaultKey);
-    this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端存在同步冲突，请先解决冲突后再继续同步。');
+    this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', this.appString($r('app.string.webdav_conflict_continue_metadata'), 'Local and remote have a sync conflict. Resolve it before continuing sync.'));
     UnlockService.getInstance().adoptRemoteMasterPassword(context, remotePassword);
-    return new WebDavSyncResult('conflict', '本地和远端存在账号冲突，请先处理同步冲突。');
+    return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_conflict_account'), 'Local and remote account data conflict. Resolve the sync conflict first.'));
   }
 
   async changeMasterPassword(context: common.UIAbilityContext, currentPassword: string, nextPassword: string): Promise<WebDavSyncResult> {
@@ -387,12 +388,12 @@ export class WebDavSyncService {
     let settings: WebDavSettings = this.settingsStore.loadWebDavSettings(context);
     let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
     if (settings.enabled && metadata.lastStatus === 'blocked') {
-      throw new Error('远端保管库需要主密码验证后才能继续同步，请先验证远端主密码。');
+      throw new Error(this.appString($r('app.string.webdav_remote_verify_before_password_change'), 'Verify the remote vault master password before continuing sync, then change the master password.'));
     }
     if (!settings.enabled) {
       this.vaultStore.rewrapMasterPassword(context, currentPassword, nextPassword);
       UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
-      return new WebDavSyncResult('local', '主密码已修改。');
+      return new WebDavSyncResult('local', this.appString($r('app.string.master_password_changed'), 'Master password changed.'));
     }
 
     this.validateSettings(settings);
@@ -406,7 +407,7 @@ export class WebDavSyncService {
     try {
       remoteSnapshot = await this.client.downloadWithPassword(settings, currentPassword);
     } catch (_error) {
-      return new WebDavSyncResult('blocked', '远端保管库需要验证后才能修改主密码。');
+      return new WebDavSyncResult('blocked', this.appString($r('app.string.webdav_remote_verify_before_password_change_short'), 'Verify the remote vault before changing the master password.'));
     }
     if (remoteSnapshot === undefined) {
       let localVaultKey: Uint8Array = this.vaultStore.exportVaultKey(context, currentPassword);
@@ -417,7 +418,7 @@ export class WebDavSyncService {
       let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, localVault, encryptedVault, localVaultKey);
       UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
       this.saveMetadata(context, syncProfileKey, localFingerprint, this.createBaseVaultJson(vault), upload.revision, upload.etag, 'synced', '');
-      return new WebDavSyncResult('pushed', '主密码已修改并同步到 WebDAV。', vault);
+      return new WebDavSyncResult('pushed', this.appString($r('app.string.master_password_changed_webdav'), 'Master password changed and synced to WebDAV.'), vault);
     }
 
     let localFingerprint: string = this.createFingerprint(localVault);
@@ -442,8 +443,8 @@ export class WebDavSyncService {
     if (decision.action === WEBDAV_SYNC_DECISION_SYNCED) {
       finalVault = localVault;
     } else if (decision.action === WEBDAV_SYNC_DECISION_FIRST_BIND_CONFLICT) {
-      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '首次绑定时本地和远端都有数据。');
-      return new WebDavSyncResult('conflict', '主密码未同步：首次绑定时本地和远端都有数据，请先完成数据同步。');
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', this.appString($r('app.string.webdav_first_bind_conflict_metadata'), 'Local and remote both contain data during first binding.'));
+      return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_password_first_bind_conflict'), 'Master password was not synced: local and remote both contain data during first binding. Complete data sync first.'));
     } else if (decision.action === WEBDAV_SYNC_DECISION_PUSH_LOCAL) {
       finalVault = localVault;
     } else if (decision.action === WEBDAV_SYNC_DECISION_PULL_REMOTE) {
@@ -451,8 +452,8 @@ export class WebDavSyncService {
     } else if (decision.action === WEBDAV_SYNC_DECISION_MERGE_AND_PUSH && mergedVault !== undefined) {
       finalVault = mergedVault;
     } else {
-      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', '本地和远端都发生了变化。');
-      return new WebDavSyncResult('conflict', '本地和远端都发生了变化，请先解决冲突后再修改主密码。');
+      this.saveMetadata(context, syncProfileKey, metadata.baseFingerprint, metadata.baseVaultJson, remoteSnapshot.revision, remoteSnapshot.etag, 'conflict', this.appString($r('app.string.webdav_both_changed_metadata'), 'Local and remote both changed.'));
+      return new WebDavSyncResult('conflict', this.appString($r('app.string.webdav_both_changed_before_password_change'), 'Local and remote both changed. Resolve the conflict before changing the master password.'));
     }
 
     let fingerprint: string = this.createFingerprint(finalVault);
@@ -468,7 +469,7 @@ export class WebDavSyncService {
     let vault: LocalVault = this.vaultStore.saveWithRemoteKey(context, finalVault, encryptedVault, remoteSnapshot.vaultKey);
     UnlockService.getInstance().updateMasterPassword(context, currentPassword, nextPassword);
     this.saveMetadata(context, syncProfileKey, fingerprint, this.createBaseVaultJson(vault), upload.revision, upload.etag, 'synced', '');
-    return new WebDavSyncResult('pushed', '主密码已修改并同步到 WebDAV。', vault);
+    return new WebDavSyncResult('pushed', this.appString($r('app.string.master_password_changed_webdav'), 'Master password changed and synced to WebDAV.'), vault);
   }
 
   private async runExclusive(task: () => Promise<WebDavSyncResult>): Promise<WebDavSyncResult> {
@@ -504,7 +505,7 @@ export class WebDavSyncService {
           metadata.remoteRevision,
           metadata.remoteEtag,
           'blocked',
-          '远端保管库需要主密码验证后才能继续同步。'
+          this.appString($r('app.string.home_sync_remote_password_required'), 'Verify the remote vault master password to continue syncing.')
         );
         return new WebDavDownloadResult(undefined, true);
       }
@@ -514,13 +515,13 @@ export class WebDavSyncService {
 
   private validateSettings(settings: WebDavSettings): void {
     if (settings.serverUrl.trim().length === 0) {
-      throw new Error('请先填写 WebDAV 服务器地址。');
+      throw new Error(this.appString($r('app.string.error_webdav_server_required'), 'Enter the WebDAV server URL first.'));
     }
     if (!settings.serverUrl.startsWith('http://') && !settings.serverUrl.startsWith('https://')) {
-      throw new Error('WebDAV 服务器地址需要以 http:// 或 https:// 开头。');
+      throw new Error(this.appString($r('app.string.webdav_validate_url_scheme'), 'WebDAV server URL must start with http:// or https://.'));
     }
     if (settings.filePath.trim().length === 0) {
-      throw new Error('请先填写 WebDAV 保管库路径。');
+      throw new Error(this.appString($r('app.string.webdav_validate_file_path_required'), 'Enter the WebDAV vault path first.'));
     }
   }
 
@@ -614,13 +615,19 @@ export class WebDavSyncService {
     if (plainError && plainError.message && plainError.message.length > 0) {
       return plainError.message;
     }
-    return '同步失败，请稍后重试。';
+    return this.appString($r('app.string.webdav_sync_failed_retry'), 'Sync failed. Please try again later.');
+  }
+
+  private appString(resource: Resource, fallback: string): string {
+    return AppI18n.globalString(resource, fallback);
   }
 
   private isRemotePasswordBlockedError(error: Object): boolean {
     let message: string = this.readErrorMessage(error);
     return message.indexOf('解密 WebDAV 保管库失败') >= 0 ||
       message.indexOf('主密码') >= 0 ||
+      message.indexOf('Failed to decrypt WebDAV vault') >= 0 ||
+      message.indexOf('master password') >= 0 ||
       message.indexOf('decrypt') >= 0;
   }
 }

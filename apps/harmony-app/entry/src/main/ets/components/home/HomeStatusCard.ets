@@ -36,37 +36,37 @@ export struct HomeStatusCard {
   @Builder
   private buildSyncConflictActions(): void {
     Column({ space: 10 }) {
-      Text('同步冲突')
+      Text($r('app.string.home_sync_conflict_title'))
         .fontSize(15)
         .fontWeight(FontWeight.Medium)
-        .fontColor('#8B3A1F')
+        .fontColor($r('app.color.color_warning_title'))
         .width('100%')
 
-      Text('本地和远端都有变化，请选择保留哪一侧。')
+      Text($r('app.string.home_sync_conflict_body'))
         .fontSize(13)
         .lineHeight(20)
-        .fontColor('#6B4C3E')
+        .fontColor($r('app.color.color_warning_text'))
         .width('100%')
 
       Row({ space: 10 }) {
-        Button('保留本地')
+        Button($r('app.string.home_sync_conflict_keep_local'))
           .layoutWeight(1)
           .height(42)
           .type(ButtonType.Capsule)
           .fontSize(14)
-          .fontColor(Color.White)
-          .backgroundColor('#1E5AA8')
+          .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
+          .backgroundColor($r('app.color.color_primary'))
           .onClick(() => {
             this.onKeepLocal();
           })
 
-        Button('使用远端')
+        Button($r('app.string.home_sync_conflict_use_remote'))
           .layoutWeight(1)
           .height(42)
           .type(ButtonType.Capsule)
           .fontSize(14)
-          .fontColor('#2F5E95')
-          .backgroundColor('#E6EEF8')
+          .fontColor($r('app.color.color_conflict_secondary_text'))
+          .backgroundColor($r('app.color.color_conflict_secondary_bg'))
           .onClick(() => {
             this.onUseRemote();
           })
@@ -75,16 +75,16 @@ export struct HomeStatusCard {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor('#FFF4E8')
+    .backgroundColor($r('app.color.color_warning_soft'))
     .borderRadius(18)
   }
 
   private resolveBannerColor(): ResourceColor {
     if (this.tone === HOME_STATUS_TONE_ERROR) {
-      return this.isDarkMode ? '#FF6B6B' : '#C53D3D';
+      return $r('app.color.color_danger');
     }
     if (this.tone === HOME_STATUS_TONE_SUCCESS) {
-      return this.isDarkMode ? '#58C18F' : '#2D7A59';
+      return $r('app.color.color_success');
     }
     return $r('sys.color.font_secondary');
   }

@@ -1,3 +1,5 @@
+import { AppI18n } from '../utils/AppI18n';
+
 export const HOME_SYNC_OPERATION_CONFLICT_KEEP_LOCAL: string = 'conflictKeepLocal';
 export const HOME_SYNC_OPERATION_CONFLICT_USE_REMOTE: string = 'conflictUseRemote';
 export const HOME_SYNC_OPERATION_LOCAL_CHANGE: string = 'localChange';
@@ -30,15 +32,15 @@ export class HomeSyncAvailabilityResult {
 export class HomeSyncUiStatePolicy {
   static resolveOperationStart(operation: string, isSyncing: boolean, canSync: boolean): HomeSyncOperationStartResult {
     if (isSyncing) {
-      return new HomeSyncOperationStartResult(false, '', '', '同步正在进行中，请稍后再试。');
+      return new HomeSyncOperationStartResult(false, '', '', AppI18n.globalString($r('app.string.home_sync_busy'), 'Sync is already in progress. Please try again later.'));
     }
 
     if (!canSync && operation === HOME_SYNC_OPERATION_MANUAL) {
-      return new HomeSyncOperationStartResult(false, '', 'WebDAV 同步未开启，本地模式。', '');
+      return new HomeSyncOperationStartResult(false, '', AppI18n.globalString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.'), '');
     }
 
     if (!canSync && operation === HOME_SYNC_OPERATION_LOCAL_CHANGE) {
-      return new HomeSyncOperationStartResult(false, 'WebDAV 同步未开启，本地模式。', '', '');
+      return new HomeSyncOperationStartResult(false, AppI18n.globalString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.'), '', '');
     }
 
     return new HomeSyncOperationStartResult(true, HomeSyncUiStatePolicy.resolveStartMessage(operation), '', '');
@@ -51,19 +53,21 @@ export class HomeSyncUiStatePolicy {
     if (isSyncing || hasSyncConflict) {
       return new HomeSyncAvailabilityResult(false, '');
     }
-    return new HomeSyncAvailabilityResult(false, hasSettingsError ? '同步设置暂不可用。' : 'WebDAV 同步未开启，本地模式。');
+    return new HomeSyncAvailabilityResult(false, hasSettingsError
+      ? AppI18n.globalString($r('app.string.home_sync_settings_unavailable'), 'Sync settings are unavailable.')
+      : AppI18n.globalString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.'));
   }
 
   private static resolveStartMessage(operation: string): string {
     if (operation === HOME_SYNC_OPERATION_LOCAL_CHANGE) {
-      return '同步本地变更中...';
+      return AppI18n.globalString($r('app.string.home_sync_local_change_status'), 'Syncing local changes...');
     }
     if (operation === HOME_SYNC_OPERATION_CONFLICT_KEEP_LOCAL) {
-      return '正在用本地版本覆盖远端...';
+      return AppI18n.globalString($r('app.string.home_sync_conflict_keep_local_status'), 'Using the local version to overwrite remote...');
     }
     if (operation === HOME_SYNC_OPERATION_CONFLICT_USE_REMOTE) {
-      return '正在使用远端版本覆盖本地...';
+      return AppI18n.globalString($r('app.string.home_sync_conflict_use_remote_status'), 'Using the remote version to overwrite local...');
     }
-    return '同步中...';
+    return AppI18n.globalString($r('app.string.home_syncing_status'), 'Syncing...');
   }
 }

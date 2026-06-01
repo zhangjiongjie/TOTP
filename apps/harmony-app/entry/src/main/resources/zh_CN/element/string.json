@@ -11,6 +11,1142 @@
     {
       "name": "module_desc",
       "value": "密令 HarmonyOS entry module"
+    },
+    {
+      "name": "action_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "action_delete",
+      "value": "删除"
+    },
+    {
+      "name": "action_import",
+      "value": "导入"
+    },
+    {
+      "name": "action_save",
+      "value": "保存"
+    },
+    {
+      "name": "action_verify",
+      "value": "验证"
+    },
+    {
+      "name": "action_verifying",
+      "value": "验证中..."
+    },
+    {
+      "name": "account_card_copy",
+      "value": "复制"
+    },
+    {
+      "name": "account_card_no_account",
+      "value": "未填写账号"
+    },
+    {
+      "name": "account_card_no_service",
+      "value": "未命名服务"
+    },
+    {
+      "name": "account_card_not_recorded",
+      "value": "未记录"
+    },
+    {
+      "name": "account_copy_current_account",
+      "value": "当前账号"
+    },
+    {
+      "name": "account_copy_failed",
+      "value": "复制失败：%1$s"
+    },
+    {
+      "name": "account_copy_success",
+      "value": "已复制 %1$s 的验证码到系统剪贴板。"
+    },
+    {
+      "name": "account_copy_unavailable",
+      "value": "当前账号验证码不可复制，请先修正密钥或算法配置。"
+    },
+    {
+      "name": "account_form_account_label",
+      "value": "账号名称"
+    },
+    {
+      "name": "account_form_account_placeholder",
+      "value": "例如 name@example.com"
+    },
+    {
+      "name": "account_form_algorithm_label",
+      "value": "算法"
+    },
+    {
+      "name": "account_form_digits_label",
+      "value": "位数"
+    },
+    {
+      "name": "account_form_group_default",
+      "value": "默认"
+    },
+    {
+      "name": "account_form_group_label",
+      "value": "分组"
+    },
+    {
+      "name": "account_form_group_personal",
+      "value": "个人"
+    },
+    {
+      "name": "account_form_group_work",
+      "value": "工作"
+    },
+    {
+      "name": "account_form_import_title",
+      "value": "otpauth 链接"
+    },
+    {
+      "name": "account_form_info_title",
+      "value": "账号信息"
+    },
+    {
+      "name": "account_form_issuer_label",
+      "value": "发行方"
+    },
+    {
+      "name": "account_form_issuer_placeholder",
+      "value": "例如 GitHub / Google"
+    },
+    {
+      "name": "account_form_parse",
+      "value": "解析"
+    },
+    {
+      "name": "account_form_period_label",
+      "value": "周期"
+    },
+    {
+      "name": "account_form_secret_label",
+      "value": "密钥 Secret"
+    },
+    {
+      "name": "account_form_secret_placeholder",
+      "value": "输入 Base32 密钥"
+    },
+    {
+      "name": "account_form_uri_placeholder",
+      "value": "粘贴 otpauth://totp/... 链接"
+    },
+    {
+      "name": "add_account_title",
+      "value": "添加账号"
+    },
+    {
+      "name": "backup_exported_count",
+      "value": "已导出 %1$d 个账号：%2$s"
+    },
+    {
+      "name": "backup_imported_count",
+      "value": "已导入 %1$d 个账号"
+    },
+    {
+      "name": "delete_account_message",
+      "value": "删除后将从本地保管库移除该账号，这个操作无法撤销。"
+    },
+    {
+      "name": "delete_confirm_title",
+      "value": "确认删除"
+    },
+    {
+      "name": "edit_account_title",
+      "value": "编辑账号"
+    },
+    {
+      "name": "error_backup_export_failed",
+      "value": "导出备份失败，请稍后重试。"
+    },
+    {
+      "name": "error_backup_import_failed",
+      "value": "导入备份失败，请稍后重试。"
+    },
+    {
+      "name": "error_backup_password_incorrect",
+      "value": "备份文件密码不正确，请重试。"
+    },
+    {
+      "name": "error_biometric_unlock_failed",
+      "value": "生物识别解锁失败，请使用主密码。"
+    },
+    {
+      "name": "error_delete_failed",
+      "value": "删除失败，请稍后重试。"
+    },
+    {
+      "name": "error_import_no_file",
+      "value": "未选择导入文件。"
+    },
+    {
+      "name": "error_invalid_otpauth_scheme",
+      "value": "仅支持 otpauth://totp/ 链接"
+    },
+    {
+      "name": "error_master_password_change_failed",
+      "value": "主密码修改失败"
+    },
+    {
+      "name": "error_master_password_required",
+      "value": "请输入当前主密码和新主密码。"
+    },
+    {
+      "name": "error_new_password_mismatch",
+      "value": "两次输入的新主密码不一致。"
+    },
+    {
+      "name": "error_otpauth_missing_account",
+      "value": "otpauth 链接缺少账号名称"
+    },
+    {
+      "name": "error_otpauth_missing_issuer",
+      "value": "otpauth 链接缺少 issuer"
+    },
+    {
+      "name": "error_otpauth_missing_secret",
+      "value": "otpauth 链接缺少 secret"
+    },
+    {
+      "name": "error_otpauth_parse_failed",
+      "value": "otpauth 链接解析失败"
+    },
+    {
+      "name": "error_paste_otpauth_first",
+      "value": "请先粘贴 otpauth 链接"
+    },
+    {
+      "name": "error_photo_no_qr",
+      "value": "图片中未识别到二维码。"
+    },
+    {
+      "name": "error_photo_parse_failed",
+      "value": "图片解析失败，请换一张更清晰的二维码。"
+    },
+    {
+      "name": "error_remote_master_password_required",
+      "value": "请输入远端主密码。"
+    },
+    {
+      "name": "error_save_failed",
+      "value": "保存失败，请稍后重试。"
+    },
+    {
+      "name": "error_scan_failed",
+      "value": "扫码失败，请重试。"
+    },
+    {
+      "name": "error_scan_not_otpauth",
+      "value": "识别成功，但内容不是 otpauth://totp/ 链接。"
+    },
+    {
+      "name": "error_settings_load_failed",
+      "value": "读取设置失败，请稍后重试。"
+    },
+    {
+      "name": "error_settings_save_failed",
+      "value": "保存设置失败，请稍后重试。"
+    },
+    {
+      "name": "error_unlock_failed",
+      "value": "解锁失败，请稍后重试。"
+    },
+    {
+      "name": "error_validate_account_name",
+      "value": "请输入账号名称"
+    },
+    {
+      "name": "error_validate_issuer",
+      "value": "请输入发行方名称"
+    },
+    {
+      "name": "error_validate_secret",
+      "value": "请输入 TOTP 密钥"
+    },
+    {
+      "name": "error_current_master_password_wrong",
+      "value": "当前主密码错误"
+    },
+    {
+      "name": "error_current_master_password_wrong_detail",
+      "value": "当前主密码错误：%1$s"
+    },
+    {
+      "name": "error_unknown",
+      "value": "未知错误"
+    },
+    {
+      "name": "error_utf8_encode_failed",
+      "value": "UTF-8 编码失败：%1$s"
+    },
+    {
+      "name": "error_utf8_decode_failed",
+      "value": "UTF-8 解码失败：%1$s"
+    },
+    {
+      "name": "error_base64_encode_failed",
+      "value": "Base64 编码失败：%1$s"
+    },
+    {
+      "name": "error_base64_decode_failed",
+      "value": "Base64 解码失败：%1$s"
+    },
+    {
+      "name": "error_hmac_output_short",
+      "value": "HMAC 输出长度不足"
+    },
+    {
+      "name": "error_hmac_offset_invalid",
+      "value": "HMAC 偏移量无效"
+    },
+    {
+      "name": "error_totp_signature_failed",
+      "value": "验证码签名计算失败：%1$s"
+    },
+    {
+      "name": "error_base32_invalid_char",
+      "value": "Base32 字符无效：%1$s"
+    },
+    {
+      "name": "error_base32_trailing_bits",
+      "value": "Base32 尾部比特无效"
+    },
+    {
+      "name": "error_base32_padding_position",
+      "value": "Base32 填充位置无效"
+    },
+    {
+      "name": "error_base32_length",
+      "value": "Base32 长度无效"
+    },
+    {
+      "name": "error_base32_padding_length",
+      "value": "Base32 填充长度无效"
+    },
+    {
+      "name": "error_base32_input_length",
+      "value": "Base32 输入长度无效"
+    },
+    {
+      "name": "error_local_vault_not_initialized",
+      "value": "本地保管库尚未初始化。"
+    },
+    {
+      "name": "error_local_vault_export_key_failed",
+      "value": "导出本地保管库密钥失败：%1$s"
+    },
+    {
+      "name": "error_local_master_password_change_failed",
+      "value": "修改本地主密码失败：%1$s"
+    },
+    {
+      "name": "error_local_vault_encrypt_failed",
+      "value": "加密本地保管库失败：%1$s"
+    },
+    {
+      "name": "error_local_vault_decrypt_failed",
+      "value": "解密本地保管库失败：%1$s"
+    },
+    {
+      "name": "error_local_vault_derive_key_failed",
+      "value": "派生本地保管库密钥失败：%1$s"
+    },
+    {
+      "name": "error_local_aes_encrypt_failed",
+      "value": "本地 AES-GCM 加密失败：%1$s"
+    },
+    {
+      "name": "error_local_vault_missing_auth_tag",
+      "value": "本地保管库密文缺少认证标签。"
+    },
+    {
+      "name": "error_local_aes_decrypt_failed",
+      "value": "本地 AES-GCM 解密失败：%1$s"
+    },
+    {
+      "name": "error_local_vault_corrupt_parse_failed",
+      "value": "本地保管库格式损坏，无法解析：%1$s"
+    },
+    {
+      "name": "error_local_vault_unsupported",
+      "value": "本地加密保管库格式暂不支持。"
+    },
+    {
+      "name": "error_biometric_credential_save_failed",
+      "value": "保存生物识别凭据失败：%1$s"
+    },
+    {
+      "name": "error_biometric_credential_read_failed",
+      "value": "读取生物识别凭据失败：%1$s"
+    },
+    {
+      "name": "error_master_password_save_failed",
+      "value": "保存主密码失败：%1$s"
+    },
+    {
+      "name": "error_biometric_start_failed",
+      "value": "启动生物识别失败：%1$s"
+    },
+    {
+      "name": "error_master_password_record_read_failed",
+      "value": "读取主密码记录失败：%1$s"
+    },
+    {
+      "name": "error_master_password_record_create_failed",
+      "value": "生成主密码记录失败：%1$s"
+    },
+    {
+      "name": "error_master_password_verifier_derive_failed",
+      "value": "派生主密码校验密钥失败：%1$s"
+    },
+    {
+      "name": "error_unlock_store_open_failed",
+      "value": "打开解锁状态存储失败：%1$s"
+    },
+    {
+      "name": "error_webdav_server_required",
+      "value": "请先填写 WebDAV 服务器地址。"
+    },
+    {
+      "name": "error_account_delete_missing",
+      "value": "未找到要删除的账号"
+    },
+    {
+      "name": "error_account_update_missing",
+      "value": "未找到要更新的账号"
+    },
+    {
+      "name": "error_totp_algorithm_unsupported",
+      "value": "不支持的算法：%1$s，仅支持 SHA1、SHA256、SHA512。"
+    },
+    {
+      "name": "error_totp_compute_failed",
+      "value": "验证码计算失败"
+    },
+    {
+      "name": "error_totp_copy_failed",
+      "value": "复制验证码失败：%1$s"
+    },
+    {
+      "name": "error_totp_empty_secret",
+      "value": "密钥为空"
+    },
+    {
+      "name": "totp_config_error",
+      "value": "配置异常"
+    },
+    {
+      "name": "totp_hint_tap_copy",
+      "value": "点击验证码即可复制"
+    },
+    {
+      "name": "totp_remaining_seconds",
+      "value": "剩余 %1$ds"
+    },
+    {
+      "name": "webdav_remote_password_blocked_with_hint",
+      "value": "远端保管库需要主密码验证后才能继续同步，请先验证远端主密码。"
+    },
+    {
+      "name": "webdav_sync_failed",
+      "value": "同步失败"
+    },
+    {
+      "name": "webdav_sync_failed_retry",
+      "value": "同步失败，请稍后重试。"
+    },
+    {
+      "name": "webdav_sync_local_change_failed",
+      "value": "同步本地变更失败"
+    },
+    {
+      "name": "webdav_sync_local_change_failed_retry",
+      "value": "同步本地变更失败，请稍后重试。"
+    },
+    {
+      "name": "webdav_remote_password_verify_failed",
+      "value": "远端密码库验证失败。"
+    },
+    {
+      "name": "webdav_conflict_resolve_failed",
+      "value": "处理冲突失败"
+    },
+    {
+      "name": "webdav_conflict_resolve_failed_retry",
+      "value": "处理冲突失败，请稍后重试。"
+    },
+    {
+      "name": "webdav_local_change_synced",
+      "value": "本地变更已同步到 WebDAV。"
+    },
+    {
+      "name": "webdav_local_modified_synced",
+      "value": "本地修改已同步到 WebDAV。"
+    },
+    {
+      "name": "master_password_changed",
+      "value": "主密码已修改。"
+    },
+    {
+      "name": "master_password_changed_webdav",
+      "value": "主密码已修改并同步到 WebDAV。"
+    },
+    {
+      "name": "backup_error_empty_accounts",
+      "value": "备份文件中没有账号列表。"
+    },
+    {
+      "name": "backup_error_encrypted_invalid",
+      "value": "加密备份内容无效。"
+    },
+    {
+      "name": "backup_error_encrypted_incomplete",
+      "value": "加密备份密文不完整。"
+    },
+    {
+      "name": "backup_error_encrypted_unsupported",
+      "value": "加密备份格式暂不支持。"
+    },
+    {
+      "name": "backup_error_missing_kdf",
+      "value": "加密备份缺少 KDF 参数。"
+    },
+    {
+      "name": "backup_error_password_mismatch",
+      "value": "备份密码与当前主密码不匹配。"
+    },
+    {
+      "name": "backup_error_plain_invalid",
+      "value": "明文备份内容无效。"
+    },
+    {
+      "name": "home_empty_body",
+      "value": "点击底部添加按钮录入账号。"
+    },
+    {
+      "name": "home_empty_title",
+      "value": "还没有账号"
+    },
+    {
+      "name": "home_account_count",
+      "value": "%1$d 个账号"
+    },
+    {
+      "name": "home_error_read_vault",
+      "value": "读取本地保管库失败：%1$s"
+    },
+    {
+      "name": "home_loading",
+      "value": "加载中..."
+    },
+    {
+      "name": "home_status_local_vault",
+      "value": "本地保管库"
+    },
+    {
+      "name": "home_sync_conflict_body",
+      "value": "本地和远端都有变化，请选择保留哪一侧。"
+    },
+    {
+      "name": "home_sync_conflict_keep_local",
+      "value": "保留本地"
+    },
+    {
+      "name": "home_sync_conflict_title",
+      "value": "同步冲突"
+    },
+    {
+      "name": "home_sync_conflict_use_remote",
+      "value": "使用远端"
+    },
+    {
+      "name": "home_sync_disabled_status",
+      "value": "WebDAV 同步未开启，本地模式。"
+    },
+    {
+      "name": "home_sync_fab_disabled",
+      "value": "未配置"
+    },
+    {
+      "name": "home_sync_fab_ready",
+      "value": "同步"
+    },
+    {
+      "name": "home_sync_fab_syncing",
+      "value": "同步中"
+    },
+    {
+      "name": "home_sync_label_never",
+      "value": "最新同步：暂无"
+    },
+    {
+      "name": "home_sync_label_time",
+      "value": "最新同步：%1$s"
+    },
+    {
+      "name": "home_syncing_status",
+      "value": "同步中..."
+    },
+    {
+      "name": "home_sync_available",
+      "value": "本地与 WebDAV 已经是最新版本。"
+    },
+    {
+      "name": "home_sync_busy",
+      "value": "同步正在进行中，请稍后再试。"
+    },
+    {
+      "name": "home_sync_conflict_keep_local_status",
+      "value": "正在用本地版本覆盖远端..."
+    },
+    {
+      "name": "home_sync_conflict_use_remote_status",
+      "value": "正在使用远端版本覆盖本地..."
+    },
+    {
+      "name": "home_sync_local_change_status",
+      "value": "同步本地变更中..."
+    },
+    {
+      "name": "home_sync_remote_password_required",
+      "value": "远端保管库需要主密码验证后才能继续同步。"
+    },
+    {
+      "name": "home_sync_settings_unavailable",
+      "value": "同步设置暂不可用。"
+    },
+    {
+      "name": "webdav_sync_enabled",
+      "value": "已启用 WebDAV 同步"
+    },
+    {
+      "name": "webdav_disabled_local_only",
+      "value": "未启用 WebDAV，同步仅保留在本机。"
+    },
+    {
+      "name": "webdav_disabled_conflict",
+      "value": "未启用 WebDAV，无法处理同步冲突。"
+    },
+    {
+      "name": "webdav_remote_empty_local_empty",
+      "value": "远端还没有保管库，本地也为空。"
+    },
+    {
+      "name": "webdav_both_empty",
+      "value": "本地与 WebDAV 都为空。"
+    },
+    {
+      "name": "webdav_synced_latest",
+      "value": "本地与 WebDAV 已是最新版本。"
+    },
+    {
+      "name": "webdav_first_bind_conflict_metadata",
+      "value": "首次绑定时本地和远端都有数据。"
+    },
+    {
+      "name": "webdav_first_bind_conflict",
+      "value": "首次绑定时本地和远端都有数据，请先决定保留哪一侧。"
+    },
+    {
+      "name": "webdav_baseline_refreshed",
+      "value": "同步基线已刷新。"
+    },
+    {
+      "name": "webdav_auto_merged_synced",
+      "value": "本地和远端修改已自动合并并同步到 WebDAV。"
+    },
+    {
+      "name": "webdav_decision_unhandled_metadata",
+      "value": "同步决策无法处理。"
+    },
+    {
+      "name": "webdav_decision_unhandled",
+      "value": "同步决策无法处理，请稍后重试。"
+    },
+    {
+      "name": "webdav_both_changed_metadata",
+      "value": "本地和远端都发生了变化。"
+    },
+    {
+      "name": "webdav_both_changed_choose",
+      "value": "本地和远端都发生了变化，请在首页选择保留本地或使用远端。"
+    },
+    {
+      "name": "webdav_remote_missing_use",
+      "value": "远端保管库不存在，无法使用远端版本。"
+    },
+    {
+      "name": "webdav_restored_remote",
+      "value": "已从 WebDAV 恢复远端版本。"
+    },
+    {
+      "name": "webdav_remote_password_verified_updated",
+      "value": "远端密码库已验证，本地密码已同步更新。"
+    },
+    {
+      "name": "webdav_conflict_resolve_first_data",
+      "value": "本地和远端都有数据，请先处理同步冲突。"
+    },
+    {
+      "name": "webdav_conflict_account",
+      "value": "本地和远端存在账号冲突，请先处理同步冲突。"
+    },
+    {
+      "name": "webdav_conflict_continue_metadata",
+      "value": "本地和远端存在同步冲突，请先解决冲突后再继续同步。"
+    },
+    {
+      "name": "webdav_remote_verify_before_password_change",
+      "value": "远端保管库需要主密码验证后才能继续同步，请先验证远端主密码。"
+    },
+    {
+      "name": "webdav_remote_verify_before_password_change_short",
+      "value": "远端保管库需要验证后才能修改主密码。"
+    },
+    {
+      "name": "webdav_password_first_bind_conflict",
+      "value": "主密码未同步：首次绑定时本地和远端都有数据，请先完成数据同步。"
+    },
+    {
+      "name": "webdav_both_changed_before_password_change",
+      "value": "本地和远端都发生了变化，请先解决冲突后再修改主密码。"
+    },
+    {
+      "name": "webdav_validate_url_scheme",
+      "value": "WebDAV 服务器地址需要以 http:// 或 https:// 开头。"
+    },
+    {
+      "name": "webdav_validate_file_path_required",
+      "value": "请先填写 WebDAV 保管库路径。"
+    },
+    {
+      "name": "backup_error_export_location_missing",
+      "value": "未选择导出位置。"
+    },
+    {
+      "name": "backup_error_import_file_missing",
+      "value": "未选择备份文件。"
+    },
+    {
+      "name": "backup_error_export_encrypted_failed",
+      "value": "导出加密备份失败：%1$s"
+    },
+    {
+      "name": "backup_error_import_encrypted_failed",
+      "value": "导入加密备份失败：%1$s"
+    },
+    {
+      "name": "backup_error_create_key_failed",
+      "value": "创建备份加密密钥失败：%1$s"
+    },
+    {
+      "name": "backup_error_derive_key_failed",
+      "value": "派生备份密钥失败：%1$s"
+    },
+    {
+      "name": "backup_error_read_file_failed",
+      "value": "读取备份文件失败：%1$s"
+    },
+    {
+      "name": "backup_error_write_file_failed",
+      "value": "写入备份文件失败：%1$s"
+    },
+    {
+      "name": "webdav_error_vault_encrypt_failed",
+      "value": "加密 WebDAV 保管库失败：%1$s"
+    },
+    {
+      "name": "webdav_error_vault_decrypt_failed",
+      "value": "解密 WebDAV 保管库失败：%1$s"
+    },
+    {
+      "name": "webdav_error_rewrap_key_failed",
+      "value": "重新保护 WebDAV 保管库密钥失败：%1$s"
+    },
+    {
+      "name": "webdav_error_encrypt_with_remote_key_failed",
+      "value": "使用远端密钥加密 WebDAV 保管库失败：%1$s"
+    },
+    {
+      "name": "webdav_error_encrypted_vault_invalid",
+      "value": "WebDAV encryptedVault 字段无效。"
+    },
+    {
+      "name": "webdav_error_encrypted_vault_kdf_invalid",
+      "value": "WebDAV encryptedVault.kdf 字段无效。"
+    },
+    {
+      "name": "webdav_error_encrypted_vault_unsupported",
+      "value": "WebDAV 加密保管库格式暂不支持。"
+    },
+    {
+      "name": "webdav_error_derive_key_failed",
+      "value": "派生 WebDAV 保管库密钥失败：%1$s"
+    },
+    {
+      "name": "webdav_error_aes_encrypt_failed",
+      "value": "WebDAV AES-GCM 加密失败：%1$s"
+    },
+    {
+      "name": "webdav_error_missing_auth_tag",
+      "value": "远端保管库密文缺少认证标签。"
+    },
+    {
+      "name": "webdav_error_aes_decrypt_failed",
+      "value": "WebDAV AES-GCM 解密失败：%1$s"
+    },
+    {
+      "name": "webdav_error_encrypted_vault_aes_invalid",
+      "value": "WebDAV encryptedVault AES-GCM 字段无效。"
+    },
+    {
+      "name": "webdav_error_download_http_failed",
+      "value": "WebDAV 下载失败，HTTP %1$d"
+    },
+    {
+      "name": "webdav_error_upload_directory_missing",
+      "value": "WebDAV 上传失败，远端目录不存在或路径不可写。请确认保管库路径所在目录已存在。"
+    },
+    {
+      "name": "webdav_error_upload_credentials_invalid",
+      "value": "WebDAV 上传失败，用户名或密码无效。"
+    },
+    {
+      "name": "webdav_error_upload_remote_changed",
+      "value": "WebDAV 上传失败，远端版本已变化，请先同步后再保存。"
+    },
+    {
+      "name": "webdav_error_upload_http_failed",
+      "value": "WebDAV 上传失败，HTTP %1$d"
+    },
+    {
+      "name": "webdav_error_request_failed",
+      "value": "WebDAV 请求失败：%1$s"
+    },
+    {
+      "name": "webdav_error_auth_create_failed",
+      "value": "生成 WebDAV 鉴权信息失败：%1$s"
+    },
+    {
+      "name": "nav_add",
+      "value": "添加"
+    },
+    {
+      "name": "nav_home",
+      "value": "首页"
+    },
+    {
+      "name": "nav_settings",
+      "value": "设置"
+    },
+    {
+      "name": "nav_sync",
+      "value": "同步"
+    },
+    {
+      "name": "remote_password_body",
+      "value": "远端主密码已变化，请输入新的远端主密码后继续同步。"
+    },
+    {
+      "name": "remote_password_cancel",
+      "value": "稍后处理"
+    },
+    {
+      "name": "remote_password_hint",
+      "value": "验证通过后，本地保管库和当前解锁密码会同步更新为远端密码。"
+    },
+    {
+      "name": "remote_password_placeholder",
+      "value": "远端主密码"
+    },
+    {
+      "name": "remote_password_title",
+      "value": "验证远端密码库"
+    },
+    {
+      "name": "settings_backup_import_password_body",
+      "value": "当前主密码无法解开该加密备份，请输入备份文件密码。导入成功后，本地仍使用当前主密码保存。"
+    },
+    {
+      "name": "settings_backup_import_password_label",
+      "value": "备份文件密码"
+    },
+    {
+      "name": "settings_backup_import_title",
+      "value": "导入备份"
+    },
+    {
+      "name": "settings_backup_title",
+      "value": "导入 / 导出"
+    },
+    {
+      "name": "settings_biometric_body",
+      "value": "开启后可用人脸或指纹解锁。"
+    },
+    {
+      "name": "settings_biometric_disabled",
+      "value": "已关闭生物识别解锁"
+    },
+    {
+      "name": "settings_biometric_enabled",
+      "value": "已开启生物识别解锁"
+    },
+    {
+      "name": "settings_biometric_save_failed",
+      "value": "保存生物识别设置失败，请稍后重试。"
+    },
+    {
+      "name": "settings_biometric_title",
+      "value": "生物识别解锁"
+    },
+    {
+      "name": "settings_change_password_title",
+      "value": "修改主密码"
+    },
+    {
+      "name": "settings_current_password",
+      "value": "当前主密码"
+    },
+    {
+      "name": "settings_import_password_required",
+      "value": "请输入备份文件密码。"
+    },
+    {
+      "name": "settings_master_password_body",
+      "value": "修改后会重新保护保管库密钥，账号数据密钥保持不变。"
+    },
+    {
+      "name": "settings_master_password_title",
+      "value": "主密码"
+    },
+    {
+      "name": "settings_new_password",
+      "value": "新主密码"
+    },
+    {
+      "name": "settings_password_change_button",
+      "value": "修改"
+    },
+    {
+      "name": "settings_repeat_new_password",
+      "value": "再次输入新主密码"
+    },
+    {
+      "name": "settings_updating_master_password",
+      "value": "正在更新主密码..."
+    },
+    {
+      "name": "settings_saved_at",
+      "value": "已保存 %1$s"
+    },
+    {
+      "name": "settings_webdav_enabled",
+      "value": "已启用"
+    },
+    {
+      "name": "settings_webdav_enable_hint",
+      "value": "勾选后立即保存并启用同步。"
+    },
+    {
+      "name": "settings_webdav_file_path",
+      "value": "保管库路径"
+    },
+    {
+      "name": "settings_webdav_password",
+      "value": "密码"
+    },
+    {
+      "name": "settings_webdav_server",
+      "value": "服务器地址"
+    },
+    {
+      "name": "settings_webdav_title",
+      "value": "WebDAV 同步"
+    },
+    {
+      "name": "settings_webdav_username",
+      "value": "WebDAV 用户名"
+    },
+    {
+      "name": "settings_webdav_interval",
+      "value": "自动同步间隔（分钟）"
+    },
+    {
+      "name": "settings_webdav_not_enabled",
+      "value": "未启用"
+    },
+    {
+      "name": "status_parsed",
+      "value": "已解析"
+    },
+    {
+      "name": "status_photo_opening",
+      "value": "打开相册..."
+    },
+    {
+      "name": "status_photo_parsed",
+      "value": "已解析图片"
+    },
+    {
+      "name": "status_scan_success",
+      "value": "扫码成功"
+    },
+    {
+      "name": "status_scanning",
+      "value": "扫码中..."
+    },
+    {
+      "name": "unlock_biometric_button",
+      "value": "人脸 / 指纹解锁"
+    },
+    {
+      "name": "unlock_biometric_continue_password",
+      "value": "%1$s 可继续使用主密码解锁。"
+    },
+    {
+      "name": "unlock_biometric_starting",
+      "value": "正在启动人脸 / 指纹验证，也可以使用主密码解锁。"
+    },
+    {
+      "name": "unlock_existing_hint",
+      "value": "请输入已保存的主密码"
+    },
+    {
+      "name": "unlock_existing_placeholder",
+      "value": "输入主密码"
+    },
+    {
+      "name": "unlock_new_hint",
+      "value": "首次输入会初始化当前设备的主密码"
+    },
+    {
+      "name": "unlock_new_placeholder",
+      "value": "设置主密码"
+    },
+    {
+      "name": "unlock_submit",
+      "value": "解锁"
+    },
+    {
+      "name": "biometric_prompt_title",
+      "value": "验证身份"
+    },
+    {
+      "name": "biometric_prompt_use_password",
+      "value": "使用主密码"
+    },
+    {
+      "name": "unlock_title",
+      "value": "解锁保管库"
+    },
+    {
+      "name": "unlock_master_password_label",
+      "value": "主密码"
+    },
+    {
+      "name": "unlock_first_state_hint",
+      "value": "这是首次解锁，输入主密码后会在本机完成初始化。"
+    },
+    {
+      "name": "unlock_state_unlocked",
+      "value": "当前设备保管库已解锁。"
+    },
+    {
+      "name": "unlock_state_locked_hint",
+      "value": "请输入主密码以解锁本地保管库。"
+    },
+    {
+      "name": "unlock_initialized",
+      "value": "主密码已初始化，当前设备保管库已解锁。"
+    },
+    {
+      "name": "unlock_verified",
+      "value": "主密码验证通过，当前设备保管库已解锁。"
+    },
+    {
+      "name": "error_unlock_password_required",
+      "value": "请输入主密码后再解锁。"
+    },
+    {
+      "name": "error_unlock_password_mismatch",
+      "value": "主密码不匹配，请重新输入。"
+    },
+    {
+      "name": "error_biometric_disabled",
+      "value": "未开启生物识别解锁。"
+    },
+    {
+      "name": "error_biometric_credential_missing",
+      "value": "未找到生物识别凭据，请先用主密码解锁后重新开启。"
+    },
+    {
+      "name": "error_vault_locked",
+      "value": "本地保管库尚未解锁，请先输入主密码。"
+    },
+    {
+      "name": "error_new_password_same",
+      "value": "新主密码不能和当前主密码相同。"
+    },
+    {
+      "name": "error_master_password_record_unsupported",
+      "value": "主密码记录版本暂不支持，请先备份数据后重置本机配置。"
+    },
+    {
+      "name": "error_biometric_no_enrollment_setup",
+      "value": "当前设备未录入可用的人脸或指纹，请先在系统设置中录入后再开启。"
+    },
+    {
+      "name": "biometric_failure_fail",
+      "value": "生物识别未通过，请重试。"
+    },
+    {
+      "name": "biometric_failure_canceled",
+      "value": "已取消生物识别。"
+    },
+    {
+      "name": "biometric_failure_timeout",
+      "value": "生物识别超时，请重新验证。"
+    },
+    {
+      "name": "biometric_failure_type_not_supported",
+      "value": "当前设备不支持所选生物识别类型。"
+    },
+    {
+      "name": "biometric_failure_trust_level",
+      "value": "当前设备的生物识别安全等级不足。"
+    },
+    {
+      "name": "biometric_failure_busy",
+      "value": "生物识别服务忙，请稍后重试。"
+    },
+    {
+      "name": "biometric_failure_invalid_parameters",
+      "value": "生物识别参数校验失败。"
+    },
+    {
+      "name": "biometric_failure_locked",
+      "value": "生物识别已被系统临时锁定，请稍后重试或使用主密码。"
+    },
+    {
+      "name": "biometric_failure_not_enrolled",
+      "value": "系统未录入可用的人脸或指纹。"
+    },
+    {
+      "name": "biometric_failure_switched_password",
+      "value": "已切换为应用主密码验证。"
+    },
+    {
+      "name": "biometric_failure_pin_expired",
+      "value": "系统锁屏密码已过期，请先到系统设置更新。"
+    },
+    {
+      "name": "biometric_failure_incomplete",
+      "value": "生物识别未完成，请使用主密码解锁。"
     }
   ]
 }

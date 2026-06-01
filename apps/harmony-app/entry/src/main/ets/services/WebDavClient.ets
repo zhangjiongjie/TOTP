@@ -3,6 +3,7 @@ import { util } from '@kit.ArkTS';
 import { LocalVault } from '../model/LocalVault';
 import { WebDavSettings } from '../model/WebDavSettings';
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService, RemoteVaultDecryption } from './RemoteVaultCryptoService';
+import { AppI18n } from '../utils/AppI18n';
 
 interface WebDavRemoteEnvelopeRecord {
   schemaVersion: number;
@@ -52,7 +53,7 @@ export class WebDavClient {
       return undefined;
     }
     if (response.responseCode < 200 || response.responseCode >= 300) {
-      throw new Error(`WebDAV 下载失败，HTTP ${response.responseCode}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_download_http_failed'), 'WebDAV download failed, HTTP %1$d', response.responseCode));
     }
 
     let payload: string = this.readResponseText(response);
@@ -100,15 +101,15 @@ export class WebDavClient {
     );
     if (response.responseCode < 200 || response.responseCode >= 300) {
       if (response.responseCode === 409) {
-        throw new Error('WebDAV 上传失败，远端目录不存在或路径不可写。请确认保管库路径所在目录已存在。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_upload_directory_missing'), 'WebDAV upload failed. The remote directory does not exist or the path is not writable. Confirm that the vault path directory already exists.'));
       }
       if (response.responseCode === 401 || response.responseCode === 403) {
-        throw new Error('WebDAV 上传失败，用户名或密码无效。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_upload_credentials_invalid'), 'WebDAV upload failed. Username or password is invalid.'));
       }
       if (response.responseCode === 412) {
-        throw new Error('WebDAV 上传失败，远端版本已变化，请先同步后再保存。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_upload_remote_changed'), 'WebDAV upload failed. Remote version changed. Sync before saving again.'));
       }
-      throw new Error(`WebDAV 上传失败，HTTP ${response.responseCode}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_upload_http_failed'), 'WebDAV upload failed, HTTP %1$d', response.responseCode));
     }
     return new WebDavUploadResult(revision, this.readEtag(response));
   }
@@ -135,15 +136,15 @@ export class WebDavClient {
     );
     if (response.responseCode < 200 || response.responseCode >= 300) {
       if (response.responseCode === 409) {
-        throw new Error('WebDAV 上传失败，远端目录不存在或路径不可写。请确认保管库路径所在目录已存在。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_upload_directory_missing'), 'WebDAV upload failed. The remote directory does not exist or the path is not writable. Confirm that the vault path directory already exists.'));
       }
       if (response.responseCode === 401 || response.responseCode === 403) {
-        throw new Error('WebDAV 上传失败，用户名或密码无效。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_upload_credentials_invalid'), 'WebDAV upload failed. Username or password is invalid.'));
       }
       if (response.responseCode === 412) {
-        throw new Error('WebDAV 上传失败，远端版本已变化，请先同步后再保存。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_upload_remote_changed'), 'WebDAV upload failed. Remote version changed. Sync before saving again.'));
       }
-      throw new Error(`WebDAV 上传失败，HTTP ${response.responseCode}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_upload_http_failed'), 'WebDAV upload failed, HTTP %1$d', response.responseCode));
     }
     return new WebDavUploadResult(revision, this.readEtag(response));
   }
@@ -176,7 +177,7 @@ export class WebDavClient {
     try {
       return await request.request(url, options);
     } catch (error) {
-      throw new Error(`WebDAV 请求失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_request_failed'), 'WebDAV request failed: %1$s', this.readErrorMessage(error)));
     } finally {
       request.destroy();
     }
@@ -217,7 +218,7 @@ export class WebDavClient {
       let base64: util.Base64Helper = new util.Base64Helper();
       return base64.encodeToStringSync(bytes, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`生成 WebDAV 鉴权信息失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_auth_create_failed'), 'Failed to create WebDAV authorization info: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -250,6 +251,6 @@ export class WebDavClient {
     if (runtimeError && runtimeError.message && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '未知错误';
+    return AppI18n.globalString($r('app.string.error_unknown'), 'Unknown error');
   }
 }

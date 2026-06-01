@@ -1,3 +1,5 @@
+import { AppI18n } from '../utils/AppI18n';
+
 const SUPPORTED_ALGORITHMS: string[] = ['SHA1', 'SHA256', 'SHA512'];
 
 /**
@@ -22,7 +24,7 @@ export function isSupportedTotpAlgorithm(normalizedAlgorithm: string): boolean {
 export function requireTotpAlgorithm(value: string): string {
   let normalized: string = normalizeTotpAlgorithm(value);
   if (!isSupportedTotpAlgorithm(normalized)) {
-    throw new Error(`不支持的算法：${value}，仅支持 SHA1、SHA256、SHA512。`);
+    throw new Error(AppI18n.globalFormat($r('app.string.error_totp_algorithm_unsupported'), 'Unsupported algorithm: %1$s. Only SHA1, SHA256, and SHA512 are supported.', value));
   }
   return normalized;
 }

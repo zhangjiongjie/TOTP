@@ -23,12 +23,12 @@ export struct AccountForm {
   @Builder
   private buildImportCard(): void {
     Column({ space: 12 }) {
-      Text('otpauth 链接')
+      Text($r('app.string.account_form_import_title'))
         .fontSize(18)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('sys.color.font_primary'))
 
-      TextArea({ text: this.otpauthUri, placeholder: '粘贴 otpauth://totp/... 链接' })
+      TextArea({ text: this.otpauthUri, placeholder: $r('app.string.account_form_uri_placeholder') })
         .width('100%')
         .height(108)
         .fontSize(14)
@@ -40,13 +40,13 @@ export struct AccountForm {
           this.otpauthUri = value;
         })
 
-      Button('解析')
+      Button($r('app.string.account_form_parse'))
         .width('100%')
         .height(44)
         .type(ButtonType.Capsule)
         .fontSize(15)
-        .fontColor('#2E5B8F')
-        .backgroundColor('#E8F0FB')
+        .fontColor($r('app.color.color_primary_text'))
+        .backgroundColor($r('app.color.color_primary_soft'))
         .onClick(() => {
           this.onApplyUri();
         })
@@ -60,40 +60,28 @@ export struct AccountForm {
   @Builder
   private buildManualCard(): void {
     Column({ space: 14 }) {
-      Text('账号信息')
+      Text($r('app.string.account_form_info_title'))
         .fontSize(18)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('sys.color.font_primary'))
 
-      this.buildTextInput('发行方', '例如 GitHub / Google', this.issuer, (value: string) => {
+      this.buildTextInput($r('app.string.account_form_issuer_label'), $r('app.string.account_form_issuer_placeholder'), this.issuer, (value: string) => {
         this.issuer = value;
       })
 
-      this.buildTextInput('账号名称', '例如 name@example.com', this.accountName, (value: string) => {
+      this.buildTextInput($r('app.string.account_form_account_label'), $r('app.string.account_form_account_placeholder'), this.accountName, (value: string) => {
         this.accountName = value;
       })
 
-      this.buildTextInput('密钥 Secret', '输入 Base32 密钥', this.secret, (value: string) => {
+      this.buildTextInput($r('app.string.account_form_secret_label'), $r('app.string.account_form_secret_placeholder'), this.secret, (value: string) => {
         this.secret = value;
       })
 
-      this.buildSelectInput(
-        '分组',
-        [
-          { value: 'Default' },
-          { value: 'Personal' },
-          { value: 'Work' }
-        ],
-        this.resolveGroupIndex(),
-        this.groupName,
-        (value: string) => {
-          this.groupName = value;
-        }
-      )
+      this.buildGroupSelectInput()
 
       Row({ space: 12 }) {
         Column({ space: 8 }) {
-          Text('位数')
+          Text($r('app.string.account_form_digits_label'))
             .fontSize(13)
             .fontColor($r('sys.color.font_secondary'))
 
@@ -113,7 +101,7 @@ export struct AccountForm {
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 8 }) {
-          Text('周期')
+          Text($r('app.string.account_form_period_label'))
             .fontSize(13)
             .fontColor($r('sys.color.font_secondary'))
 
@@ -135,7 +123,7 @@ export struct AccountForm {
       .width('100%')
 
       this.buildSelectInput(
-        '算法',
+        $r('app.string.account_form_algorithm_label'),
         [
           { value: 'SHA1' },
           { value: 'SHA256' },
@@ -156,8 +144,8 @@ export struct AccountForm {
 
   @Builder
   private buildTextInput(
-    label: string,
-    placeholder: string,
+    label: ResourceStr,
+    placeholder: ResourceStr,
     value: string,
     onValueChange: (value: string) => void
   ): void {
@@ -184,7 +172,7 @@ export struct AccountForm {
 
   @Builder
   private buildSelectInput(
-    label: string,
+    label: ResourceStr,
     options: SelectOption[],
     selectedIndex: number,
     value: string,
@@ -215,6 +203,35 @@ export struct AccountForm {
     .alignItems(HorizontalAlign.Start)
   }
 
+  @Builder
+  private buildGroupSelectInput(): void {
+    Column({ space: 8 }) {
+      Text($r('app.string.account_form_group_label'))
+        .fontSize(13)
+        .fontColor($r('sys.color.font_secondary'))
+
+      Select([
+        { value: $r('app.string.account_form_group_default') },
+        { value: $r('app.string.account_form_group_personal') },
+        { value: $r('app.string.account_form_group_work') }
+      ])
+        .selected(this.resolveGroupIndex())
+        .value(this.resolveGroupDisplayValue())
+        .width('100%')
+        .height(46)
+        .backgroundColor($r('sys.color.comp_background_gray'))
+        .borderRadius(16)
+        .font({ size: 14, weight: FontWeight.Medium })
+        .fontColor($r('sys.color.font_primary'))
+        .optionWidth(240)
+        .onSelect((index: number) => {
+          this.groupName = this.resolveGroupValue(index);
+        })
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
   private resolveAlgorithmIndex(): number {
     let normalized: string = this.algorithm.trim().toUpperCase();
     if (normalized === 'SHA256') {
@@ -235,5 +252,26 @@ export struct AccountForm {
       return 2;
     }
     return 0;
+  }
+
+  private resolveGroupDisplayValue(): ResourceStr {
+    let index: number = this.resolveGroupIndex();
+    if (index === 1) {
+      return $r('app.string.account_form_group_personal');
+    }
+    if (index === 2) {
+      return $r('app.string.account_form_group_work');
+    }
+    return $r('app.string.account_form_group_default');
+  }
+
+  private resolveGroupValue(index: number): string {
+    if (index === 1) {
+      return 'Personal';
+    }
+    if (index === 2) {
+      return 'Work';
+    }
+    return 'Default';
   }
 }

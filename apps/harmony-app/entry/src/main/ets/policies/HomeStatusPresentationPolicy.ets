@@ -1,3 +1,5 @@
+import { AppI18n } from '../utils/AppI18n';
+
 export const HOME_STATUS_TONE_ERROR: string = 'error';
 export const HOME_STATUS_TONE_SECONDARY: string = 'secondary';
 export const HOME_STATUS_TONE_SUCCESS: string = 'success';
@@ -67,24 +69,27 @@ export class HomeStatusPresentationPolicy {
 
   static resolveRegularSyncStatus(input: HomeRegularSyncStatusInput): string {
     if (input.isSyncing) {
-      return '同步中...';
+      return AppI18n.globalString($r('app.string.home_syncing_status'), 'Syncing...');
     }
     if (input.hasSettingsError) {
-      return '同步设置暂不可用。';
+      return AppI18n.globalString($r('app.string.home_sync_settings_unavailable'), 'Sync settings are unavailable.');
     }
     if (!input.canSync) {
-      return 'WebDAV 同步未开启，本地模式。';
+      return AppI18n.globalString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.');
     }
     if (input.isBlocked || HomeStatusPresentationPolicy.isRemotePasswordStatus(input.lastError)) {
-      return '远端保管库需要主密码验证后才能继续同步。';
+      return AppI18n.globalString($r('app.string.home_sync_remote_password_required'), 'Verify the remote vault master password to continue syncing.');
     }
-    return '本地与 WebDAV 已经是最新版本。';
+    return AppI18n.globalString($r('app.string.home_sync_available'), 'Local and WebDAV are already up to date.');
   }
 
   static isRemotePasswordStatus(message: string): boolean {
     return message.indexOf('远端保管库') >= 0 ||
       message.indexOf('远端密码库') >= 0 ||
       message.indexOf('Master password is incorrect') >= 0 ||
+      message.indexOf('master password') >= 0 ||
+      message.indexOf('remote vault') >= 0 ||
+      message.indexOf('remote password') >= 0 ||
       message.indexOf('主密码') >= 0;
   }
 

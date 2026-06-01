@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { SyncResultPresentation, SyncResultPresentationPolicy } from '../policies/SyncResultPresentationPolicy';
 import { LocalVault } from '../model/LocalVault';
 import { WebDavSyncResult, WebDavSyncService } from './WebDavSyncService';
+import { AppI18n } from '../utils/AppI18n';
 
 export const WEBDAV_SYNC_COORDINATOR_CONFLICT: string = 'conflict';
 export const WEBDAV_SYNC_COORDINATOR_LOCAL_CHANGE: string = 'localChange';
@@ -98,7 +99,11 @@ export class WebDavSyncCoordinator {
         SyncResultPresentationPolicy.forStandardSync(result, isUnlocked, activeRoute)
       );
     } catch (error) {
-      return WebDavSyncActionOutcome.error(WEBDAV_SYNC_COORDINATOR_MANUAL, this.normalizeError(error, '同步失败', '同步失败，请稍后重试。'));
+      return WebDavSyncActionOutcome.error(WEBDAV_SYNC_COORDINATOR_MANUAL, this.normalizeError(
+        error,
+        AppI18n.globalString($r('app.string.webdav_sync_failed'), 'Sync failed'),
+        AppI18n.globalString($r('app.string.webdav_sync_failed_retry'), 'Sync failed. Please try again later.')
+      ));
     }
   }
 
@@ -111,13 +116,17 @@ export class WebDavSyncCoordinator {
         SyncResultPresentationPolicy.forStandardSync(result, isUnlocked, activeRoute)
       );
     } catch (error) {
-      return WebDavSyncActionOutcome.error(WEBDAV_SYNC_COORDINATOR_LOCAL_CHANGE, this.normalizeError(error, '同步本地变更失败', '同步本地变更失败，请稍后重试。'));
+      return WebDavSyncActionOutcome.error(WEBDAV_SYNC_COORDINATOR_LOCAL_CHANGE, this.normalizeError(
+        error,
+        AppI18n.globalString($r('app.string.webdav_sync_local_change_failed'), 'Failed to sync local changes'),
+        AppI18n.globalString($r('app.string.webdav_sync_local_change_failed_retry'), 'Failed to sync local changes. Please try again later.')
+      ));
     }
   }
 
   async verifyRemotePassword(context: Object, remotePassword: string): Promise<WebDavSyncActionOutcome> {
     if (remotePassword.trim().length === 0) {
-      return WebDavSyncActionOutcome.remotePasswordError('请输入远端主密码。');
+      return WebDavSyncActionOutcome.remotePasswordError(AppI18n.globalString($r('app.string.error_remote_master_password_required'), 'Enter the remote master password.'));
     }
     try {
       let result: WebDavSyncResult = await this.runner.verifyRemoteMasterPassword(context, remotePassword);
@@ -128,7 +137,7 @@ export class WebDavSyncCoordinator {
         true
       );
     } catch (error) {
-      return WebDavSyncActionOutcome.remotePasswordError(this.readErrorMessage(error, '远端密码库验证失败。'));
+      return WebDavSyncActionOutcome.remotePasswordError(this.readErrorMessage(error, AppI18n.globalString($r('app.string.webdav_remote_password_verify_failed'), 'Remote vault password verification failed.')));
     }
   }
 
@@ -143,7 +152,11 @@ export class WebDavSyncCoordinator {
         SyncResultPresentationPolicy.forConflictResolution(result)
       );
     } catch (error) {
-      return WebDavSyncActionOutcome.error(WEBDAV_SYNC_COORDINATOR_CONFLICT, this.normalizeError(error, '处理冲突失败', '处理冲突失败，请稍后重试。'));
+      return WebDavSyncActionOutcome.error(WEBDAV_SYNC_COORDINATOR_CONFLICT, this.normalizeError(
+        error,
+        AppI18n.globalString($r('app.string.webdav_conflict_resolve_failed'), 'Failed to resolve conflict'),
+        AppI18n.globalString($r('app.string.webdav_conflict_resolve_failed_retry'), 'Failed to resolve conflict. Please try again later.')
+      ));
     }
   }
 

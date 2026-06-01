@@ -5,6 +5,7 @@ import { detectBarcode, scanBarcode, scanCore } from '@kit.ScanKit';
 import { AccountForm } from '../components/forms/AccountForm';
 import { LocalVault } from '../model/LocalVault';
 import { AccountDraft, AccountEditorService } from '../services/AccountEditorService';
+import { AppI18n } from '../utils/AppI18n';
 
 @Component
 export struct AddAccount {
@@ -71,18 +72,18 @@ export struct AddAccount {
           Text(this.errorMessage)
             .fontSize(13)
             .lineHeight(20)
-            .fontColor('#C53D3D')
+            .fontColor($r('app.color.color_danger'))
             .width('100%')
         }
 
-        Button('保存')
+        Button($r('app.string.action_save'))
           .width('100%')
           .height(50)
           .type(ButtonType.Capsule)
           .fontSize(16)
           .fontWeight(FontWeight.Medium)
-          .fontColor(Color.White)
-          .backgroundColor('#1E5AA8')
+          .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
+          .backgroundColor($r('app.color.color_primary'))
           .onClick(() => {
             this.saveAccount();
           })
@@ -119,7 +120,7 @@ export struct AddAccount {
       this.onSaved(vault);
     } catch (error) {
       let message: string = this.readErrorMessage(error);
-      this.errorMessage = message.length > 0 ? message : '保存失败，请稍后重试。';
+      this.errorMessage = message.length > 0 ? message : this.appString($r('app.string.error_save_failed'), 'Save failed. Please try again later.');
     }
   }
 
@@ -129,13 +130,13 @@ export struct AddAccount {
     let secret: string = this.secret.trim().replace(/\s+/g, '');
 
     if (issuer.length === 0) {
-      throw new Error('请输入发行方名称');
+      throw new Error(this.appString($r('app.string.error_validate_issuer'), 'Enter an issuer'));
     }
     if (accountName.length === 0) {
-      throw new Error('请输入账号名称');
+      throw new Error(this.appString($r('app.string.error_validate_account_name'), 'Enter an account name'));
     }
     if (secret.length === 0) {
-      throw new Error('请输入 TOTP 密钥');
+      throw new Error(this.appString($r('app.string.error_validate_secret'), 'Enter a TOTP secret'));
     }
 
     return {
@@ -152,7 +153,7 @@ export struct AddAccount {
   private applyOtpauthUri(): void {
     let uri: string = this.otpauthUri.trim();
     if (uri.length === 0) {
-      this.errorMessage = '请先粘贴 otpauth 链接';
+      this.errorMessage = this.appString($r('app.string.error_paste_otpauth_first'), 'Paste an otpauth link first');
       return;
     }
 
@@ -168,16 +169,16 @@ export struct AddAccount {
         this.groupName = parsed.groupName;
       }
       this.errorMessage = '';
-      this.statusMessage = '已解析';
+      this.statusMessage = this.appString($r('app.string.status_parsed'), 'Parsed');
     } catch (error) {
       let message: string = this.readErrorMessage(error);
-      this.errorMessage = message.length > 0 ? message : 'otpauth 链接解析失败';
+      this.errorMessage = message.length > 0 ? message : this.appString($r('app.string.error_otpauth_parse_failed'), 'Failed to parse the otpauth link');
     }
   }
 
   private async startQrScan(): Promise<void> {
     this.errorMessage = '';
-    this.statusMessage = '扫码中...';
+    this.statusMessage = this.appString($r('app.string.status_scanning'), 'Scanning...');
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let options: scanBarcode.ScanOptions = {
@@ -186,15 +187,15 @@ export struct AddAccount {
         enableAlbum: false
       };
       let result: scanBarcode.ScanResult = await scanBarcode.startScanForResult(context, options);
-      this.applyScanValue(result.originalValue, '扫码成功');
+      this.applyScanValue(result.originalValue, this.appString($r('app.string.status_scan_success'), 'Scan successful'));
     } catch (error) {
-      this.handleScanError(error, '扫码失败，请重试。');
+      this.handleScanError(error, this.appString($r('app.string.error_scan_failed'), 'Scan failed. Please try again.'));
     }
   }
 
   private async pickQrImage(): Promise<void> {
     this.errorMessage = '';
-    this.statusMessage = '打开相册...';
+    this.statusMessage = this.appString($r('app.string.status_photo_opening'), 'Opening Photos...');
     try {
       let photoOption: photoAccessHelper.PhotoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
       photoOption.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
@@ -217,20 +218,20 @@ export struct AddAccount {
       };
       let results: Array<scanBarcode.ScanResult> = await detectBarcode.decode(inputImage, options);
       if (results.length === 0) {
-        this.errorMessage = '图片中未识别到二维码。';
+        this.errorMessage = this.appString($r('app.string.error_photo_no_qr'), 'No QR code was found in the image.');
         this.statusMessage = '';
         return;
       }
-      this.applyScanValue(results[0].originalValue, '已解析图片');
+      this.applyScanValue(results[0].originalValue, this.appString($r('app.string.status_photo_parsed'), 'Image parsed'));
     } catch (error) {
-      this.handleScanError(error, '图片解析失败，请换一张更清晰的二维码。');
+      this.handleScanError(error, this.appString($r('app.string.error_photo_parse_failed'), 'Image parsing failed. Try a clearer QR code.'));
     }
   }
 
   private applyScanValue(value: string, successMessage: string): void {
     let normalized: string = value.trim();
     if (!normalized.startsWith('otpauth://totp/')) {
-      this.errorMessage = '识别成功，但内容不是 otpauth://totp/ 链接。';
+      this.errorMessage = this.appString($r('app.string.error_scan_not_otpauth'), 'Recognized content is not an otpauth://totp/ link.');
       this.statusMessage = '';
       return;
     }
@@ -270,7 +271,7 @@ export struct AddAccount {
     let normalizedUri: string = uri.trim();
     let prefix: string = 'otpauth://totp/';
     if (!normalizedUri.startsWith(prefix)) {
-      throw new Error('仅支持 otpauth://totp/ 链接');
+      throw new Error(this.appString($r('app.string.error_invalid_otpauth_scheme'), 'Only otpauth://totp/ links are supported'));
     }
 
     let content: string = normalizedUri.substring(prefix.length);
@@ -293,13 +294,13 @@ export struct AddAccount {
     let secret: string = this.readParam(params, 'secret', '');
 
     if (issuer.length === 0) {
-      throw new Error('otpauth 链接缺少 issuer');
+      throw new Error(this.appString($r('app.string.error_otpauth_missing_issuer'), 'The otpauth link is missing an issuer'));
     }
     if (accountName.length === 0) {
-      throw new Error('otpauth 链接缺少账号名称');
+      throw new Error(this.appString($r('app.string.error_otpauth_missing_account'), 'The otpauth link is missing an account name'));
     }
     if (secret.length === 0) {
-      throw new Error('otpauth 链接缺少 secret');
+      throw new Error(this.appString($r('app.string.error_otpauth_missing_secret'), 'The otpauth link is missing a secret'));
     }
 
     return {
@@ -350,6 +351,11 @@ export struct AddAccount {
   private readErrorMessage(error: Object): string {
     let businessError: Error = error as Error;
     return businessError && businessError.message ? businessError.message : '';
+  }
+
+  private appString(resource: Resource, fallback: string): string {
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return AppI18n.string(context, resource, fallback);
   }
 }
 

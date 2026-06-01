@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { UnlockService, UnlockState } from '../services/UnlockService';
+import { AppI18n } from '../utils/AppI18n';
 
 @Component
 export struct Unlock {
@@ -42,7 +43,7 @@ export struct Unlock {
   @Builder
   private buildFixedHeader(): void {
     Row() {
-      Text('解锁保管库')
+      Text($r('app.string.unlock_title'))
         .fontSize(25)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('sys.color.font_primary'))
@@ -60,25 +61,25 @@ export struct Unlock {
   @Builder
   private buildPasswordCard(): void {
     Column({ space: 14 }) {
-      Text('主密码')
+      Text($r('app.string.unlock_master_password_label'))
         .fontSize(17)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('sys.color.font_primary'))
         .width('100%')
 
-      Text(this.hasMasterPassword ? '请输入已保存的主密码' : '首次输入会初始化当前设备的主密码')
+      Text(this.hasMasterPassword ? $r('app.string.unlock_existing_hint') : $r('app.string.unlock_new_hint'))
         .fontSize(13)
         .fontColor($r('sys.color.font_secondary'))
         .width('100%')
 
       TextInput({
-        placeholder: this.hasMasterPassword ? '输入主密码' : '设置主密码',
+        placeholder: this.hasMasterPassword ? $r('app.string.unlock_existing_placeholder') : $r('app.string.unlock_new_placeholder'),
         text: this.password
       })
         .type(InputType.Password)
         .fontSize(16)
         .fontColor($r('sys.color.font_primary'))
-        .placeholderColor('#97A3B5')
+        .placeholderColor($r('app.color.color_unlock_placeholder'))
         .backgroundColor($r('sys.color.comp_background_gray'))
         .borderRadius(18)
         .height(52)
@@ -87,26 +88,26 @@ export struct Unlock {
           this.password = value;
         })
 
-      Button('解锁')
+      Button($r('app.string.unlock_submit'))
         .type(ButtonType.Capsule)
         .width('100%')
         .height(48)
         .fontSize(16)
         .fontWeight(FontWeight.Medium)
-        .fontColor(Color.White)
-        .backgroundColor('#215C98')
+        .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
+        .backgroundColor($r('app.color.color_primary'))
         .onClick(() => {
           this.handlePasswordUnlock();
         })
 
       if (this.biometricUnlockAvailable) {
-        Button(this.isBiometricAuthenticating ? '验证中...' : '人脸 / 指纹解锁')
+        Button(this.isBiometricAuthenticating ? $r('app.string.action_verifying') : $r('app.string.unlock_biometric_button'))
           .type(ButtonType.Capsule)
           .width('100%')
           .height(46)
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#215C98')
+          .fontColor($r('app.color.color_primary_text'))
           .backgroundColor($r('sys.color.comp_background_gray'))
           .enabled(!this.isBiometricAuthenticating)
           .onClick(() => {
@@ -118,7 +119,7 @@ export struct Unlock {
         Text(this.errorMessage)
           .fontSize(13)
           .lineHeight(20)
-          .fontColor('#C53D3D')
+          .fontColor($r('app.color.color_danger'))
           .width('100%')
       }
     }
@@ -143,7 +144,7 @@ export struct Unlock {
     } catch (error) {
       let message: string = (error as Error).message;
       this.isUnlocked = false;
-      this.errorMessage = message.length > 0 ? message : '解锁失败，请稍后重试。';
+      this.errorMessage = message.length > 0 ? message : this.appString($r('app.string.error_unlock_failed'), 'Unlock failed. Please try again later.');
     }
   }
 
@@ -157,7 +158,7 @@ export struct Unlock {
 
     this.isBiometricAuthenticating = true;
     if (autoTriggered) {
-      this.errorMessage = '正在启动人脸 / 指纹验证，也可以使用主密码解锁。';
+      this.errorMessage = this.appString($r('app.string.unlock_biometric_starting'), 'Starting face / fingerprint verification. You can also unlock with the master password.');
     }
 
     try {
@@ -171,8 +172,10 @@ export struct Unlock {
     } catch (error) {
       let message: string = (error as Error).message;
       this.isUnlocked = false;
-      let fallbackMessage: string = message.length > 0 ? message : '生物识别解锁失败，请使用主密码。';
-      this.errorMessage = autoTriggered ? `${fallbackMessage} 可继续使用主密码解锁。` : fallbackMessage;
+      let fallbackMessage: string = message.length > 0 ? message : this.appString($r('app.string.error_biometric_unlock_failed'), 'Biometric unlock failed. Use the master password.');
+      this.errorMessage = autoTriggered
+        ? this.appFormat($r('app.string.unlock_biometric_continue_password'), '%1$s You can still unlock with the master password.', fallbackMessage)
+        : fallbackMessage;
     } finally {
       this.isBiometricAuthenticating = false;
     }
@@ -213,6 +216,14 @@ export struct Unlock {
 
   private resolveHeaderHeight(): number {
     return 76;
+  }
+
+  private appString(resource: Resource, fallback: string): string {
+    return AppI18n.string(this.getHostContext(), resource, fallback);
+  }
+
+  private appFormat(resource: Resource, fallback: string, ...args: Array<string | number>): string {
+    return AppI18n.format(this.getHostContext(), resource, fallback, ...args);
   }
 
 }

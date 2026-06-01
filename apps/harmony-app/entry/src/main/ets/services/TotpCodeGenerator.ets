@@ -1,5 +1,6 @@
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { requireTotpAlgorithm } from '../shared/TotpAlgorithm';
+import { AppI18n } from '../utils/AppI18n';
 
 export class TotpCodeGenerator {
   static generate(secretValue: string, timestamp: number, periodValue: number, digitsValue: number, algorithmValue: string): string {
@@ -10,12 +11,12 @@ export class TotpCodeGenerator {
     let counter: number = Math.floor(timestamp / 1000 / period);
     let signature: Uint8Array = TotpCodeGenerator.calculateHmac(algorithm, secret, TotpCodeGenerator.encodeCounter(counter));
     if (signature.length < 4) {
-      throw new Error('HMAC 输出长度不足');
+      throw new Error(AppI18n.globalString($r('app.string.error_hmac_output_short'), 'HMAC output is too short'));
     }
 
     let offset: number = signature[signature.length - 1] & 0x0f;
     if (offset + 3 >= signature.length) {
-      throw new Error('HMAC 偏移量无效');
+      throw new Error(AppI18n.globalString($r('app.string.error_hmac_offset_invalid'), 'HMAC offset is invalid'));
     }
 
     let binary: number =
@@ -41,14 +42,14 @@ export class TotpCodeGenerator {
       mac.updateSync({ data: counter });
       return mac.doFinalSync().data;
     } catch (error) {
-      throw new Error(`验证码签名计算失败：${TotpCodeGenerator.resolveErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_totp_signature_failed'), 'Failed to calculate verification code signature: %1$s', TotpCodeGenerator.resolveErrorMessage(error)));
     }
   }
 
   private static decodeBase32(value: string): Uint8Array {
     let normalized: string = value.trim().toUpperCase().replace(/[\s-]/g, '');
     if (normalized.length === 0) {
-      throw new Error('密钥为空');
+      throw new Error(AppI18n.globalString($r('app.string.error_totp_empty_secret'), 'Secret is empty'));
     }
 
     TotpCodeGenerator.validateBase32(normalized);
@@ -64,7 +65,7 @@ export class TotpCodeGenerator {
       let character: string = data.substring(index, index + 1);
       let alphabetIndex: number = alphabet.indexOf(character);
       if (alphabetIndex < 0) {
-        throw new Error(`Base32 字符无效：${character}`);
+        throw new Error(AppI18n.globalFormat($r('app.string.error_base32_invalid_char'), 'Invalid Base32 character: %1$s', character));
       }
 
       bits = (bits << 5) | alphabetIndex;
@@ -79,7 +80,7 @@ export class TotpCodeGenerator {
     if (bitCount > 0) {
       let trailingMask: number = (1 << bitCount) - 1;
       if ((bits & trailingMask) !== 0) {
-        throw new Error('Base32 尾部比特无效');
+        throw new Error(AppI18n.globalString($r('app.string.error_base32_trailing_bits'), 'Invalid Base32 trailing bits'));
       }
     }
 
@@ -96,24 +97,24 @@ export class TotpCodeGenerator {
     let dataLength: number = paddingStart;
     let padding: string = value.substring(paddingStart);
     if (!/^=+$/.test(padding)) {
-      throw new Error('Base32 填充位置无效');
+      throw new Error(AppI18n.globalString($r('app.string.error_base32_padding_position'), 'Invalid Base32 padding position'));
     }
 
     if (value.length % 8 !== 0) {
-      throw new Error('Base32 长度无效');
+      throw new Error(AppI18n.globalString($r('app.string.error_base32_length'), 'Invalid Base32 length'));
     }
 
     let remainder: number = dataLength % 8;
     let expectedPadding: number = TotpCodeGenerator.resolveExpectedPadding(remainder);
     if (expectedPadding < 0 || padding.length !== expectedPadding) {
-      throw new Error('Base32 填充长度无效');
+      throw new Error(AppI18n.globalString($r('app.string.error_base32_padding_length'), 'Invalid Base32 padding length'));
     }
   }
 
   private static validateUnpaddedLength(length: number): void {
     let remainder: number = length % 8;
     if (remainder !== 0 && remainder !== 2 && remainder !== 4 && remainder !== 5 && remainder !== 7) {
-      throw new Error('Base32 输入长度无效');
+      throw new Error(AppI18n.globalString($r('app.string.error_base32_input_length'), 'Invalid Base32 input length'));
     }
   }
 
@@ -158,6 +159,6 @@ export class TotpCodeGenerator {
     if (runtimeError.message !== undefined && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '验证码计算失败';
+    return AppI18n.globalString($r('app.string.error_totp_compute_failed'), 'Failed to calculate verification code');
   }
 }

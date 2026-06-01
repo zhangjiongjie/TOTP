@@ -4,6 +4,7 @@ import { TotpAccount } from '../model/TotpAccount';
 import { LocalVaultStore } from '../storage/LocalVaultStore';
 import { resolveIconKey } from './BrandIconMatcher';
 import { resolveTotpAlgorithm } from '../shared/TotpAlgorithm';
+import { AppI18n } from '../utils/AppI18n';
 
 export interface AccountDraft {
   issuer: string;
@@ -33,7 +34,7 @@ export class AccountEditorService {
     let accountIndex: number = this.findAccountIndex(accounts, accountId);
 
     if (accountIndex < 0) {
-      throw new Error('未找到要更新的账号');
+      throw new Error(AppI18n.globalString($r('app.string.error_account_update_missing'), 'Account to update was not found'));
     }
 
     let current: TotpAccount = accounts[accountIndex];
@@ -53,7 +54,7 @@ export class AccountEditorService {
     }
 
     if (accounts.length === vault.accounts.length) {
-      throw new Error('未找到要删除的账号');
+      throw new Error(AppI18n.globalString($r('app.string.error_account_delete_missing'), 'Account to delete was not found'));
     }
 
     let now: string = this.createTimestamp();

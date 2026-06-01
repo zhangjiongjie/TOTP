@@ -6,6 +6,7 @@ import { buffer, util } from '@kit.ArkTS';
 import { LocalVault, createEmptyLocalVault, createLocalVaultFromJson } from '../model/LocalVault';
 import { EncryptedRemoteVaultBlob } from '../services/RemoteVaultCryptoService';
 import { UnlockService } from '../services/UnlockService';
+import { AppI18n } from '../utils/AppI18n';
 
 const STORE_NAME: string = 'totp_local_vault';
 const SNAPSHOT_KEY: string = 'vault.snapshot';
@@ -143,7 +144,7 @@ export class LocalVaultStore {
       let existing: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
       this.unwrapVaultKeyWithPassword(existing, password);
     } catch (error) {
-      throw new Error(`当前主密码错误：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_current_master_password_wrong_detail'), 'Current master password is incorrect: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -152,12 +153,12 @@ export class LocalVaultStore {
       let store: preferences.Preferences = this.getStore(context);
       let payload: string = store.getSync(SNAPSHOT_KEY, '') as string;
       if (payload.length === 0) {
-        throw new Error('本地保管库尚未初始化。');
+        throw new Error(AppI18n.globalString($r('app.string.error_local_vault_not_initialized'), 'Local vault is not initialized.'));
       }
       let existing: EncryptedVaultRecord = this.parseEncryptedPayload(payload);
       return this.unwrapVaultKeyWithPassword(existing, password);
     } catch (error) {
-      throw new Error(`导出本地保管库密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_vault_export_key_failed'), 'Failed to export local vault key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -184,7 +185,7 @@ export class LocalVaultStore {
       store.putSync(SNAPSHOT_KEY, JSON.stringify(updated));
       store.flushSync();
     } catch (error) {
-      throw new Error(`修改本地主密码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_master_password_change_failed'), 'Failed to change local master password: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -244,7 +245,7 @@ export class LocalVaultStore {
       }
       return JSON.stringify(record);
     } catch (error) {
-      throw new Error(`加密本地保管库失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_vault_encrypt_failed'), 'Failed to encrypt local vault: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -256,7 +257,7 @@ export class LocalVaultStore {
       let vaultKey: cryptoFramework.SymKey = cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: vaultKeyBytes });
       return this.decodeUtf8(this.decryptGcm(vaultKey, this.decodeBase64(record.vaultEncryption.iv), this.decodeBase64(record.vaultEncryption.ciphertext)));
     } catch (error) {
-      throw new Error(`解密本地保管库失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_vault_decrypt_failed'), 'Failed to decrypt local vault: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -286,7 +287,7 @@ export class LocalVaultStore {
       let keyBytes: Uint8Array = kdf.generateSecretSync(spec).data;
       return cryptoFramework.createSymKeyGenerator(AES_ALGORITHM).convertKeySync({ data: keyBytes });
     } catch (error) {
-      throw new Error(`派生本地保管库密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_vault_derive_key_failed'), 'Failed to derive local vault key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -296,14 +297,14 @@ export class LocalVaultStore {
       cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, this.createGcmParams(iv, new Uint8Array(TAG_SIZE)));
       return cipher.doFinalSync({ data: plaintext }).data;
     } catch (error) {
-      throw new Error(`本地 AES-GCM 加密失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_aes_encrypt_failed'), 'Local AES-GCM encryption failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
   private decryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, encryptedWithTag: Uint8Array): Uint8Array {
     try {
       if (encryptedWithTag.length < TAG_SIZE) {
-        throw new Error('本地保管库密文缺少认证标签。');
+        throw new Error(AppI18n.globalString($r('app.string.error_local_vault_missing_auth_tag'), 'Local vault ciphertext is missing the authentication tag.'));
       }
       let splitIndex: number = encryptedWithTag.length - TAG_SIZE;
       let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
@@ -312,7 +313,7 @@ export class LocalVaultStore {
       cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, this.createGcmParams(iv, authTag));
       return cipher.doFinalSync({ data: ciphertext }).data;
     } catch (error) {
-      throw new Error(`本地 AES-GCM 解密失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_aes_decrypt_failed'), 'Local AES-GCM decryption failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -337,7 +338,7 @@ export class LocalVaultStore {
     try {
       parsed = JSON.parse(payload) as Record<string, Object>;
     } catch (error) {
-      throw new Error(`本地保管库格式损坏，无法解析：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_local_vault_corrupt_parse_failed'), 'Local vault format is damaged and cannot be parsed: %1$s', this.readErrorMessage(error)));
     }
     let kdf: Record<string, Object> = this.readRecord(parsed, 'kdf');
     let keyEncryption: Record<string, Object> = this.readRecord(parsed, 'keyEncryption');
@@ -381,7 +382,7 @@ export class LocalVaultStore {
       record.kdf.iterations !== KDF_ITERATIONS ||
       record.keyEncryption.cipher !== CIPHER ||
       record.vaultEncryption.cipher !== CIPHER) {
-      throw new Error('本地加密保管库格式暂不支持。');
+      throw new Error(AppI18n.globalString($r('app.string.error_local_vault_unsupported'), 'This encrypted local vault format is not supported.'));
     }
   }
 
@@ -399,7 +400,7 @@ export class LocalVaultStore {
     try {
       return new Uint8Array(buffer.from(value, 'utf-8').buffer);
     } catch (error) {
-      throw new Error(`UTF-8 编码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_utf8_encode_failed'), 'UTF-8 encoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -407,7 +408,7 @@ export class LocalVaultStore {
     try {
       return buffer.from(this.sliceBytes(value, 0, value.length).buffer).toString('utf-8');
     } catch (error) {
-      throw new Error(`UTF-8 解码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_utf8_decode_failed'), 'UTF-8 decoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -415,7 +416,7 @@ export class LocalVaultStore {
     try {
       return new util.Base64Helper().encodeToStringSync(bytes, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`Base64 编码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_base64_encode_failed'), 'Base64 encoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -423,7 +424,7 @@ export class LocalVaultStore {
     try {
       return new util.Base64Helper().decodeSync(value, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`Base64 解码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_base64_decode_failed'), 'Base64 decoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -446,6 +447,6 @@ export class LocalVaultStore {
     if (runtimeError && runtimeError.message && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '未知错误';
+    return AppI18n.globalString($r('app.string.error_unknown'), 'Unknown error');
   }
 }

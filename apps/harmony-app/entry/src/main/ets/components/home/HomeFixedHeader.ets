@@ -55,8 +55,8 @@ export struct HomeFixedHeader {
     .width(40)
     .height(40)
     .type(ButtonType.Circle)
-    .backgroundColor(this.isDarkMode ? '#1C1C1E' : '#EEF3F8')
-    .border({ width: 1, color: this.isDarkMode ? '#2F333A' : '#D5DFEA' })
+    .backgroundColor($r('app.color.color_header_icon_bg'))
+    .border({ width: 1, color: $r('app.color.color_header_icon_border') })
     .onClick(() => {
       action();
     })
@@ -75,8 +75,8 @@ export struct HomeFixedHeader {
     .width(40)
     .height(40)
     .type(ButtonType.Circle)
-    .backgroundColor(this.isDarkMode ? '#1C1C1E' : '#EEF3F8')
-    .border({ width: 1, color: this.isDarkMode ? '#2F333A' : '#D5DFEA' })
+    .backgroundColor($r('app.color.color_header_icon_bg'))
+    .border({ width: 1, color: $r('app.color.color_header_icon_border') })
     .onClick(() => {
       if (this.onSync) {
         this.onSync();

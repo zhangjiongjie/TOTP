@@ -6,6 +6,7 @@ import { util } from '@kit.ArkTS';
 import { userAuth } from '@kit.UserAuthenticationKit';
 import { BiometricVaultCredentialService } from './BiometricVaultCredentialService';
 import { SettingsStore } from '../storage/SettingsStore';
+import { AppI18n } from '../utils/AppI18n';
 
 const STORE_NAME: string = 'totp_unlock_state';
 const MASTER_PASSWORD_KEY: string = 'unlock.masterPassword';
@@ -90,12 +91,12 @@ export class UnlockService {
   readState(context: common.UIAbilityContext): UnlockState {
     let store: preferences.Preferences = this.getStore(context);
     let hasMasterPassword: boolean = this.getStoredMasterPassword(store).length > 0;
-    let hintMessage: string = '这是首次解锁，输入主密码后会在本机完成初始化。';
+    let hintMessage: string = this.readResourceString($r('app.string.unlock_first_state_hint'), 'This is the first unlock. Enter a master password to initialize this device.');
 
     if (hasMasterPassword) {
       hintMessage = this.isUnlocked
-        ? '当前设备保管库已解锁。'
-        : '请输入主密码以解锁本地保管库。';
+        ? this.readResourceString($r('app.string.unlock_state_unlocked'), 'The current device vault is unlocked.')
+        : this.readResourceString($r('app.string.unlock_state_locked_hint'), 'Enter the master password to unlock the local vault.');
     }
 
     return new UnlockState(
@@ -121,7 +122,7 @@ export class UnlockService {
   unlockWithPassword(context: common.UIAbilityContext, password: string): UnlockState {
     let normalizedPassword: string = password.trim();
     if (normalizedPassword.length === 0) {
-      throw new Error('请输入主密码后再解锁。');
+      throw new Error(this.readResourceString($r('app.string.error_unlock_password_required'), 'Enter the master password before unlocking.'));
     }
 
     let store: preferences.Preferences = this.getStore(context);
@@ -137,13 +138,13 @@ export class UnlockService {
         true,
         true,
         this.lastUnlockAt,
-        '主密码已初始化，当前设备保管库已解锁。'
+        this.readResourceString($r('app.string.unlock_initialized'), 'Master password initialized. The current device vault is unlocked.')
       );
     }
 
     if (!this.verifyStoredPassword(savedPassword, normalizedPassword)) {
       this.isUnlocked = false;
-      throw new Error('主密码不匹配，请重新输入。');
+      throw new Error(this.readResourceString($r('app.string.error_unlock_password_mismatch'), 'Master password does not match. Try again.'));
     }
 
     if (!this.isPasswordRecord(savedPassword)) {
@@ -158,18 +159,18 @@ export class UnlockService {
       true,
       true,
       this.lastUnlockAt,
-      '主密码验证通过，当前设备保管库已解锁。'
+      this.readResourceString($r('app.string.unlock_verified'), 'Master password verified. The current device vault is unlocked.')
     );
   }
 
   async unlockWithBiometric(context: common.UIAbilityContext): Promise<UnlockState> {
     if (!this.settingsStore.loadBiometricUnlockEnabled(context)) {
-      throw new Error('未开启生物识别解锁。');
+      throw new Error(this.readResourceString($r('app.string.error_biometric_disabled'), 'Biometric unlock is not enabled.'));
     }
 
     let savedPassword: string = BiometricVaultCredentialService.getInstance().loadMasterPassword();
     if (savedPassword.length === 0) {
-      throw new Error('未找到生物识别凭据，请先用主密码解锁后重新开启。');
+      throw new Error(this.readResourceString($r('app.string.error_biometric_credential_missing'), 'No biometric credential found. Unlock with the master password first, then enable it again.'));
     }
 
     await this.authenticateBiometric();
@@ -178,7 +179,7 @@ export class UnlockService {
 
   requireVaultPassword(): string {
     if (!this.isUnlocked || this.sessionPassword.length === 0) {
-      throw new Error('本地保管库尚未解锁，请先输入主密码。');
+      throw new Error(this.readResourceString($r('app.string.error_vault_locked'), 'The local vault is locked. Enter the master password first.'));
     }
     return this.sessionPassword;
   }
@@ -187,15 +188,15 @@ export class UnlockService {
     let normalizedCurrent: string = currentPassword.trim();
     let normalizedNext: string = nextPassword.trim();
     if (normalizedCurrent.length === 0 || normalizedNext.length === 0) {
-      throw new Error('请输入当前主密码和新主密码。');
+      throw new Error(this.readResourceString($r('app.string.error_master_password_required'), 'Enter the current master password and a new master password.'));
     }
     if (normalizedCurrent === normalizedNext) {
-      throw new Error('新主密码不能和当前主密码相同。');
+      throw new Error(this.readResourceString($r('app.string.error_new_password_same'), 'The new master password cannot be the same as the current one.'));
     }
     let store: preferences.Preferences = this.getStore(context);
     let savedPassword: string = this.getStoredMasterPassword(store);
     if (savedPassword.length === 0 || !this.verifyStoredPassword(savedPassword, normalizedCurrent)) {
-      throw new Error('当前主密码错误');
+      throw new Error(this.readResourceString($r('app.string.error_current_master_password_wrong'), 'Current master password is incorrect'));
     }
     this.saveMasterPassword(store, normalizedNext);
     this.refreshBiometricCredentialIfEnabled(context, normalizedNext);
@@ -207,7 +208,7 @@ export class UnlockService {
   adoptRemoteMasterPassword(context: common.UIAbilityContext, remotePassword: string): void {
     let normalizedPassword: string = remotePassword.trim();
     if (normalizedPassword.length === 0) {
-      throw new Error('请输入远端主密码。');
+      throw new Error(this.readResourceString($r('app.string.error_remote_master_password_required'), 'Enter the remote master password.'));
     }
     let store: preferences.Preferences = this.getStore(context);
     this.saveMasterPassword(store, normalizedPassword);
@@ -228,7 +229,7 @@ export class UnlockService {
       store.flushSync();
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      throw new Error(`保存主密码失败：${businessError.message}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_master_password_save_failed'), 'Failed to save master password: %1$s', businessError.message));
     }
   }
 
@@ -244,8 +245,8 @@ export class UnlockService {
           skipLockedBiometricAuth: true
         };
         let widgetParam: userAuth.WidgetParam = {
-          title: '验证身份',
-          navigationButtonText: '使用主密码'
+          title: this.readResourceString($r('app.string.biometric_prompt_title'), 'Verify identity'),
+          navigationButtonText: this.readResourceString($r('app.string.biometric_prompt_use_password'), 'Use master password')
         };
         let authInstance: userAuth.UserAuthInstance = userAuth.getUserAuthInstance(authParam, widgetParam);
         authInstance.on('result', {
@@ -259,7 +260,7 @@ export class UnlockService {
         });
         authInstance.start();
       } catch (error) {
-        reject(new Error(`启动生物识别失败：${this.readErrorMessage(error)}`));
+        reject(new Error(AppI18n.globalFormat($r('app.string.error_biometric_start_failed'), 'Failed to start biometric verification: %1$s', this.readErrorMessage(error))));
       }
     });
   }
@@ -275,7 +276,7 @@ export class UnlockService {
       return new BiometricAuthConfig(basicTypes, userAuth.AuthTrustLevel.ATL1);
     }
 
-    throw new Error('当前设备未录入可用的人脸或指纹，请先在系统设置中录入后再开启。');
+    throw new Error(this.readResourceString($r('app.string.error_biometric_no_enrollment_setup'), 'No available face or fingerprint is enrolled on this device. Enroll one in system settings first.'));
   }
 
   private isBiometricAuthSuccess(resultCode: number): boolean {
@@ -286,37 +287,37 @@ export class UnlockService {
     switch (resultCode) {
       case userAuth.UserAuthResultCode.FAIL:
       case 1:
-        return this.formatBiometricAuthMessage('生物识别未通过，请重试。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_fail'), 'Biometric verification failed. Try again.'), resultCode);
       case userAuth.UserAuthResultCode.CANCELED:
       case 3:
-        return this.formatBiometricAuthMessage('已取消生物识别。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_canceled'), 'Biometric verification canceled.'), resultCode);
       case userAuth.UserAuthResultCode.TIMEOUT:
       case 4:
-        return this.formatBiometricAuthMessage('生物识别超时，请重新验证。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_timeout'), 'Biometric verification timed out. Verify again.'), resultCode);
       case userAuth.UserAuthResultCode.TYPE_NOT_SUPPORT:
       case 5:
-        return this.formatBiometricAuthMessage('当前设备不支持所选生物识别类型。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_type_not_supported'), 'This device does not support the selected biometric type.'), resultCode);
       case userAuth.UserAuthResultCode.TRUST_LEVEL_NOT_SUPPORT:
       case 6:
-        return this.formatBiometricAuthMessage('当前设备的生物识别安全等级不足。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_trust_level'), "This device's biometric security level is insufficient."), resultCode);
       case userAuth.UserAuthResultCode.BUSY:
       case 7:
-        return this.formatBiometricAuthMessage('生物识别服务忙，请稍后重试。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_busy'), 'Biometric service is busy. Try again later.'), resultCode);
       case userAuth.UserAuthResultCode.INVALID_PARAMETERS:
       case 8:
-        return this.formatBiometricAuthMessage('生物识别参数校验失败。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_invalid_parameters'), 'Biometric parameters failed validation.'), resultCode);
       case userAuth.UserAuthResultCode.LOCKED:
       case 9:
-        return this.formatBiometricAuthMessage('生物识别已被系统临时锁定，请稍后重试或使用主密码。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_locked'), 'Biometric verification is temporarily locked by the system. Try again later or use the master password.'), resultCode);
       case userAuth.UserAuthResultCode.NOT_ENROLLED:
       case 10:
-        return this.formatBiometricAuthMessage('系统未录入可用的人脸或指纹。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_not_enrolled'), 'No available face or fingerprint is enrolled in the system.'), resultCode);
       case userAuth.UserAuthResultCode.CANCELED_FROM_WIDGET:
-        return this.formatBiometricAuthMessage('已切换为应用主密码验证。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_switched_password'), 'Switched to app master password verification.'), resultCode);
       case userAuth.UserAuthResultCode.PIN_EXPIRED:
-        return this.formatBiometricAuthMessage('系统锁屏密码已过期，请先到系统设置更新。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_pin_expired'), 'The system lock screen password has expired. Update it in system settings first.'), resultCode);
       default:
-        return this.formatBiometricAuthMessage('生物识别未完成，请使用主密码解锁。', resultCode);
+        return this.formatBiometricAuthMessage(this.readResourceString($r('app.string.biometric_failure_incomplete'), 'Biometric verification did not complete. Use the master password to unlock.'), resultCode);
     }
   }
 
@@ -348,7 +349,7 @@ export class UnlockService {
     try {
       return store.getSync(MASTER_PASSWORD_KEY, '') as string;
     } catch (error) {
-      throw new Error(`读取主密码记录失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_master_password_record_read_failed'), 'Failed to read master password record: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -362,7 +363,7 @@ export class UnlockService {
       record.kdfName !== PASSWORD_KDF_NAME ||
       record.hash !== PASSWORD_KDF_HASH ||
       record.iterations !== PASSWORD_KDF_ITERATIONS) {
-      throw new Error('主密码记录版本暂不支持，请先备份数据后重置本机配置。');
+      throw new Error(this.readResourceString($r('app.string.error_master_password_record_unsupported'), 'This master password record version is not supported. Back up your data and reset local settings.'));
     }
 
     let salt: Uint8Array = this.decodeBase64(record.salt);
@@ -386,7 +387,7 @@ export class UnlockService {
       );
       return JSON.stringify(record);
     } catch (error) {
-      throw new Error(`生成主密码记录失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_master_password_record_create_failed'), 'Failed to create master password record: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -402,7 +403,7 @@ export class UnlockService {
       let kdf: cryptoFramework.Kdf = cryptoFramework.createKdf('PBKDF2|SHA256');
       return kdf.generateSecretSync(spec).data;
     } catch (error) {
-      throw new Error(`派生主密码校验密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_master_password_verifier_derive_failed'), 'Failed to derive master password verifier key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -451,7 +452,7 @@ export class UnlockService {
     try {
       return new util.Base64Helper().encodeToStringSync(bytes, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`Base64 编码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_base64_encode_failed'), 'Base64 encoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -459,7 +460,7 @@ export class UnlockService {
     try {
       return new util.Base64Helper().decodeSync(value, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`Base64 解码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_base64_decode_failed'), 'Base64 decoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -481,7 +482,7 @@ export class UnlockService {
       return preferences.getPreferencesSync(context, options);
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      throw new Error(`打开解锁状态存储失败：${businessError.message}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_unlock_store_open_failed'), 'Failed to open unlock state storage: %1$s', businessError.message));
     }
   }
 
@@ -500,6 +501,10 @@ export class UnlockService {
     if (runtimeError && runtimeError.message && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '未知错误';
+    return AppI18n.globalString($r('app.string.error_unknown'), 'Unknown error');
+  }
+
+  private readResourceString(resource: Resource, fallback: string): string {
+    return AppI18n.globalString(resource, fallback);
   }
 }

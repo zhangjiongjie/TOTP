@@ -13,7 +13,7 @@ export struct HomeAccountSection {
   build() {
     Column({ space: 10 }) {
       if (this.isLoading) {
-        Text('加载中...')
+        Text($r('app.string.home_loading'))
           .fontSize(13)
           .fontColor($r('sys.color.font_secondary'))
           .width('100%')
@@ -48,12 +48,12 @@ export struct HomeAccountSection {
   @Builder
   private buildEmptyState(): void {
     Column({ space: 10 }) {
-      Text('还没有账号')
+      Text($r('app.string.home_empty_title'))
         .fontSize(18)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('sys.color.font_primary'))
 
-      Text('点击底部添加按钮录入账号。')
+      Text($r('app.string.home_empty_body'))
         .fontSize(14)
         .lineHeight(22)
         .fontColor($r('sys.color.font_secondary'))
@@ -71,6 +71,6 @@ export struct HomeAccountSection {
         return this.snapshots[index];
       }
     }
-    return new TotpCodeSnapshot(accountId, '', '------', '等待生成验证码', '30s / 30s', '本地保管库');
+    return new TotpCodeSnapshot(accountId, '', '------', '', '30s / 30s', '');
   }
 }

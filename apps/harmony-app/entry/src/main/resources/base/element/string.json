@@ -11,6 +11,1142 @@
     {
       "name": "module_desc",
       "value": "Keyring HarmonyOS entry module"
+    },
+    {
+      "name": "action_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "action_delete",
+      "value": "Delete"
+    },
+    {
+      "name": "action_import",
+      "value": "Import"
+    },
+    {
+      "name": "action_save",
+      "value": "Save"
+    },
+    {
+      "name": "action_verify",
+      "value": "Verify"
+    },
+    {
+      "name": "action_verifying",
+      "value": "Verifying..."
+    },
+    {
+      "name": "account_card_copy",
+      "value": "Copy"
+    },
+    {
+      "name": "account_card_no_account",
+      "value": "No account"
+    },
+    {
+      "name": "account_card_no_service",
+      "value": "Unnamed service"
+    },
+    {
+      "name": "account_card_not_recorded",
+      "value": "Not recorded"
+    },
+    {
+      "name": "account_copy_current_account",
+      "value": "Current account"
+    },
+    {
+      "name": "account_copy_failed",
+      "value": "Copy failed: %1$s"
+    },
+    {
+      "name": "account_copy_success",
+      "value": "Copied the verification code for %1$s to the clipboard."
+    },
+    {
+      "name": "account_copy_unavailable",
+      "value": "The code for this account cannot be copied. Check the secret or algorithm settings."
+    },
+    {
+      "name": "account_form_account_label",
+      "value": "Account name"
+    },
+    {
+      "name": "account_form_account_placeholder",
+      "value": "e.g. name@example.com"
+    },
+    {
+      "name": "account_form_algorithm_label",
+      "value": "Algorithm"
+    },
+    {
+      "name": "account_form_digits_label",
+      "value": "Digits"
+    },
+    {
+      "name": "account_form_group_default",
+      "value": "Default"
+    },
+    {
+      "name": "account_form_group_label",
+      "value": "Group"
+    },
+    {
+      "name": "account_form_group_personal",
+      "value": "Personal"
+    },
+    {
+      "name": "account_form_group_work",
+      "value": "Work"
+    },
+    {
+      "name": "account_form_import_title",
+      "value": "otpauth link"
+    },
+    {
+      "name": "account_form_info_title",
+      "value": "Account details"
+    },
+    {
+      "name": "account_form_issuer_label",
+      "value": "Issuer"
+    },
+    {
+      "name": "account_form_issuer_placeholder",
+      "value": "e.g. GitHub / Google"
+    },
+    {
+      "name": "account_form_parse",
+      "value": "Parse"
+    },
+    {
+      "name": "account_form_period_label",
+      "value": "Period"
+    },
+    {
+      "name": "account_form_secret_label",
+      "value": "Secret"
+    },
+    {
+      "name": "account_form_secret_placeholder",
+      "value": "Enter Base32 secret"
+    },
+    {
+      "name": "account_form_uri_placeholder",
+      "value": "Paste an otpauth://totp/... link"
+    },
+    {
+      "name": "add_account_title",
+      "value": "Add account"
+    },
+    {
+      "name": "backup_exported_count",
+      "value": "Exported %1$d accounts: %2$s"
+    },
+    {
+      "name": "backup_imported_count",
+      "value": "Imported %1$d accounts"
+    },
+    {
+      "name": "delete_account_message",
+      "value": "This account will be removed from the local vault. This action cannot be undone."
+    },
+    {
+      "name": "delete_confirm_title",
+      "value": "Confirm deletion"
+    },
+    {
+      "name": "edit_account_title",
+      "value": "Edit account"
+    },
+    {
+      "name": "error_backup_export_failed",
+      "value": "Export failed. Please try again later."
+    },
+    {
+      "name": "error_backup_import_failed",
+      "value": "Import failed. Please try again later."
+    },
+    {
+      "name": "error_backup_password_incorrect",
+      "value": "The backup password is incorrect. Try again."
+    },
+    {
+      "name": "error_biometric_unlock_failed",
+      "value": "Biometric unlock failed. Use the master password."
+    },
+    {
+      "name": "error_delete_failed",
+      "value": "Delete failed. Please try again later."
+    },
+    {
+      "name": "error_import_no_file",
+      "value": "No import file selected."
+    },
+    {
+      "name": "error_invalid_otpauth_scheme",
+      "value": "Only otpauth://totp/ links are supported"
+    },
+    {
+      "name": "error_master_password_change_failed",
+      "value": "Failed to change master password"
+    },
+    {
+      "name": "error_master_password_required",
+      "value": "Enter the current master password and a new master password."
+    },
+    {
+      "name": "error_new_password_mismatch",
+      "value": "The new passwords do not match."
+    },
+    {
+      "name": "error_otpauth_missing_account",
+      "value": "The otpauth link is missing an account name"
+    },
+    {
+      "name": "error_otpauth_missing_issuer",
+      "value": "The otpauth link is missing an issuer"
+    },
+    {
+      "name": "error_otpauth_missing_secret",
+      "value": "The otpauth link is missing a secret"
+    },
+    {
+      "name": "error_otpauth_parse_failed",
+      "value": "Failed to parse the otpauth link"
+    },
+    {
+      "name": "error_paste_otpauth_first",
+      "value": "Paste an otpauth link first"
+    },
+    {
+      "name": "error_photo_no_qr",
+      "value": "No QR code was found in the image."
+    },
+    {
+      "name": "error_photo_parse_failed",
+      "value": "Image parsing failed. Try a clearer QR code."
+    },
+    {
+      "name": "error_remote_master_password_required",
+      "value": "Enter the remote master password."
+    },
+    {
+      "name": "error_save_failed",
+      "value": "Save failed. Please try again later."
+    },
+    {
+      "name": "error_scan_failed",
+      "value": "Scan failed. Please try again."
+    },
+    {
+      "name": "error_scan_not_otpauth",
+      "value": "Recognized content is not an otpauth://totp/ link."
+    },
+    {
+      "name": "error_settings_load_failed",
+      "value": "Failed to load settings. Please try again later."
+    },
+    {
+      "name": "error_settings_save_failed",
+      "value": "Failed to save settings. Please try again later."
+    },
+    {
+      "name": "error_unlock_failed",
+      "value": "Unlock failed. Please try again later."
+    },
+    {
+      "name": "error_validate_account_name",
+      "value": "Enter an account name"
+    },
+    {
+      "name": "error_validate_issuer",
+      "value": "Enter an issuer"
+    },
+    {
+      "name": "error_validate_secret",
+      "value": "Enter a TOTP secret"
+    },
+    {
+      "name": "error_current_master_password_wrong",
+      "value": "Current master password is incorrect"
+    },
+    {
+      "name": "error_current_master_password_wrong_detail",
+      "value": "Current master password is incorrect: %1$s"
+    },
+    {
+      "name": "error_unknown",
+      "value": "Unknown error"
+    },
+    {
+      "name": "error_utf8_encode_failed",
+      "value": "UTF-8 encoding failed: %1$s"
+    },
+    {
+      "name": "error_utf8_decode_failed",
+      "value": "UTF-8 decoding failed: %1$s"
+    },
+    {
+      "name": "error_base64_encode_failed",
+      "value": "Base64 encoding failed: %1$s"
+    },
+    {
+      "name": "error_base64_decode_failed",
+      "value": "Base64 decoding failed: %1$s"
+    },
+    {
+      "name": "error_hmac_output_short",
+      "value": "HMAC output is too short"
+    },
+    {
+      "name": "error_hmac_offset_invalid",
+      "value": "HMAC offset is invalid"
+    },
+    {
+      "name": "error_totp_signature_failed",
+      "value": "Failed to calculate verification code signature: %1$s"
+    },
+    {
+      "name": "error_base32_invalid_char",
+      "value": "Invalid Base32 character: %1$s"
+    },
+    {
+      "name": "error_base32_trailing_bits",
+      "value": "Invalid Base32 trailing bits"
+    },
+    {
+      "name": "error_base32_padding_position",
+      "value": "Invalid Base32 padding position"
+    },
+    {
+      "name": "error_base32_length",
+      "value": "Invalid Base32 length"
+    },
+    {
+      "name": "error_base32_padding_length",
+      "value": "Invalid Base32 padding length"
+    },
+    {
+      "name": "error_base32_input_length",
+      "value": "Invalid Base32 input length"
+    },
+    {
+      "name": "error_local_vault_not_initialized",
+      "value": "Local vault is not initialized."
+    },
+    {
+      "name": "error_local_vault_export_key_failed",
+      "value": "Failed to export local vault key: %1$s"
+    },
+    {
+      "name": "error_local_master_password_change_failed",
+      "value": "Failed to change local master password: %1$s"
+    },
+    {
+      "name": "error_local_vault_encrypt_failed",
+      "value": "Failed to encrypt local vault: %1$s"
+    },
+    {
+      "name": "error_local_vault_decrypt_failed",
+      "value": "Failed to decrypt local vault: %1$s"
+    },
+    {
+      "name": "error_local_vault_derive_key_failed",
+      "value": "Failed to derive local vault key: %1$s"
+    },
+    {
+      "name": "error_local_aes_encrypt_failed",
+      "value": "Local AES-GCM encryption failed: %1$s"
+    },
+    {
+      "name": "error_local_vault_missing_auth_tag",
+      "value": "Local vault ciphertext is missing the authentication tag."
+    },
+    {
+      "name": "error_local_aes_decrypt_failed",
+      "value": "Local AES-GCM decryption failed: %1$s"
+    },
+    {
+      "name": "error_local_vault_corrupt_parse_failed",
+      "value": "Local vault format is damaged and cannot be parsed: %1$s"
+    },
+    {
+      "name": "error_local_vault_unsupported",
+      "value": "This encrypted local vault format is not supported."
+    },
+    {
+      "name": "error_biometric_credential_save_failed",
+      "value": "Failed to save biometric credential: %1$s"
+    },
+    {
+      "name": "error_biometric_credential_read_failed",
+      "value": "Failed to read biometric credential: %1$s"
+    },
+    {
+      "name": "error_master_password_save_failed",
+      "value": "Failed to save master password: %1$s"
+    },
+    {
+      "name": "error_biometric_start_failed",
+      "value": "Failed to start biometric verification: %1$s"
+    },
+    {
+      "name": "error_master_password_record_read_failed",
+      "value": "Failed to read master password record: %1$s"
+    },
+    {
+      "name": "error_master_password_record_create_failed",
+      "value": "Failed to create master password record: %1$s"
+    },
+    {
+      "name": "error_master_password_verifier_derive_failed",
+      "value": "Failed to derive master password verifier key: %1$s"
+    },
+    {
+      "name": "error_unlock_store_open_failed",
+      "value": "Failed to open unlock state storage: %1$s"
+    },
+    {
+      "name": "error_webdav_server_required",
+      "value": "Enter the WebDAV server URL first."
+    },
+    {
+      "name": "error_account_delete_missing",
+      "value": "Account to delete was not found"
+    },
+    {
+      "name": "error_account_update_missing",
+      "value": "Account to update was not found"
+    },
+    {
+      "name": "error_totp_algorithm_unsupported",
+      "value": "Unsupported algorithm: %1$s. Only SHA1, SHA256, and SHA512 are supported."
+    },
+    {
+      "name": "error_totp_compute_failed",
+      "value": "Failed to calculate verification code"
+    },
+    {
+      "name": "error_totp_copy_failed",
+      "value": "Failed to copy verification code: %1$s"
+    },
+    {
+      "name": "error_totp_empty_secret",
+      "value": "Secret is empty"
+    },
+    {
+      "name": "totp_config_error",
+      "value": "Configuration error"
+    },
+    {
+      "name": "totp_hint_tap_copy",
+      "value": "Tap the code to copy"
+    },
+    {
+      "name": "totp_remaining_seconds",
+      "value": "%1$ds left"
+    },
+    {
+      "name": "webdav_remote_password_blocked_with_hint",
+      "value": "Verify the remote vault master password before continuing sync."
+    },
+    {
+      "name": "webdav_sync_failed",
+      "value": "Sync failed"
+    },
+    {
+      "name": "webdav_sync_failed_retry",
+      "value": "Sync failed. Please try again later."
+    },
+    {
+      "name": "webdav_sync_local_change_failed",
+      "value": "Failed to sync local changes"
+    },
+    {
+      "name": "webdav_sync_local_change_failed_retry",
+      "value": "Failed to sync local changes. Please try again later."
+    },
+    {
+      "name": "webdav_remote_password_verify_failed",
+      "value": "Remote vault password verification failed."
+    },
+    {
+      "name": "webdav_conflict_resolve_failed",
+      "value": "Failed to resolve conflict"
+    },
+    {
+      "name": "webdav_conflict_resolve_failed_retry",
+      "value": "Failed to resolve conflict. Please try again later."
+    },
+    {
+      "name": "webdav_local_change_synced",
+      "value": "Local changes synced to WebDAV."
+    },
+    {
+      "name": "webdav_local_modified_synced",
+      "value": "Local updates synced to WebDAV."
+    },
+    {
+      "name": "master_password_changed",
+      "value": "Master password changed."
+    },
+    {
+      "name": "master_password_changed_webdav",
+      "value": "Master password changed and synced to WebDAV."
+    },
+    {
+      "name": "backup_error_empty_accounts",
+      "value": "The backup file has no account list."
+    },
+    {
+      "name": "backup_error_encrypted_invalid",
+      "value": "Encrypted backup content is invalid."
+    },
+    {
+      "name": "backup_error_encrypted_incomplete",
+      "value": "Encrypted backup data is incomplete."
+    },
+    {
+      "name": "backup_error_encrypted_unsupported",
+      "value": "Encrypted backup format is not supported."
+    },
+    {
+      "name": "backup_error_missing_kdf",
+      "value": "Encrypted backup is missing KDF parameters."
+    },
+    {
+      "name": "backup_error_password_mismatch",
+      "value": "Backup password does not match the current master password."
+    },
+    {
+      "name": "backup_error_plain_invalid",
+      "value": "Plain backup content is invalid."
+    },
+    {
+      "name": "home_empty_body",
+      "value": "Tap the add button at the bottom to add an account."
+    },
+    {
+      "name": "home_empty_title",
+      "value": "No accounts yet"
+    },
+    {
+      "name": "home_account_count",
+      "value": "%1$d accounts"
+    },
+    {
+      "name": "home_error_read_vault",
+      "value": "Failed to read local vault: %1$s"
+    },
+    {
+      "name": "home_loading",
+      "value": "Loading..."
+    },
+    {
+      "name": "home_status_local_vault",
+      "value": "Local vault"
+    },
+    {
+      "name": "home_sync_conflict_body",
+      "value": "Both local and remote data changed. Choose which side to keep."
+    },
+    {
+      "name": "home_sync_conflict_keep_local",
+      "value": "Keep local"
+    },
+    {
+      "name": "home_sync_conflict_title",
+      "value": "Sync conflict"
+    },
+    {
+      "name": "home_sync_conflict_use_remote",
+      "value": "Use remote"
+    },
+    {
+      "name": "home_sync_disabled_status",
+      "value": "WebDAV sync is off. Local mode."
+    },
+    {
+      "name": "home_sync_fab_disabled",
+      "value": "Not set"
+    },
+    {
+      "name": "home_sync_fab_ready",
+      "value": "Sync"
+    },
+    {
+      "name": "home_sync_fab_syncing",
+      "value": "Syncing"
+    },
+    {
+      "name": "home_sync_label_never",
+      "value": "Last sync: never"
+    },
+    {
+      "name": "home_sync_label_time",
+      "value": "Last sync: %1$s"
+    },
+    {
+      "name": "home_syncing_status",
+      "value": "Syncing..."
+    },
+    {
+      "name": "home_sync_available",
+      "value": "Local and WebDAV are already up to date."
+    },
+    {
+      "name": "home_sync_busy",
+      "value": "Sync is already in progress. Please try again later."
+    },
+    {
+      "name": "home_sync_conflict_keep_local_status",
+      "value": "Using the local version to overwrite remote..."
+    },
+    {
+      "name": "home_sync_conflict_use_remote_status",
+      "value": "Using the remote version to overwrite local..."
+    },
+    {
+      "name": "home_sync_local_change_status",
+      "value": "Syncing local changes..."
+    },
+    {
+      "name": "home_sync_remote_password_required",
+      "value": "Verify the remote vault master password to continue syncing."
+    },
+    {
+      "name": "home_sync_settings_unavailable",
+      "value": "Sync settings are unavailable."
+    },
+    {
+      "name": "webdav_sync_enabled",
+      "value": "WebDAV sync enabled"
+    },
+    {
+      "name": "webdav_disabled_local_only",
+      "value": "WebDAV is not enabled. Sync stays on this device."
+    },
+    {
+      "name": "webdav_disabled_conflict",
+      "value": "WebDAV is not enabled. Sync conflicts cannot be resolved."
+    },
+    {
+      "name": "webdav_remote_empty_local_empty",
+      "value": "Remote vault does not exist yet, and local vault is empty."
+    },
+    {
+      "name": "webdav_both_empty",
+      "value": "Local and WebDAV are both empty."
+    },
+    {
+      "name": "webdav_synced_latest",
+      "value": "Local and WebDAV are up to date."
+    },
+    {
+      "name": "webdav_first_bind_conflict_metadata",
+      "value": "Local and remote both contain data during first binding."
+    },
+    {
+      "name": "webdav_first_bind_conflict",
+      "value": "Local and remote both contain data during first binding. Choose which side to keep first."
+    },
+    {
+      "name": "webdav_baseline_refreshed",
+      "value": "Sync baseline refreshed."
+    },
+    {
+      "name": "webdav_auto_merged_synced",
+      "value": "Local and remote changes were merged automatically and synced to WebDAV."
+    },
+    {
+      "name": "webdav_decision_unhandled_metadata",
+      "value": "Sync decision could not be handled."
+    },
+    {
+      "name": "webdav_decision_unhandled",
+      "value": "Sync decision could not be handled. Please try again later."
+    },
+    {
+      "name": "webdav_both_changed_metadata",
+      "value": "Local and remote both changed."
+    },
+    {
+      "name": "webdav_both_changed_choose",
+      "value": "Local and remote both changed. Choose keep local or use remote on the home page."
+    },
+    {
+      "name": "webdav_remote_missing_use",
+      "value": "Remote vault does not exist. Cannot use the remote version."
+    },
+    {
+      "name": "webdav_restored_remote",
+      "value": "Restored the remote version from WebDAV."
+    },
+    {
+      "name": "webdav_remote_password_verified_updated",
+      "value": "Remote vault password verified. Local password updated."
+    },
+    {
+      "name": "webdav_conflict_resolve_first_data",
+      "value": "Local and remote both contain data. Resolve the sync conflict first."
+    },
+    {
+      "name": "webdav_conflict_account",
+      "value": "Local and remote account data conflict. Resolve the sync conflict first."
+    },
+    {
+      "name": "webdav_conflict_continue_metadata",
+      "value": "Local and remote have a sync conflict. Resolve it before continuing sync."
+    },
+    {
+      "name": "webdav_remote_verify_before_password_change",
+      "value": "Verify the remote vault master password before continuing sync, then change the master password."
+    },
+    {
+      "name": "webdav_remote_verify_before_password_change_short",
+      "value": "Verify the remote vault before changing the master password."
+    },
+    {
+      "name": "webdav_password_first_bind_conflict",
+      "value": "Master password was not synced: local and remote both contain data during first binding. Complete data sync first."
+    },
+    {
+      "name": "webdav_both_changed_before_password_change",
+      "value": "Local and remote both changed. Resolve the conflict before changing the master password."
+    },
+    {
+      "name": "webdav_validate_url_scheme",
+      "value": "WebDAV server URL must start with http:// or https://."
+    },
+    {
+      "name": "webdav_validate_file_path_required",
+      "value": "Enter the WebDAV vault path first."
+    },
+    {
+      "name": "backup_error_export_location_missing",
+      "value": "No export location selected."
+    },
+    {
+      "name": "backup_error_import_file_missing",
+      "value": "No backup file selected."
+    },
+    {
+      "name": "backup_error_export_encrypted_failed",
+      "value": "Failed to export encrypted backup: %1$s"
+    },
+    {
+      "name": "backup_error_import_encrypted_failed",
+      "value": "Failed to import encrypted backup: %1$s"
+    },
+    {
+      "name": "backup_error_create_key_failed",
+      "value": "Failed to create backup encryption key: %1$s"
+    },
+    {
+      "name": "backup_error_derive_key_failed",
+      "value": "Failed to derive backup key: %1$s"
+    },
+    {
+      "name": "backup_error_read_file_failed",
+      "value": "Failed to read backup file: %1$s"
+    },
+    {
+      "name": "backup_error_write_file_failed",
+      "value": "Failed to write backup file: %1$s"
+    },
+    {
+      "name": "webdav_error_vault_encrypt_failed",
+      "value": "Failed to encrypt WebDAV vault: %1$s"
+    },
+    {
+      "name": "webdav_error_vault_decrypt_failed",
+      "value": "Failed to decrypt WebDAV vault: %1$s"
+    },
+    {
+      "name": "webdav_error_rewrap_key_failed",
+      "value": "Failed to re-protect WebDAV vault key: %1$s"
+    },
+    {
+      "name": "webdav_error_encrypt_with_remote_key_failed",
+      "value": "Failed to encrypt WebDAV vault with remote key: %1$s"
+    },
+    {
+      "name": "webdav_error_encrypted_vault_invalid",
+      "value": "WebDAV encryptedVault field is invalid."
+    },
+    {
+      "name": "webdav_error_encrypted_vault_kdf_invalid",
+      "value": "WebDAV encryptedVault.kdf field is invalid."
+    },
+    {
+      "name": "webdav_error_encrypted_vault_unsupported",
+      "value": "This encrypted WebDAV vault format is not supported."
+    },
+    {
+      "name": "webdav_error_derive_key_failed",
+      "value": "Failed to derive WebDAV vault key: %1$s"
+    },
+    {
+      "name": "webdav_error_aes_encrypt_failed",
+      "value": "WebDAV AES-GCM encryption failed: %1$s"
+    },
+    {
+      "name": "webdav_error_missing_auth_tag",
+      "value": "Remote vault ciphertext is missing the authentication tag."
+    },
+    {
+      "name": "webdav_error_aes_decrypt_failed",
+      "value": "WebDAV AES-GCM decryption failed: %1$s"
+    },
+    {
+      "name": "webdav_error_encrypted_vault_aes_invalid",
+      "value": "WebDAV encryptedVault AES-GCM field is invalid."
+    },
+    {
+      "name": "webdav_error_download_http_failed",
+      "value": "WebDAV download failed, HTTP %1$d"
+    },
+    {
+      "name": "webdav_error_upload_directory_missing",
+      "value": "WebDAV upload failed. The remote directory does not exist or the path is not writable. Confirm that the vault path directory already exists."
+    },
+    {
+      "name": "webdav_error_upload_credentials_invalid",
+      "value": "WebDAV upload failed. Username or password is invalid."
+    },
+    {
+      "name": "webdav_error_upload_remote_changed",
+      "value": "WebDAV upload failed. Remote version changed. Sync before saving again."
+    },
+    {
+      "name": "webdav_error_upload_http_failed",
+      "value": "WebDAV upload failed, HTTP %1$d"
+    },
+    {
+      "name": "webdav_error_request_failed",
+      "value": "WebDAV request failed: %1$s"
+    },
+    {
+      "name": "webdav_error_auth_create_failed",
+      "value": "Failed to create WebDAV authorization info: %1$s"
+    },
+    {
+      "name": "nav_add",
+      "value": "Add"
+    },
+    {
+      "name": "nav_home",
+      "value": "Home"
+    },
+    {
+      "name": "nav_settings",
+      "value": "Settings"
+    },
+    {
+      "name": "nav_sync",
+      "value": "Sync"
+    },
+    {
+      "name": "remote_password_body",
+      "value": "The remote master password changed. Enter the new remote master password to continue syncing."
+    },
+    {
+      "name": "remote_password_cancel",
+      "value": "Later"
+    },
+    {
+      "name": "remote_password_hint",
+      "value": "After verification, your local vault and current unlock password will be updated to the remote password."
+    },
+    {
+      "name": "remote_password_placeholder",
+      "value": "Remote master password"
+    },
+    {
+      "name": "remote_password_title",
+      "value": "Verify remote vault"
+    },
+    {
+      "name": "settings_backup_import_password_body",
+      "value": "The current master password cannot decrypt this encrypted backup. Enter the backup file password. After import, the local vault will still be saved with the current master password."
+    },
+    {
+      "name": "settings_backup_import_password_label",
+      "value": "Backup file password"
+    },
+    {
+      "name": "settings_backup_import_title",
+      "value": "Import backup"
+    },
+    {
+      "name": "settings_backup_title",
+      "value": "Import / Export"
+    },
+    {
+      "name": "settings_biometric_body",
+      "value": "Use face or fingerprint to unlock after enabling."
+    },
+    {
+      "name": "settings_biometric_disabled",
+      "value": "Biometric unlock is off"
+    },
+    {
+      "name": "settings_biometric_enabled",
+      "value": "Biometric unlock is on"
+    },
+    {
+      "name": "settings_biometric_save_failed",
+      "value": "Failed to save biometric settings. Please try again later."
+    },
+    {
+      "name": "settings_biometric_title",
+      "value": "Biometric unlock"
+    },
+    {
+      "name": "settings_change_password_title",
+      "value": "Change master password"
+    },
+    {
+      "name": "settings_current_password",
+      "value": "Current master password"
+    },
+    {
+      "name": "settings_import_password_required",
+      "value": "Enter the backup file password."
+    },
+    {
+      "name": "settings_master_password_body",
+      "value": "Changing it rewraps the vault key. Account data keys stay unchanged."
+    },
+    {
+      "name": "settings_master_password_title",
+      "value": "Master password"
+    },
+    {
+      "name": "settings_new_password",
+      "value": "New master password"
+    },
+    {
+      "name": "settings_password_change_button",
+      "value": "Change"
+    },
+    {
+      "name": "settings_repeat_new_password",
+      "value": "Repeat new master password"
+    },
+    {
+      "name": "settings_updating_master_password",
+      "value": "Updating master password..."
+    },
+    {
+      "name": "settings_saved_at",
+      "value": "Saved %1$s"
+    },
+    {
+      "name": "settings_webdav_enabled",
+      "value": "Enabled"
+    },
+    {
+      "name": "settings_webdav_enable_hint",
+      "value": "Check to save and enable sync immediately."
+    },
+    {
+      "name": "settings_webdav_file_path",
+      "value": "Vault path"
+    },
+    {
+      "name": "settings_webdav_password",
+      "value": "Password"
+    },
+    {
+      "name": "settings_webdav_server",
+      "value": "Server URL"
+    },
+    {
+      "name": "settings_webdav_title",
+      "value": "WebDAV sync"
+    },
+    {
+      "name": "settings_webdav_username",
+      "value": "WebDAV username"
+    },
+    {
+      "name": "settings_webdav_interval",
+      "value": "Auto sync interval (minutes)"
+    },
+    {
+      "name": "settings_webdav_not_enabled",
+      "value": "Off"
+    },
+    {
+      "name": "status_parsed",
+      "value": "Parsed"
+    },
+    {
+      "name": "status_photo_opening",
+      "value": "Opening Photos..."
+    },
+    {
+      "name": "status_photo_parsed",
+      "value": "Image parsed"
+    },
+    {
+      "name": "status_scan_success",
+      "value": "Scan successful"
+    },
+    {
+      "name": "status_scanning",
+      "value": "Scanning..."
+    },
+    {
+      "name": "unlock_biometric_button",
+      "value": "Face / fingerprint unlock"
+    },
+    {
+      "name": "unlock_biometric_continue_password",
+      "value": "%1$s You can still unlock with the master password."
+    },
+    {
+      "name": "unlock_biometric_starting",
+      "value": "Starting face / fingerprint verification. You can also unlock with the master password."
+    },
+    {
+      "name": "unlock_existing_hint",
+      "value": "Enter the saved master password"
+    },
+    {
+      "name": "unlock_existing_placeholder",
+      "value": "Enter master password"
+    },
+    {
+      "name": "unlock_new_hint",
+      "value": "Your first entry initializes the current device master password"
+    },
+    {
+      "name": "unlock_new_placeholder",
+      "value": "Set master password"
+    },
+    {
+      "name": "unlock_submit",
+      "value": "Unlock"
+    },
+    {
+      "name": "biometric_prompt_title",
+      "value": "Verify identity"
+    },
+    {
+      "name": "biometric_prompt_use_password",
+      "value": "Use master password"
+    },
+    {
+      "name": "unlock_title",
+      "value": "Unlock vault"
+    },
+    {
+      "name": "unlock_master_password_label",
+      "value": "Master password"
+    },
+    {
+      "name": "unlock_first_state_hint",
+      "value": "This is the first unlock. Enter a master password to initialize this device."
+    },
+    {
+      "name": "unlock_state_unlocked",
+      "value": "The current device vault is unlocked."
+    },
+    {
+      "name": "unlock_state_locked_hint",
+      "value": "Enter the master password to unlock the local vault."
+    },
+    {
+      "name": "unlock_initialized",
+      "value": "Master password initialized. The current device vault is unlocked."
+    },
+    {
+      "name": "unlock_verified",
+      "value": "Master password verified. The current device vault is unlocked."
+    },
+    {
+      "name": "error_unlock_password_required",
+      "value": "Enter the master password before unlocking."
+    },
+    {
+      "name": "error_unlock_password_mismatch",
+      "value": "Master password does not match. Try again."
+    },
+    {
+      "name": "error_biometric_disabled",
+      "value": "Biometric unlock is not enabled."
+    },
+    {
+      "name": "error_biometric_credential_missing",
+      "value": "No biometric credential found. Unlock with the master password first, then enable it again."
+    },
+    {
+      "name": "error_vault_locked",
+      "value": "The local vault is locked. Enter the master password first."
+    },
+    {
+      "name": "error_new_password_same",
+      "value": "The new master password cannot be the same as the current one."
+    },
+    {
+      "name": "error_master_password_record_unsupported",
+      "value": "This master password record version is not supported. Back up your data and reset local settings."
+    },
+    {
+      "name": "error_biometric_no_enrollment_setup",
+      "value": "No available face or fingerprint is enrolled on this device. Enroll one in system settings first."
+    },
+    {
+      "name": "biometric_failure_fail",
+      "value": "Biometric verification failed. Try again."
+    },
+    {
+      "name": "biometric_failure_canceled",
+      "value": "Biometric verification canceled."
+    },
+    {
+      "name": "biometric_failure_timeout",
+      "value": "Biometric verification timed out. Verify again."
+    },
+    {
+      "name": "biometric_failure_type_not_supported",
+      "value": "This device does not support the selected biometric type."
+    },
+    {
+      "name": "biometric_failure_trust_level",
+      "value": "This device's biometric security level is insufficient."
+    },
+    {
+      "name": "biometric_failure_busy",
+      "value": "Biometric service is busy. Try again later."
+    },
+    {
+      "name": "biometric_failure_invalid_parameters",
+      "value": "Biometric parameters failed validation."
+    },
+    {
+      "name": "biometric_failure_locked",
+      "value": "Biometric verification is temporarily locked by the system. Try again later or use the master password."
+    },
+    {
+      "name": "biometric_failure_not_enrolled",
+      "value": "No available face or fingerprint is enrolled in the system."
+    },
+    {
+      "name": "biometric_failure_switched_password",
+      "value": "Switched to app master password verification."
+    },
+    {
+      "name": "biometric_failure_pin_expired",
+      "value": "The system lock screen password has expired. Update it in system settings first."
+    },
+    {
+      "name": "biometric_failure_incomplete",
+      "value": "Biometric verification did not complete. Use the master password to unlock."
     }
   ]
 }

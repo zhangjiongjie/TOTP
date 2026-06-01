@@ -7,6 +7,7 @@ import { WebDavSettingsSaveOutcome, WebDavSettingsSaveResultPolicy } from '../po
 import { MasterPasswordChangeResultPolicy } from '../policies/MasterPasswordChangeResultPolicy';
 import { InlineMessageState, TransientInlineMessagePolicy } from '../policies/TransientInlineMessagePolicy';
 import { ImportBackupPasswordPromptPolicy } from '../policies/ImportBackupPasswordPromptPolicy';
+import { AppI18n } from '../utils/AppI18n';
 
 const BACKUP_MESSAGE_VISIBLE_MS: number = 2500;
 
@@ -88,12 +89,12 @@ export struct Settings {
   private buildMasterPasswordCard(): void {
     Row() {
       Column({ space: 6 }) {
-        Text('主密码')
+        Text($r('app.string.settings_master_password_title'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('sys.color.font_primary'))
 
-        Text('修改后会重新保护保管库密钥，账号数据密钥保持不变。')
+        Text($r('app.string.settings_master_password_body'))
           .fontSize(13)
           .lineHeight(20)
           .fontColor($r('sys.color.font_secondary'))
@@ -102,15 +103,15 @@ export struct Settings {
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
 
-      Button('修改')
+      Button($r('app.string.settings_password_change_button'))
         .height(36)
         .enabled(!this.isPasswordChanging)
         .backgroundColor(Color.Transparent)
-        .fontColor('#2878C8')
+        .fontColor($r('app.color.color_primary'))
         .onClick(() => {
           let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
           if (this.service.isRemotePasswordBlocked(context)) {
-            this.webDavErrorMessage = '远端保管库需要主密码验证后才能继续同步，请先验证远端主密码。';
+            this.webDavErrorMessage = this.appString($r('app.string.webdav_remote_password_blocked_with_hint'), 'Verify the remote vault master password before continuing sync.');
             return;
           }
           this.currentMasterPassword = '';
@@ -139,29 +140,29 @@ export struct Settings {
                   .width(36)
                   .height(36)
               }
-              Text(this.passwordChangeMessage.length > 0 ? this.passwordChangeMessage : '正在更新主密码...')
+              Text(this.passwordChangeMessage.length > 0 ? this.passwordChangeMessage : $r('app.string.settings_updating_master_password'))
                 .fontSize(15)
                 .lineHeight(22)
-                .fontColor(this.passwordChangeIsError ? '#C53D3D' : $r('sys.color.font_primary'))
+                .fontColor(this.passwordChangeIsError ? $r('app.color.color_danger') : $r('sys.color.font_primary'))
             } else {
-              Text('修改主密码')
+              Text($r('app.string.settings_change_password_title'))
                 .fontSize(20)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('sys.color.font_primary'))
                 .width('100%')
 
-              this.buildInput('当前主密码', '当前主密码', this.currentMasterPassword, (value: string) => {
+              this.buildInput($r('app.string.settings_current_password'), $r('app.string.settings_current_password'), this.currentMasterPassword, (value: string) => {
                 this.currentMasterPassword = value;
               }, true)
-              this.buildInput('新主密码', '新主密码', this.nextMasterPassword, (value: string) => {
+              this.buildInput($r('app.string.settings_new_password'), $r('app.string.settings_new_password'), this.nextMasterPassword, (value: string) => {
                 this.nextMasterPassword = value;
               }, true)
-              this.buildInput('再次输入新主密码', '再次输入新主密码', this.confirmMasterPassword, (value: string) => {
+              this.buildInput($r('app.string.settings_repeat_new_password'), $r('app.string.settings_repeat_new_password'), this.confirmMasterPassword, (value: string) => {
                 this.confirmMasterPassword = value;
               }, true)
 
               Row({ space: 10 }) {
-                Button('取消')
+                Button($r('app.string.action_cancel'))
                   .height(42)
                   .layoutWeight(1)
                   .backgroundColor($r('sys.color.comp_background_gray'))
@@ -170,11 +171,11 @@ export struct Settings {
                     this.showChangePasswordDialog = false;
                   })
 
-                Button('保存')
+                Button($r('app.string.action_save'))
                   .height(42)
                   .layoutWeight(1)
-                  .backgroundColor('#2878C8')
-                  .fontColor(Color.White)
+                  .backgroundColor($r('app.color.color_primary'))
+                  .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
                   .onClick(() => {
                     this.changeMasterPassword();
                   })
@@ -187,7 +188,7 @@ export struct Settings {
           .backgroundColor($r('app.color.dialog_surface'))
           .border({ width: 1, color: $r('app.color.dialog_border') })
           .borderRadius(26)
-          .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
+          .shadow({ radius: 28, color: $r('app.color.color_dialog_shadow'), offsetX: 0, offsetY: 14 })
           .alignItems(HorizontalAlign.Center)
           .margin({ top: 44, bottom: 180 })
         }
@@ -208,12 +209,12 @@ export struct Settings {
   private buildSecurityCard(): void {
     Row() {
       Column({ space: 6 }) {
-        Text('生物识别解锁')
+        Text($r('app.string.settings_biometric_title'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('sys.color.font_primary'))
 
-        Text('开启后可用人脸或指纹解锁。')
+        Text($r('app.string.settings_biometric_body'))
           .fontSize(13)
           .lineHeight(20)
           .fontColor($r('sys.color.font_secondary'))
@@ -246,7 +247,7 @@ export struct Settings {
     Column({ space: 14 }) {
       Row() {
         Column({ space: 6 }) {
-          Text('WebDAV 同步')
+          Text($r('app.string.settings_webdav_title'))
             .fontSize(18)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('sys.color.font_primary'))
@@ -266,7 +267,7 @@ export struct Settings {
           Checkbox({ name: 'webdav-enabled' })
             .select(this.webDavEnabled)
             .shape(CheckBoxShape.ROUNDED_SQUARE)
-            .selectedColor('#1E5AA8')
+            .selectedColor($r('app.color.color_primary'))
             .unselectedColor($r('sys.color.comp_background_gray'))
             .width(28)
             .height(28)
@@ -274,7 +275,7 @@ export struct Settings {
               this.handleWebDavEnabledChange(value);
             })
 
-          Text(this.webDavEnabled ? '已启用' : '未启用')
+          Text(this.webDavEnabled ? $r('app.string.settings_webdav_enabled') : $r('app.string.settings_webdav_not_enabled'))
             .fontSize(11)
             .fontColor($r('sys.color.font_secondary'))
         }
@@ -284,26 +285,26 @@ export struct Settings {
       .width('100%')
 
       if (!this.webDavEnabled) {
-        Text('勾选后立即保存并启用同步。')
+        Text($r('app.string.settings_webdav_enable_hint'))
           .fontSize(12)
           .lineHeight(18)
           .fontColor($r('sys.color.font_secondary'))
           .width('100%')
       }
 
-      this.buildInput('服务器地址', 'https://example.com/dav', this.serverUrl, (value: string) => {
+      this.buildInput($r('app.string.settings_webdav_server'), 'https://example.com/dav', this.serverUrl, (value: string) => {
         this.serverUrl = value;
       })
-      this.buildInput('保管库路径', DEFAULT_WEBDAV_FILE_PATH, this.filePath, (value: string) => {
+      this.buildInput($r('app.string.settings_webdav_file_path'), DEFAULT_WEBDAV_FILE_PATH, this.filePath, (value: string) => {
         this.filePath = value;
       })
-      this.buildInput('用户名', 'WebDAV 用户名', this.username, (value: string) => {
+      this.buildInput($r('app.string.settings_webdav_username'), $r('app.string.settings_webdav_username'), this.username, (value: string) => {
         this.username = value;
       })
-      this.buildInput('密码', '密码', this.password, (value: string) => {
+      this.buildInput($r('app.string.settings_webdav_password'), $r('app.string.settings_webdav_password'), this.password, (value: string) => {
         this.password = value;
       }, true)
-      this.buildInput('自动同步间隔（分钟）', '15', this.syncIntervalMinutes, (value: string) => {
+      this.buildInput($r('app.string.settings_webdav_interval'), '15', this.syncIntervalMinutes, (value: string) => {
         this.syncIntervalMinutes = value;
       })
     }
@@ -317,7 +318,7 @@ export struct Settings {
   private buildBackupCard(): void {
     Column({ space: 14 }) {
       Row() {
-        Text('导入 / 导出')
+        Text($r('app.string.settings_backup_title'))
           .fontSize(18)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('sys.color.font_primary'))
@@ -373,14 +374,14 @@ export struct Settings {
     Text(message)
       .fontSize(13)
       .lineHeight(20)
-      .fontColor(isError ? '#C53D3D' : $r('sys.color.font_secondary'))
+      .fontColor(isError ? $r('app.color.color_danger') : $r('sys.color.font_secondary'))
       .width('100%')
   }
 
   @Builder
   private buildInput(
-    label: string,
-    placeholder: string,
+    label: ResourceStr,
+    placeholder: ResourceStr,
     textValue: string,
     onChanged: (value: string) => void,
     isPassword: boolean = false
@@ -397,7 +398,7 @@ export struct Settings {
         .height(46)
         .fontSize(15)
         .fontColor($r('sys.color.font_primary'))
-        .placeholderColor('#8FA0B8')
+        .placeholderColor($r('app.color.color_placeholder'))
         .backgroundColor($r('sys.color.comp_background_gray'))
         .borderRadius(16)
         .padding({ left: 14, right: 14 })
@@ -418,7 +419,7 @@ export struct Settings {
       this.applySettings(settings);
       this.biometricUnlockEnabled = this.service.loadBiometricUnlockEnabled(context);
     } catch (error) {
-      this.webDavErrorMessage = this.readErrorMessage(error, '读取设置失败，请稍后重试。');
+      this.webDavErrorMessage = this.readErrorMessage(error, this.appString($r('app.string.error_settings_load_failed'), 'Failed to load settings. Please try again later.'));
     }
   }
 
@@ -426,7 +427,7 @@ export struct Settings {
     if (enabled && !this.hasRequiredWebDavFields()) {
       this.webDavEnabled = false;
       this.webDavStatusMessage = '';
-      this.webDavErrorMessage = '请先填写 WebDAV 服务器地址。';
+      this.webDavErrorMessage = this.appString($r('app.string.error_webdav_server_required'), 'Enter the WebDAV server URL first.');
       return;
     }
     this.saveWebDavSettings(enabled);
@@ -459,13 +460,13 @@ export struct Settings {
         }
       } else {
         this.webDavErrorMessage = '';
-        this.webDavStatusMessage = 'WebDAV 同步未开启，本地模式。';
+        this.webDavStatusMessage = this.appString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.');
       }
       let outcome: WebDavSettingsSaveOutcome = WebDavSettingsSaveResultPolicy.resolve(settings.enabled, syncResult);
       this.onSaved(outcome.message, outcome.syncedVault, outcome.alreadySynced);
     } catch (error) {
       this.webDavEnabled = !enabled;
-      this.webDavErrorMessage = this.readErrorMessage(error, '保存设置失败，请稍后重试。');
+      this.webDavErrorMessage = this.readErrorMessage(error, this.appString($r('app.string.error_settings_save_failed'), 'Failed to save settings. Please try again later.'));
     }
   }
 
@@ -474,16 +475,18 @@ export struct Settings {
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       this.biometricUnlockEnabled = await this.service.saveBiometricUnlockEnabled(context, enabled);
-      this.securityStatusMessage = this.biometricUnlockEnabled ? '已开启生物识别解锁' : '已关闭生物识别解锁';
+      this.securityStatusMessage = this.biometricUnlockEnabled
+        ? this.appString($r('app.string.settings_biometric_enabled'), 'Biometric unlock is on')
+        : this.appString($r('app.string.settings_biometric_disabled'), 'Biometric unlock is off');
     } catch (error) {
       this.biometricUnlockEnabled = !enabled;
-      this.securityErrorMessage = this.readErrorMessage(error, '保存生物识别设置失败，请稍后重试。');
+      this.securityErrorMessage = this.readErrorMessage(error, this.appString($r('app.string.settings_biometric_save_failed'), 'Failed to save biometric settings. Please try again later.'));
     }
   }
 
   private async changeMasterPassword(): Promise<void> {
     if (this.currentMasterPassword.trim().length === 0 || this.nextMasterPassword.trim().length === 0) {
-      this.passwordChangeMessage = '请输入当前主密码和新主密码。';
+      this.passwordChangeMessage = this.appString($r('app.string.error_master_password_required'), 'Enter the current master password and a new master password.');
       this.passwordChangeIsError = true;
       setTimeout(() => {
         this.passwordChangeMessage = '';
@@ -491,7 +494,7 @@ export struct Settings {
       return;
     }
     if (this.nextMasterPassword !== this.confirmMasterPassword) {
-      this.passwordChangeMessage = '两次输入的新主密码不一致。';
+      this.passwordChangeMessage = this.appString($r('app.string.error_new_password_mismatch'), 'The new passwords do not match.');
       this.passwordChangeIsError = true;
       setTimeout(() => {
         this.passwordChangeMessage = '';
@@ -499,7 +502,7 @@ export struct Settings {
       return;
     }
     this.isPasswordChanging = true;
-    this.passwordChangeMessage = '正在更新主密码...';
+    this.passwordChangeMessage = this.appString($r('app.string.settings_updating_master_password'), 'Updating master password...');
     this.passwordChangeIsError = false;
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
@@ -528,9 +531,9 @@ export struct Settings {
   }
 
   private normalizePasswordChangeError(error: Object): string {
-    let message: string = this.readErrorMessage(error, '主密码修改失败');
+    let message: string = this.readErrorMessage(error, this.appString($r('app.string.error_master_password_change_failed'), 'Failed to change master password'));
     if (message.indexOf('解密') >= 0 || message.indexOf('decrypt') >= 0 || message.indexOf('GCM') >= 0) {
-      return '当前主密码错误';
+      return this.appString($r('app.string.error_current_master_password_wrong'), 'Current master password is incorrect');
     }
     return message;
   }
@@ -544,9 +547,9 @@ export struct Settings {
     try {
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       let result: ExportVaultResult = await this.service.exportVault(context);
-      this.showBackupStatus(`已导出 ${result.exportedCount} 个账号：${result.filename}`);
+      this.showBackupStatus(this.appFormat($r('app.string.backup_exported_count'), 'Exported %1$d accounts: %2$s', result.exportedCount, result.filename));
     } catch (error) {
-      this.showBackupError(this.readErrorMessage(error, '导出备份失败，请稍后重试。'));
+      this.showBackupError(this.readErrorMessage(error, this.appString($r('app.string.error_backup_export_failed'), 'Export failed. Please try again later.')));
     } finally {
       this.isBackupBusy = false;
     }
@@ -558,19 +561,19 @@ export struct Settings {
       Scroll() {
         Column() {
           Column({ space: 12 }) {
-            Text('导入备份')
+            Text($r('app.string.settings_backup_import_title'))
               .fontSize(20)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('sys.color.font_primary'))
               .width('100%')
 
-            Text('当前主密码无法解开该加密备份，请输入备份文件密码。导入成功后，本地仍使用当前主密码保存。')
+            Text($r('app.string.settings_backup_import_password_body'))
               .fontSize(14)
               .lineHeight(21)
               .fontColor($r('sys.color.font_secondary'))
               .width('100%')
 
-            this.buildInput('备份文件密码', '备份文件密码', this.importBackupPassword, (value: string) => {
+            this.buildInput($r('app.string.settings_backup_import_password_label'), $r('app.string.settings_backup_import_password_label'), this.importBackupPassword, (value: string) => {
               this.importBackupPassword = value;
               this.importPasswordErrorMessage = '';
             }, true)
@@ -579,12 +582,12 @@ export struct Settings {
               Text(this.importPasswordErrorMessage)
                 .fontSize(13)
                 .lineHeight(20)
-                .fontColor('#C53D3D')
+                .fontColor($r('app.color.color_danger'))
                 .width('100%')
             }
 
             Row({ space: 10 }) {
-              Button('取消')
+              Button($r('app.string.action_cancel'))
                 .height(42)
                 .layoutWeight(1)
                 .backgroundColor($r('sys.color.comp_background_gray'))
@@ -593,11 +596,11 @@ export struct Settings {
                   this.dismissImportPasswordDialog();
                 })
 
-              Button('导入')
+              Button($r('app.string.action_import'))
                 .height(42)
                 .layoutWeight(1)
-                .backgroundColor('#2878C8')
-                .fontColor(Color.White)
+                .backgroundColor($r('app.color.color_primary'))
+                .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
                 .enabled(!this.isBackupBusy)
                 .onClick(() => {
                   this.retryImportBackupWithPassword();
@@ -610,7 +613,7 @@ export struct Settings {
           .backgroundColor($r('app.color.dialog_surface'))
           .border({ width: 1, color: $r('app.color.dialog_border') })
           .borderRadius(26)
-          .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
+          .shadow({ radius: 28, color: $r('app.color.color_dialog_shadow'), offsetX: 0, offsetY: 14 })
           .alignItems(HorizontalAlign.Center)
           .margin({ top: 44, bottom: 180 })
         }
@@ -641,7 +644,7 @@ export struct Settings {
       this.importPasswordErrorMessage = '';
       this.finishSelectedImport(context, selection);
     } catch (error) {
-      this.showBackupError(this.readErrorMessage(error, '导入备份失败，请稍后重试。'));
+      this.showBackupError(this.readErrorMessage(error, this.appString($r('app.string.error_backup_import_failed'), 'Import failed. Please try again later.')));
       this.isBackupBusy = false;
     }
   }
@@ -652,13 +655,13 @@ export struct Settings {
     }
     let password: string = this.importBackupPassword.trim();
     if (password.length === 0) {
-      this.importPasswordErrorMessage = '请输入备份文件密码。';
+      this.importPasswordErrorMessage = this.appString($r('app.string.settings_import_password_required'), 'Enter the backup file password.');
       return;
     }
     let selection: ImportVaultSelection | undefined = this.pendingImportSelection;
     if (selection === undefined) {
       this.dismissImportPasswordDialog();
-      this.showBackupError('未选择导入文件。');
+      this.showBackupError(this.appString($r('app.string.error_import_no_file'), 'No import file selected.'));
       return;
     }
     this.isBackupBusy = true;
@@ -669,20 +672,20 @@ export struct Settings {
   private finishSelectedImport(context: common.UIAbilityContext, selection: ImportVaultSelection, importPassword: string | undefined = undefined): void {
     try {
       let result: ImportVaultResult = this.service.importSelectedVault(context, selection, importPassword);
-      let message: string = `已导入 ${result.importedCount} 个账号`;
+      let message: string = this.appFormat($r('app.string.backup_imported_count'), 'Imported %1$d accounts', result.importedCount);
       this.dismissImportPasswordDialog();
       this.pendingImportSelection = undefined;
       this.showBackupStatus(message);
       this.onImported(result.vault, message);
     } catch (error) {
-      let message: string = this.readErrorMessage(error, '导入备份失败，请稍后重试。');
+      let message: string = this.readErrorMessage(error, this.appString($r('app.string.error_backup_import_failed'), 'Import failed. Please try again later.'));
       if (importPassword === undefined && ImportBackupPasswordPromptPolicy.shouldPromptForPassword(message)) {
         this.showImportPasswordDialog = true;
         this.importPasswordErrorMessage = '';
         return;
       }
       if (importPassword !== undefined && ImportBackupPasswordPromptPolicy.shouldPromptForPassword(message)) {
-        this.importPasswordErrorMessage = '备份文件密码不正确，请重试。';
+        this.importPasswordErrorMessage = this.appString($r('app.string.error_backup_password_incorrect'), 'The backup password is incorrect. Try again.');
         return;
       }
       this.dismissImportPasswordDialog();
@@ -734,13 +737,13 @@ export struct Settings {
     this.password = settings.password;
     this.syncIntervalMinutes = `${settings.syncIntervalMinutes}`;
     if (settings.updatedAt.length > 0 && this.webDavStatusMessage.length === 0 && this.webDavErrorMessage.length === 0) {
-      this.webDavStatusMessage = `已保存 ${this.formatDateLabel(settings.updatedAt)}`;
+      this.webDavStatusMessage = this.appFormat($r('app.string.settings_saved_at'), 'Saved %1$s', this.formatDateLabel(settings.updatedAt));
     }
   }
 
   private resolveWebDavStatusMessage(): string {
     if (!this.webDavEnabled) {
-      return 'WebDAV 同步未开启，本地模式。';
+      return this.appString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.');
     }
     if (this.webDavEnabled &&
       this.isUsefulSyncStatusMessage(this.syncStatusMessage) &&
@@ -765,13 +768,17 @@ export struct Settings {
 
   private isUsefulSyncStatusMessage(message: string): boolean {
     return message.length > 0 &&
+      message !== this.appString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.') &&
+      message !== this.appString($r('app.string.home_syncing_status'), 'Syncing...') &&
       message !== '未配置 WebDAV，数据仅保留在本机。' &&
       message !== '同步中...' &&
       message.indexOf('已关闭 WebDAV 同步') < 0;
   }
 
   private isRemotePasswordMessage(message: string): boolean {
-    return message.indexOf('远端保管库需要主密码验证') >= 0;
+    return message.indexOf('远端保管库需要主密码验证') >= 0 ||
+      message.indexOf('remote vault') >= 0 ||
+      message.indexOf('master password') >= 0;
   }
 
   private isSuccessfulWebDavMessage(message: string): boolean {
@@ -786,7 +793,17 @@ export struct Settings {
       message.indexOf('主密码已修改并同步到 WebDAV') >= 0 ||
       message.indexOf('本地修改已同步到 WebDAV') >= 0 ||
       message.indexOf('本地变更已同步到 WebDAV') >= 0 ||
-      message.indexOf('自动合并并同步到 WebDAV') >= 0;
+      message.indexOf('自动合并并同步到 WebDAV') >= 0 ||
+      message.indexOf('synced') >= 0 ||
+      message.indexOf('Sync baseline refreshed') >= 0 ||
+      message.indexOf('Master password changed and synced to WebDAV') >= 0 ||
+      message.indexOf('Local and WebDAV') >= 0 ||
+      message.indexOf('Local updates') >= 0 ||
+      message.indexOf('Local changes') >= 0 ||
+      message.indexOf('merged automatically') >= 0 ||
+      message.indexOf('up to date') >= 0 ||
+      message.indexOf('restored from WebDAV') >= 0 ||
+      message.indexOf('updated to WebDAV') >= 0;
   }
 
   private hasRequiredWebDavFields(): boolean {
@@ -817,5 +834,15 @@ export struct Settings {
 
   private pad(value: number): string {
     return value < 10 ? `0${value}` : `${value}`;
+  }
+
+  private appString(resource: Resource, fallback: string): string {
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return AppI18n.string(context, resource, fallback);
+  }
+
+  private appFormat(resource: Resource, fallback: string, ...args: Array<string | number>): string {
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return AppI18n.format(context, resource, fallback, ...args);
   }
 }

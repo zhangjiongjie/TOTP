@@ -10,6 +10,7 @@ import { BiometricVaultCredentialService } from './BiometricVaultCredentialServi
 import { UnlockService } from './UnlockService';
 import { EncryptedRemoteVaultBlob, RemoteVaultCryptoService, RemoteVaultDecryption } from './RemoteVaultCryptoService';
 import { WebDavSyncResult, WebDavSyncService } from './WebDavSyncService';
+import { AppI18n } from '../utils/AppI18n';
 import {
   VAULT_IMPORT_FORMAT_ENCRYPTED_V1,
   VAULT_IMPORT_FORMAT_LOCAL_JSON,
@@ -193,7 +194,7 @@ export class SettingsService {
     }
 
     if (draft.enabled && draft.serverUrl.trim().length === 0) {
-      throw new Error('启用 WebDAV 前需要填写服务器地址');
+      throw new Error(AppI18n.globalString($r('app.string.error_webdav_server_required'), 'Enter the WebDAV server URL first.'));
     }
 
     let interval: number = draft.syncIntervalMinutes > 0 ? draft.syncIntervalMinutes : 15;
@@ -233,7 +234,7 @@ export class SettingsService {
     let documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(context);
     let selectedUris: string[] = await documentPicker.save(documentSaveOptions);
     if (selectedUris.length === 0) {
-      throw new Error('未选择导出位置。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_export_location_missing'), 'No export location selected.'));
     }
 
     this.writeTextFile(selectedUris[0], this.createEncryptedExportContent(vault));
@@ -250,7 +251,7 @@ export class SettingsService {
     let documentPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(context);
     let selectedUris: string[] = await documentPicker.select(documentSelectOptions);
     if (selectedUris.length === 0) {
-      throw new Error('未选择备份文件。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_import_file_missing'), 'No backup file selected.'));
     }
 
     let raw: string = this.readTextFile(selectedUris[0]);
@@ -296,7 +297,7 @@ export class SettingsService {
     let parsed: VaultImportParseResult = VaultImportParser.parse(raw);
     if (parsed.format === VAULT_IMPORT_FORMAT_PLAIN || parsed.format === VAULT_IMPORT_FORMAT_LOCAL_JSON) {
       if (parsed.vault === undefined) {
-        throw new Error('备份文件中没有账号列表。');
+        throw new Error(AppI18n.globalString($r('app.string.backup_error_empty_accounts'), 'The backup file has no account list.'));
       }
       return parsed.vault;
     }
@@ -331,7 +332,7 @@ export class SettingsService {
         this.encodeBase64(passwordVerifier)
       );
     } catch (error) {
-      throw new Error(`导出加密备份失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.backup_error_export_encrypted_failed'), 'Failed to export encrypted backup: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -345,10 +346,10 @@ export class SettingsService {
       let expectedVerifier: Uint8Array = this.decodeBase64(this.readString(encryptedVault, 'passwordVerifier', ''));
       let actualVerifier: Uint8Array = this.deriveWebPasswordVerifier(password, salt);
       if (!this.bytesEqual(expectedVerifier, actualVerifier)) {
-        throw new Error('备份密码与当前主密码不匹配。');
+        throw new Error(AppI18n.globalString($r('app.string.backup_error_password_mismatch'), 'Backup password does not match the current master password.'));
       }
       if (encryptedWithTag.length <= WEB_EXPORT_TAG_SIZE) {
-        throw new Error('加密备份密文不完整。');
+        throw new Error(AppI18n.globalString($r('app.string.backup_error_encrypted_incomplete'), 'Encrypted backup data is incomplete.'));
       }
 
       let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, encryptedWithTag.length - WEB_EXPORT_TAG_SIZE);
@@ -359,14 +360,14 @@ export class SettingsService {
       let decrypted: Uint8Array = cipher.doFinalSync({ data: ciphertext }).data;
       return JSON.parse(this.decodeUtf8(decrypted)) as Record<string, Object>;
     } catch (error) {
-      throw new Error(`导入加密备份失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.backup_error_import_encrypted_failed'), 'Failed to import encrypted backup: %1$s', this.readErrorMessage(error)));
     }
   }
 
   private validateWebEncryptedVault(encryptedVault: Record<string, Object>): void {
     let kdfValue: Object | undefined = encryptedVault['kdf'];
     if (typeof kdfValue !== 'object' || kdfValue === null || Array.isArray(kdfValue)) {
-      throw new Error('加密备份缺少 KDF 参数。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_missing_kdf'), 'Encrypted backup is missing KDF parameters.'));
     }
     let kdf: Record<string, Object> = kdfValue as Record<string, Object>;
     if (this.readNumber(encryptedVault, 'formatVersion', 0) !== WEB_EXPORT_FORMAT_VERSION ||
@@ -374,7 +375,7 @@ export class SettingsService {
       this.readNumber(kdf, 'iterations', 0) !== WEB_EXPORT_KDF_ITERATIONS ||
       this.readString(kdf, 'hash', '') !== WEB_EXPORT_KDF_HASH ||
       this.readString(encryptedVault, 'cipher', '') !== WEB_EXPORT_CIPHER) {
-      throw new Error('加密备份格式暂不支持。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_encrypted_unsupported'), 'Encrypted backup format is not supported.'));
     }
   }
 
@@ -383,7 +384,7 @@ export class SettingsService {
       let keyBytes: Uint8Array = this.deriveWebKeyBytes(password, salt);
       return cryptoFramework.createSymKeyGenerator(WEB_EXPORT_AES_ALGORITHM).convertKeySync({ data: keyBytes });
     } catch (error) {
-      throw new Error(`创建备份加密密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.backup_error_create_key_failed'), 'Failed to create backup encryption key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -403,7 +404,7 @@ export class SettingsService {
       let kdf: cryptoFramework.Kdf = cryptoFramework.createKdf('PBKDF2|SHA256');
       return kdf.generateSecretSync(spec).data;
     } catch (error) {
-      throw new Error(`派生备份密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.backup_error_derive_key_failed'), 'Failed to derive backup key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -438,7 +439,7 @@ export class SettingsService {
       let readLength: number = fs.readSync(file.fd, contentBuffer);
       return buffer.from(contentBuffer.slice(0, readLength)).toString('utf-8');
     } catch (error) {
-      throw new Error(`读取备份文件失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.backup_error_read_file_failed'), 'Failed to read backup file: %1$s', this.readErrorMessage(error)));
     } finally {
       if (file !== undefined) {
         this.closeFileQuietly(file);
@@ -453,7 +454,7 @@ export class SettingsService {
       fs.writeSync(file.fd, content);
       fs.fsyncSync(file.fd);
     } catch (error) {
-      throw new Error(`写入备份文件失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.backup_error_write_file_failed'), 'Failed to write backup file: %1$s', this.readErrorMessage(error)));
     } finally {
       if (file !== undefined) {
         this.closeFileQuietly(file);
@@ -465,7 +466,7 @@ export class SettingsService {
     try {
       return new Uint8Array(buffer.from(value, 'utf-8').buffer);
     } catch (error) {
-      throw new Error(`UTF-8 编码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_utf8_encode_failed'), 'UTF-8 encoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -473,7 +474,7 @@ export class SettingsService {
     try {
       return buffer.from(this.sliceBytes(value, 0, value.length).buffer).toString('utf-8');
     } catch (error) {
-      throw new Error(`UTF-8 解码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_utf8_decode_failed'), 'UTF-8 decoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -481,7 +482,7 @@ export class SettingsService {
     try {
       return new util.Base64Helper().encodeToStringSync(bytes, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`Base64 编码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_base64_encode_failed'), 'Base64 encoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -489,7 +490,7 @@ export class SettingsService {
     try {
       return new util.Base64Helper().decodeSync(value, util.Type.BASIC);
     } catch (error) {
-      throw new Error(`Base64 解码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_base64_decode_failed'), 'Base64 decoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -524,7 +525,7 @@ export class SettingsService {
     if (runtimeError && runtimeError.message && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '未知错误';
+    return AppI18n.globalString($r('app.string.error_unknown'), 'Unknown error');
   }
 
   private readString(record: Record<string, Object>, key: string, fallback: string): string {

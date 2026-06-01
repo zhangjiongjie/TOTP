@@ -1,6 +1,7 @@
 import { pasteboard } from '@kit.BasicServicesKit';
 import { TotpAccount } from '../model/TotpAccount';
 import { TotpCodeGenerator } from './TotpCodeGenerator';
+import { AppI18n } from '../utils/AppI18n';
 
 export class TotpCodeSnapshot {
   accountId: string;
@@ -50,7 +51,7 @@ export class TotpRuntimeService {
       let pasteData: pasteboard.PasteData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, code);
       pasteboard.getSystemPasteboard().setDataSync(pasteData);
     } catch (error) {
-      throw new Error(`复制验证码失败：${this.resolveErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_totp_copy_failed'), 'Failed to copy verification code: %1$s', this.resolveErrorMessage(error)));
     }
   }
 
@@ -64,9 +65,9 @@ export class TotpRuntimeService {
         account.id,
         rawCode,
         this.formatCodeValue(rawCode),
-        '点击验证码即可复制',
+        AppI18n.globalString($r('app.string.totp_hint_tap_copy'), 'Tap the code to copy'),
         `${remainingSeconds}s / ${period}s`,
-        `剩余 ${remainingSeconds}s`
+        AppI18n.globalFormat($r('app.string.totp_remaining_seconds'), '%1$ds left', remainingSeconds)
       );
     } catch (error) {
       let message: string = this.resolveErrorMessage(error);
@@ -76,7 +77,7 @@ export class TotpRuntimeService {
         '------',
         message,
         `${remainingSeconds}s / ${period}s`,
-        '配置异常'
+        AppI18n.globalString($r('app.string.totp_config_error'), 'Configuration error')
       );
     }
   }
@@ -118,6 +119,6 @@ export class TotpRuntimeService {
     if (runtimeError.message !== undefined && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '验证码计算失败';
+    return AppI18n.globalString($r('app.string.error_totp_compute_failed'), 'Failed to calculate verification code');
   }
 }

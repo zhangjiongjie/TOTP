@@ -21,7 +21,7 @@ export struct EditFixedHeader {
         }
       })
 
-      Text('编辑账号')
+      Text($r('app.string.edit_account_title'))
         .fontSize(25)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('sys.color.font_primary'))

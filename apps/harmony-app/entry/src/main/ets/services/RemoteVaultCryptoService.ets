@@ -6,6 +6,7 @@ import { TotpAccount } from '../model/TotpAccount';
 import { resolveIconKey } from './BrandIconMatcher';
 import { UnlockService } from './UnlockService';
 import { resolveTotpAlgorithm } from '../shared/TotpAlgorithm';
+import { AppI18n } from '../utils/AppI18n';
 
 const REMOTE_FORMAT_VERSION: number = 2;
 const REMOTE_KDF_NAME: string = 'PBKDF2';
@@ -118,7 +119,7 @@ export class RemoteVaultCryptoService {
         new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault))
       );
     } catch (error) {
-      throw new Error(`加密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_vault_encrypt_failed'), 'Failed to encrypt WebDAV vault: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -139,7 +140,7 @@ export class RemoteVaultCryptoService {
         new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault))
       );
     } catch (error) {
-      throw new Error(`加密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_vault_encrypt_failed'), 'Failed to encrypt WebDAV vault: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -170,7 +171,7 @@ export class RemoteVaultCryptoService {
       );
       return new RemoteVaultDecryption(this.createLocalVaultFromRemotePayload(this.decodeUtf8(plaintext)), vaultKeyBytes);
     } catch (error) {
-      throw new Error(`解密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_vault_decrypt_failed'), 'Failed to decrypt WebDAV vault: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -189,7 +190,7 @@ export class RemoteVaultCryptoService {
         existingBlob.vaultEncryption
       );
     } catch (error) {
-      throw new Error(`重新保护 WebDAV 保管库密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_rewrap_key_failed'), 'Failed to re-protect WebDAV vault key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -207,18 +208,18 @@ export class RemoteVaultCryptoService {
         new RemoteAesGcmRecord(REMOTE_CIPHER, this.encodeBase64(vaultIv), this.encodeBase64(encryptedVault))
       );
     } catch (error) {
-      throw new Error(`使用远端密钥加密 WebDAV 保管库失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_encrypt_with_remote_key_failed'), 'Failed to encrypt WebDAV vault with remote key: %1$s', this.readErrorMessage(error)));
     }
   }
 
   parseEncryptedBlob(value: Object | undefined): EncryptedRemoteVaultBlob {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      throw new Error('WebDAV encryptedVault 字段无效。');
+      throw new Error(AppI18n.globalString($r('app.string.webdav_error_encrypted_vault_invalid'), 'WebDAV encryptedVault field is invalid.'));
     }
     let record: Record<string, Object> = value as Record<string, Object>;
     let kdfValue: Object | undefined = record['kdf'];
     if (typeof kdfValue !== 'object' || kdfValue === null || Array.isArray(kdfValue)) {
-      throw new Error('WebDAV encryptedVault.kdf 字段无效。');
+      throw new Error(AppI18n.globalString($r('app.string.webdav_error_encrypted_vault_kdf_invalid'), 'WebDAV encryptedVault.kdf field is invalid.'));
     }
     let kdfRecord: Record<string, Object> = kdfValue as Record<string, Object>;
     let keyEncryption: RemoteAesGcmRecord = this.parseAesGcmRecord(record['keyEncryption']);
@@ -303,7 +304,7 @@ export class RemoteVaultCryptoService {
       blob.kdf.iterations !== REMOTE_KDF_ITERATIONS ||
       blob.keyEncryption.cipher !== REMOTE_CIPHER ||
       blob.vaultEncryption.cipher !== REMOTE_CIPHER) {
-      throw new Error('WebDAV 加密保管库格式暂不支持。');
+      throw new Error(AppI18n.globalString($r('app.string.webdav_error_encrypted_vault_unsupported'), 'This encrypted WebDAV vault format is not supported.'));
     }
   }
 
@@ -320,7 +321,7 @@ export class RemoteVaultCryptoService {
       let keyBytes: Uint8Array = kdf.generateSecretSync(spec).data;
       return cryptoFramework.createSymKeyGenerator(REMOTE_AES_ALGORITHM).convertKeySync({ data: keyBytes });
     } catch (error) {
-      throw new Error(`派生 WebDAV 保管库密钥失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_derive_key_failed'), 'Failed to derive WebDAV vault key: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -340,14 +341,14 @@ export class RemoteVaultCryptoService {
       cipher.initSync(cryptoFramework.CryptoMode.ENCRYPT_MODE, key, params);
       return cipher.doFinalSync({ data: plaintext }).data;
     } catch (error) {
-      throw new Error(`WebDAV AES-GCM 加密失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_aes_encrypt_failed'), 'WebDAV AES-GCM encryption failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
   private decryptGcm(key: cryptoFramework.SymKey, iv: Uint8Array, encryptedWithTag: Uint8Array): Uint8Array {
     try {
       if (encryptedWithTag.length < REMOTE_TAG_SIZE) {
-        throw new Error('远端保管库密文缺少认证标签。');
+        throw new Error(AppI18n.globalString($r('app.string.webdav_error_missing_auth_tag'), 'Remote vault ciphertext is missing the authentication tag.'));
       }
       let splitIndex: number = encryptedWithTag.length - REMOTE_TAG_SIZE;
       let ciphertext: Uint8Array = this.sliceBytes(encryptedWithTag, 0, splitIndex);
@@ -357,13 +358,13 @@ export class RemoteVaultCryptoService {
       cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, key, params);
       return cipher.doFinalSync({ data: ciphertext }).data;
     } catch (error) {
-      throw new Error(`WebDAV AES-GCM 解密失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.webdav_error_aes_decrypt_failed'), 'WebDAV AES-GCM decryption failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
   private parseAesGcmRecord(value: Object | undefined): RemoteAesGcmRecord {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      throw new Error('WebDAV encryptedVault AES-GCM 字段无效。');
+      throw new Error(AppI18n.globalString($r('app.string.webdav_error_encrypted_vault_aes_invalid'), 'WebDAV encryptedVault AES-GCM field is invalid.'));
     }
     let record: Record<string, Object> = value as Record<string, Object>;
     return new RemoteAesGcmRecord(
@@ -425,7 +426,7 @@ export class RemoteVaultCryptoService {
     try {
       return new Uint8Array(buffer.from(value, 'utf-8').buffer);
     } catch (error) {
-      throw new Error(`UTF-8 编码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_utf8_encode_failed'), 'UTF-8 encoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -433,7 +434,7 @@ export class RemoteVaultCryptoService {
     try {
       return buffer.from(this.sliceBytes(value, 0, value.length).buffer).toString('utf-8');
     } catch (error) {
-      throw new Error(`UTF-8 解码失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_utf8_decode_failed'), 'UTF-8 decoding failed: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -460,6 +461,7 @@ export class RemoteVaultCryptoService {
     if (runtimeError && runtimeError.message && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '未知错误';
+    return AppI18n.globalString($r('app.string.error_unknown'), 'Unknown error');
   }
 }
+

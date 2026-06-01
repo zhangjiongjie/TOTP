@@ -51,6 +51,7 @@ import { TotpHomeService } from '../services/TotpHomeService';
 import { TotpCodeSnapshot, TotpRuntimeService } from '../services/TotpRuntimeService';
 import { WebDavSyncActionOutcome, WebDavSyncCoordinator } from '../services/WebDavSyncCoordinator';
 import { SettingsStore } from '../storage/SettingsStore';
+import { AppI18n } from '../utils/AppI18n';
 
 const VAULT_SESSION_LOCKED_EVENT: string = 'totpVaultSessionLocked';
 
@@ -60,14 +61,14 @@ struct Index {
   @State private isLoading: boolean = true;
   @State private accounts: TotpAccount[] = [];
   @State private codeSnapshots: TotpCodeSnapshot[] = [];
-  @State private accountCountLabel: string = '0 个账号';
-  @State private lastUpdatedLabel: string = '最新同步：暂无';
+  @State private accountCountLabel: string = '0 accounts';
+  @State private lastUpdatedLabel: string = 'Last sync: never';
   @State private statusMessage: string = '';
   @State private copyStatusMessage: string = '';
   @State private errorMessage: string = '';
   @State private activeRoute: string = 'home';
   @State private activeAccountId: string = '';
-  @State private syncStatusMessage: string = 'WebDAV 同步未开启，本地模式。';
+  @State private syncStatusMessage: string = 'WebDAV sync is off. Local mode.';
   @State private isSyncing: boolean = false;
   @State private canSync: boolean = false;
   @State private syncSpinAngle: number = 0;
@@ -175,7 +176,7 @@ struct Index {
           .width('100%')
           .scrollBar(BarState.Auto)
         }
-        .tabBar(BottomTabBarStyle.of($r('app.media.nav_home'), '首页')
+        .tabBar(BottomTabBarStyle.of($r('app.media.nav_home'), $r('app.string.nav_home'))
           .iconStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() })
           .labelStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() }))
 
@@ -188,7 +189,7 @@ struct Index {
             scanRequestToken: this.addScanRequestToken,
             onSaved: (vault: LocalVault) => {
               this.applyVault(vault);
-              this.syncStatusMessage = '同步中...';
+              this.syncStatusMessage = this.appString($r('app.string.home_syncing_status'), 'Syncing...');
               this.syncAfterLocalChange();
               this.activeTabIndex = 0;
               this.tabsController.changeIndex(0);
@@ -199,7 +200,7 @@ struct Index {
             }
           })
         }
-        .tabBar(BottomTabBarStyle.of($r('app.media.nav_add'), '添加')
+        .tabBar(BottomTabBarStyle.of($r('app.media.nav_add'), $r('app.string.nav_add'))
           .iconStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() })
           .labelStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() }))
 
@@ -216,7 +217,7 @@ struct Index {
               }
               this.syncStatusMessage = message;
               this.refreshSyncAvailability();
-              if (message === 'WebDAV 同步未开启，本地模式。') {
+              if (message === this.appString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.')) {
                 this.canSync = false;
                 this.hasSyncConflict = false;
                 this.showRemotePasswordDialog = false;
@@ -244,7 +245,7 @@ struct Index {
             }
           })
         }
-        .tabBar(BottomTabBarStyle.of($r('app.media.nav_settings'), '设置')
+        .tabBar(BottomTabBarStyle.of($r('app.media.nav_settings'), $r('app.string.nav_settings'))
           .iconStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() })
           .labelStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() }))
       }
@@ -315,13 +316,13 @@ struct Index {
         onSaved: (vault: LocalVault) => {
           this.applyVault(vault);
           this.activeRoute = 'home';
-          this.syncStatusMessage = '同步中...';
+          this.syncStatusMessage = this.appString($r('app.string.home_syncing_status'), 'Syncing...');
           this.syncAfterLocalChange();
         },
         onDeleted: (vault: LocalVault) => {
           this.applyVault(vault);
           this.activeRoute = 'home';
-          this.syncStatusMessage = '同步中...';
+          this.syncStatusMessage = this.appString($r('app.string.home_syncing_status'), 'Syncing...');
           this.syncAfterLocalChange();
         },
         onBack: () => {
@@ -376,18 +377,18 @@ struct Index {
         .rotate({ angle: this.syncSpinAngle })
         .opacity(this.canSync ? 1 : 0.42)
 
-      Text(this.isSyncing ? '同步中' : (this.canSync ? '同步' : '未配置'))
+      Text(this.isSyncing ? $r('app.string.home_sync_fab_syncing') : (this.canSync ? $r('app.string.home_sync_fab_ready') : $r('app.string.home_sync_fab_disabled')))
         .fontSize(12)
         .fontWeight(FontWeight.Medium)
-        .fontColor(this.canSync ? '#1F6BAE' : '#8A96A8')
+        .fontColor(this.canSync ? $r('app.color.color_sync_button_text') : $r('app.color.color_sync_button_disabled_text'))
     }
     .width(72)
     .height(72)
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
-    .backgroundColor(this.canSync ? (this.isSyncing ? '#DDEBFA' : '#EAF3FF') : '#EEF1F5')
+    .backgroundColor(this.canSync ? (this.isSyncing ? $r('app.color.color_sync_button_bg_active') : $r('app.color.color_sync_button_bg')) : $r('app.color.color_sync_button_bg_disabled'))
     .borderRadius(36)
-    .shadow({ radius: 14, color: this.canSync ? '#241F6BAE' : '#1A667085', offsetX: 0, offsetY: 6 })
+    .shadow({ radius: 14, color: this.canSync ? $r('app.color.color_sync_button_shadow') : $r('app.color.color_sync_button_disabled_shadow'), offsetX: 0, offsetY: 6 })
     .margin({ right: 22, bottom: 112 })
     .opacity(this.canSync ? 1 : 0.78)
     .onClick(() => {
@@ -407,8 +408,8 @@ struct Index {
       if (!this.isUnlocked) {
         this.accounts = [];
         this.codeSnapshots = [];
-        this.accountCountLabel = '0 个账号';
-        this.lastUpdatedLabel = '最新同步：暂无';
+        this.accountCountLabel = this.resolveAccountCountLabel(0);
+        this.lastUpdatedLabel = this.appString($r('app.string.home_sync_label_never'), 'Last sync: never');
         this.statusMessage = '';
         return;
       }
@@ -418,13 +419,13 @@ struct Index {
       this.applyVault(vault);
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      this.showHomeError(`读取本地保管库失败：${businessError.message}`);
+      this.showHomeError(this.appFormat($r('app.string.home_error_read_vault'), 'Failed to read local vault: %1$s', businessError.message));
       let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       this.isUnlocked = UnlockService.getInstance().readState(context).isUnlocked;
       if (this.accounts.length === 0) {
         this.codeSnapshots = [];
-        this.accountCountLabel = '0 个账号';
-        this.lastUpdatedLabel = '最新同步：暂无';
+        this.accountCountLabel = this.resolveAccountCountLabel(0);
+        this.lastUpdatedLabel = this.appString($r('app.string.home_sync_label_never'), 'Last sync: never');
       }
     } finally {
       this.isLoading = false;
@@ -455,7 +456,7 @@ struct Index {
     this.activeTabIndex = 0;
     this.accounts = [];
     this.codeSnapshots = [];
-    this.accountCountLabel = '0 个账号';
+    this.accountCountLabel = this.resolveAccountCountLabel(0);
     this.copyStatusMessage = '';
     this.statusMessage = '';
     this.errorMessage = '';
@@ -473,7 +474,7 @@ struct Index {
   private applyVault(vault: LocalVault): void {
     this.accounts = vault.accounts;
     this.refreshSnapshots();
-    this.accountCountLabel = `${vault.accounts.length} 个账号`;
+    this.accountCountLabel = this.resolveAccountCountLabel(vault.accounts.length);
     let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
     this.refreshLastSyncLabel(context);
   }
@@ -505,7 +506,7 @@ struct Index {
         return this.codeSnapshots[index];
       }
     }
-    return new TotpCodeSnapshot(accountId, '', '------', '等待生成验证码', '30s / 30s', '本地保管库');
+    return new TotpCodeSnapshot(accountId, '', '------', '', '30s / 30s', this.appString($r('app.string.home_status_local_vault'), 'Local vault'));
   }
 
   private refreshSnapshots(): void {
@@ -563,7 +564,7 @@ struct Index {
       this.statusMessage = '';
     } catch (error) {
       let businessError: BusinessError = error as BusinessError;
-      this.showHomeError(`复制失败：${businessError.message}`);
+      this.showHomeError(this.appFormat($r('app.string.account_copy_failed'), 'Copy failed: %1$s', businessError.message));
     }
   }
 
@@ -612,7 +613,7 @@ struct Index {
 
   private async verifyRemotePassword(): Promise<void> {
     if (this.remotePassword.trim().length === 0) {
-      this.remotePasswordError = '请输入远端主密码。';
+      this.remotePasswordError = this.appString($r('app.string.error_remote_master_password_required'), 'Enter the remote master password.');
       return;
     }
     this.isRemotePasswordBusy = true;
@@ -737,10 +738,10 @@ struct Index {
     try {
       let metadata: WebDavSyncMetadata = this.settingsStore.loadWebDavSyncMetadata(context);
       this.lastUpdatedLabel = metadata.lastSyncedAt.length > 0
-        ? `最新同步：${this.formatDateLabel(metadata.lastSyncedAt)}`
-        : '最新同步：暂无';
+        ? this.appFormat($r('app.string.home_sync_label_time'), 'Last sync: %1$s', this.formatDateLabel(metadata.lastSyncedAt))
+        : this.appString($r('app.string.home_sync_label_never'), 'Last sync: never');
     } catch (_error) {
-      this.lastUpdatedLabel = '最新同步：暂无';
+      this.lastUpdatedLabel = this.appString($r('app.string.home_sync_label_never'), 'Last sync: never');
     }
   }
 
@@ -843,10 +844,10 @@ struct Index {
 
   private resolveRootTitle(): ResourceStr {
     if (this.activeTabIndex === 1) {
-      return '添加账号';
+      return $r('app.string.add_account_title');
     }
     if (this.activeTabIndex === 2) {
-      return '设置';
+      return $r('app.string.nav_settings');
     }
     return $r('app.string.EntryAbility_label');
   }
@@ -872,12 +873,12 @@ struct Index {
     return this.colorMode === ColorMode.DARK;
   }
 
-  private resolveTabSelectedColor(): string {
-    return this.isDarkMode() ? '#62B7FF' : '#1F6BAE';
+  private resolveTabSelectedColor(): ResourceColor {
+    return $r('app.color.color_tab_selected');
   }
 
-  private resolveTabUnselectedColor(): string {
-    return this.isDarkMode() ? '#F2F6FF' : '#667085';
+  private resolveTabUnselectedColor(): ResourceColor {
+    return $r('app.color.color_tab_unselected');
   }
 
   private formatDateLabel(isoText: string): string {
@@ -891,5 +892,19 @@ struct Index {
 
   private pad(value: number): string {
     return value < 10 ? `0${value}` : `${value}`;
+  }
+
+  private resolveAccountCountLabel(count: number): string {
+    return this.appFormat($r('app.string.home_account_count'), '%1$d accounts', count);
+  }
+
+  private appString(resource: Resource, fallback: string): string {
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return AppI18n.string(context, resource, fallback);
+  }
+
+  private appFormat(resource: Resource, fallback: string, ...args: Array<string | number>): string {
+    let context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    return AppI18n.format(context, resource, fallback, ...args);
   }
 }

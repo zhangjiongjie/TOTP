@@ -1,5 +1,6 @@
 import { LocalVault, createLocalVaultFromJson } from '../model/LocalVault';
 import { TotpAccount } from '../model/TotpAccount';
+import { AppI18n } from '../utils/AppI18n';
 
 export const VAULT_IMPORT_FORMAT_LOCAL_JSON: string = 'localJson';
 export const VAULT_IMPORT_FORMAT_PLAIN: string = 'plain';
@@ -25,14 +26,14 @@ export class VaultImportParser {
     if (modeValue === 'plain') {
       let vaultValue: Object | undefined = parsed['vault'];
       if (!VaultImportParser.isRecord(vaultValue)) {
-        throw new Error('明文备份内容无效。');
+        throw new Error(AppI18n.globalString($r('app.string.backup_error_plain_invalid'), 'Plain backup content is invalid.'));
       }
       return new VaultImportParseResult(VAULT_IMPORT_FORMAT_PLAIN, VaultImportParser.createLocalVaultFromWebPayload(vaultValue as Record<string, Object>));
     }
     if (modeValue === 'encrypted') {
       let encryptedVaultValue: Object | undefined = parsed['encryptedVault'];
       if (!VaultImportParser.isRecord(encryptedVaultValue)) {
-        throw new Error('加密备份内容无效。');
+        throw new Error(AppI18n.globalString($r('app.string.backup_error_encrypted_invalid'), 'Encrypted backup content is invalid.'));
       }
       let encryptedVault: Record<string, Object> = encryptedVaultValue as Record<string, Object>;
       if (VaultImportParser.isRemoteV2Envelope(encryptedVault)) {
@@ -48,7 +49,7 @@ export class VaultImportParser {
   static createLocalVaultFromWebPayload(payload: Record<string, Object>): LocalVault {
     let accountsValue: Object | undefined = payload['accounts'];
     if (!Array.isArray(accountsValue)) {
-      throw new Error('备份文件中没有账号列表。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_empty_accounts'), 'The backup file has no account list.'));
     }
 
     let now: string = new Date().toISOString();
@@ -72,7 +73,7 @@ export class VaultImportParser {
   private static assertLegacyEncryptedV1(encryptedVault: Record<string, Object>): void {
     let kdfValue: Object | undefined = encryptedVault['kdf'];
     if (!VaultImportParser.isRecord(kdfValue)) {
-      throw new Error('加密备份缺少 KDF 参数。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_missing_kdf'), 'Encrypted backup is missing KDF parameters.'));
     }
     let kdf: Record<string, Object> = kdfValue as Record<string, Object>;
     if (VaultImportParser.readNumber(encryptedVault, 'formatVersion', 0) !== 1 ||
@@ -80,7 +81,7 @@ export class VaultImportParser {
       VaultImportParser.readNumber(kdf, 'iterations', 0) !== 310000 ||
       VaultImportParser.readString(kdf, 'hash', '') !== 'SHA-256' ||
       VaultImportParser.readString(encryptedVault, 'cipher', '') !== 'AES-GCM') {
-      throw new Error('加密备份格式暂不支持。');
+      throw new Error(AppI18n.globalString($r('app.string.backup_error_encrypted_unsupported'), 'Encrypted backup format is not supported.'));
     }
   }
 

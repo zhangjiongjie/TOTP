@@ -1,9 +1,9 @@
 @Component
 export struct DeleteConfirmDialog {
-  title: string = '确认删除';
-  content: string = '删除后将从本地保管库移除该账号。';
-  confirmText: string = '删除';
-  cancelText: string = '取消';
+  title: ResourceStr = $r('app.string.delete_confirm_title');
+  content: ResourceStr = $r('app.string.delete_account_message');
+  confirmText: ResourceStr = $r('app.string.action_delete');
+  cancelText: ResourceStr = $r('app.string.action_cancel');
   onConfirm: () => void = () => {};
   onCancel: () => void = () => {};
 
@@ -46,8 +46,8 @@ export struct DeleteConfirmDialog {
             .height(44)
             .type(ButtonType.Capsule)
             .fontSize(15)
-            .fontColor(Color.White)
-            .backgroundColor('#D84B4B')
+            .fontColor($r('sys.color.ohos_id_color_foreground_contrary'))
+            .backgroundColor($r('app.color.color_danger_strong'))
             .onClick(() => {
               this.onConfirm();
             })
@@ -59,7 +59,7 @@ export struct DeleteConfirmDialog {
       .backgroundColor($r('app.color.dialog_surface'))
       .border({ width: 1, color: $r('app.color.dialog_border') })
       .borderRadius(26)
-      .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 14 })
+      .shadow({ radius: 28, color: $r('app.color.color_dialog_shadow'), offsetX: 0, offsetY: 14 })
       .onClick(() => {})
     }
     .width('100%')

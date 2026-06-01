@@ -85,7 +85,7 @@ function resolveBrandPalette(iconKey: string, issuer: string, accountName: strin
 
 function formatDateLabel(isoText: string): string {
   if (isoText.length === 0) {
-    return '未记录';
+    return '';
   }
 
   let date: Date = new Date(isoText);
@@ -104,9 +104,9 @@ function pad(value: number): string {
 export struct AccountCard {
   @Prop account: TotpAccount = createFallbackAccount();
   @Prop codeValue: string = '------';
-  @Prop codeHint: string = '验证码生成中';
-  @Prop countdownLabel: string = '30s 周期';
-  @Prop statusLabel: string = '本地保管库';
+  @Prop codeHint: ResourceStr = '';
+  @Prop countdownLabel: string = '30s / 30s';
+  @Prop statusLabel: string = '';
   onCopy?: (accountId: string) => void;
   onEdit?: (accountId: string) => void;
 
@@ -202,7 +202,7 @@ export struct AccountCard {
 
   @Builder
   private buildCopyPill(): void {
-    Text('复制')
+    Text($r('app.string.account_card_copy'))
       .fontSize(12)
       .fontWeight(FontWeight.Medium)
       .fontColor('#24527E')
@@ -225,11 +225,11 @@ export struct AccountCard {
           .letterSpacing(4)
           .layoutWeight(1)
 
-        Text('复制')
+        Text($r('app.string.account_card_copy'))
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor('#24527E')
-          .backgroundColor(Color.White)
+          .backgroundColor($r('app.color.dialog_surface'))
           .borderRadius(999)
           .padding({ left: 18, right: 18, top: 9, bottom: 9 })
           .onClick(() => {
@@ -273,12 +273,12 @@ export struct AccountCard {
     .height(38)
   }
 
-  private resolveIssuerLabel(): string {
-    return this.account.issuer.length > 0 ? this.account.issuer : '未命名服务';
+  private resolveIssuerLabel(): ResourceStr {
+    return this.account.issuer.length > 0 ? this.account.issuer : $r('app.string.account_card_no_service');
   }
 
-  private resolveAccountLabel(): string {
-    return this.account.accountName.length > 0 ? this.account.accountName : '未填写账号';
+  private resolveAccountLabel(): ResourceStr {
+    return this.account.accountName.length > 0 ? this.account.accountName : $r('app.string.account_card_no_account');
   }
 
   private resolveGroupLabel(): string {
@@ -307,9 +307,12 @@ export struct AccountCard {
     return Math.max(0, Math.min(100, remaining * 100 / period));
   }
 
-  private resolveRemainingLabel(): string {
+  private resolveRemainingLabel(): ResourceStr {
     let remaining: number = this.resolveRemainingSeconds();
-    return remaining > 0 ? `${remaining}s` : this.statusLabel;
+    if (remaining > 0) {
+      return `${remaining}s`;
+    }
+    return this.statusLabel.length > 0 ? this.statusLabel : $r('app.string.home_status_local_vault');
   }
 
   private resolvePalette(): BrandPalette {

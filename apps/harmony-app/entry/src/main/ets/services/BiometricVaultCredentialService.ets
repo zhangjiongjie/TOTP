@@ -1,6 +1,7 @@
 import { BusinessError } from '@kit.BasicServicesKit';
 import { asset } from '@kit.AssetStoreKit';
 import { util } from '@kit.ArkTS';
+import { AppI18n } from '../utils/AppI18n';
 
 const MASTER_PASSWORD_ALIAS: string = 'totp.biometric.masterPassword';
 
@@ -26,7 +27,7 @@ export class BiometricVaultCredentialService {
       attributes.set(asset.Tag.SYNC_TYPE, asset.SyncType.NEVER);
       asset.addSync(attributes);
     } catch (error) {
-      throw new Error(`保存生物识别凭据失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_biometric_credential_save_failed'), 'Failed to save biometric credential: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -42,7 +43,7 @@ export class BiometricVaultCredentialService {
       let secret: Uint8Array = result[0].get(asset.Tag.SECRET) as Uint8Array;
       return this.decodeText(secret);
     } catch (error) {
-      throw new Error(`读取生物识别凭据失败：${this.readErrorMessage(error)}`);
+      throw new Error(AppI18n.globalFormat($r('app.string.error_biometric_credential_read_failed'), 'Failed to read biometric credential: %1$s', this.readErrorMessage(error)));
     }
   }
 
@@ -83,6 +84,6 @@ export class BiometricVaultCredentialService {
     if (runtimeError && runtimeError.message && runtimeError.message.length > 0) {
       return runtimeError.message;
     }
-    return '未知错误';
+    return AppI18n.globalString($r('app.string.error_unknown'), 'Unknown error');
   }
 }
