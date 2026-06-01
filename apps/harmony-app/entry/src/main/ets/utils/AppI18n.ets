@@ -1,9 +1,19 @@
 import { common } from '@kit.AbilityKit';
 
 export class AppI18n {
+  private static globalContext: common.UIAbilityContext | undefined = undefined;
+
+  static setGlobalContext(context: common.UIAbilityContext): void {
+    AppI18n.globalContext = context;
+  }
+
+  static clearGlobalContext(): void {
+    AppI18n.globalContext = undefined;
+  }
+
   static string(context: common.UIAbilityContext, resource: Resource, fallback: string): string {
     try {
-      return context.resourceManager.getStringSync(resource);
+      return context.resourceManager.getStringSync(resource.id);
     } catch (_error) {
       return fallback;
     }
@@ -11,7 +21,7 @@ export class AppI18n {
 
   static format(context: common.UIAbilityContext, resource: Resource, fallback: string, ...args: Array<string | number>): string {
     try {
-      return context.resourceManager.getStringSync(resource, ...args);
+      return context.resourceManager.getStringSync(resource.id, ...args);
     } catch (_error) {
       return AppI18n.formatFallback(fallback, args);
     }
@@ -19,7 +29,10 @@ export class AppI18n {
 
   static globalString(resource: Resource, fallback: string): string {
     try {
-      return getContext().resourceManager.getStringSync(resource);
+      if (AppI18n.globalContext === undefined) {
+        return fallback;
+      }
+      return AppI18n.globalContext.resourceManager.getStringSync(resource.id);
     } catch (_error) {
       return fallback;
     }
@@ -27,7 +40,10 @@ export class AppI18n {
 
   static globalFormat(resource: Resource, fallback: string, ...args: Array<string | number>): string {
     try {
-      return getContext().resourceManager.getStringSync(resource, ...args);
+      if (AppI18n.globalContext === undefined) {
+        return AppI18n.formatFallback(fallback, args);
+      }
+      return AppI18n.globalContext.resourceManager.getStringSync(resource.id, ...args);
     } catch (_error) {
       return AppI18n.formatFallback(fallback, args);
     }

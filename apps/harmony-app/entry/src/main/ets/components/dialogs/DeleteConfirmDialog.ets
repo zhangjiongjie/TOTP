@@ -36,7 +36,7 @@ export struct DeleteConfirmDialog {
             .type(ButtonType.Capsule)
             .fontSize(15)
             .fontColor($r('sys.color.font_primary'))
-            .backgroundColor($r('sys.color.comp_background_gray'))
+            .backgroundColor($r('app.color.color_control_surface'))
             .onClick(() => {
               this.onCancel();
             })

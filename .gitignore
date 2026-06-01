@@ -25,3 +25,8 @@ apps/android-app/gradle/gradle-daemon-jvm.properties
 apps/android-app/local.properties
 browser-extension-*.zip
 apps/harmony-app/local.properties
+
+# HarmonyOS local signing materials
+apps/harmony-app/agc-assets/*.p7b
+apps/harmony-app/agc-assets/*.cer
+apps/harmony-app/agc-assets/*.p12

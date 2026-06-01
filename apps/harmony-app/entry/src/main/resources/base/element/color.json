@@ -30,7 +30,11 @@
     },
     {
       "name": "color_primary_soft",
-      "value": "#E8F0FB"
+      "value": "#DCEBFA"
+    },
+    {
+      "name": "color_control_surface",
+      "value": "#EEF3F8"
     },
     {
       "name": "color_danger",
@@ -95,6 +99,10 @@
     {
       "name": "color_header_icon_border",
       "value": "#D5DFEA"
+    },
+    {
+      "name": "color_checkbox_unselected_outline",
+      "value": "#667085"
     },
     {
       "name": "color_success",

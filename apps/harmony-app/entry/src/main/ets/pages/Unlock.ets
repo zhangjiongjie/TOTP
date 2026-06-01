@@ -80,7 +80,7 @@ export struct Unlock {
         .fontSize(16)
         .fontColor($r('sys.color.font_primary'))
         .placeholderColor($r('app.color.color_unlock_placeholder'))
-        .backgroundColor($r('sys.color.comp_background_gray'))
+        .backgroundColor($r('app.color.color_control_surface'))
         .borderRadius(18)
         .height(52)
         .padding({ left: 16, right: 16 })
@@ -108,7 +108,7 @@ export struct Unlock {
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.color_primary_text'))
-          .backgroundColor($r('sys.color.comp_background_gray'))
+          .backgroundColor($r('app.color.color_control_surface'))
           .enabled(!this.isBiometricAuthenticating)
           .onClick(() => {
             this.handleBiometricUnlock();

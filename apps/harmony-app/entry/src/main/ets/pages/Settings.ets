@@ -165,7 +165,7 @@ export struct Settings {
                 Button($r('app.string.action_cancel'))
                   .height(42)
                   .layoutWeight(1)
-                  .backgroundColor($r('sys.color.comp_background_gray'))
+                  .backgroundColor($r('app.color.color_control_surface'))
                   .fontColor($r('sys.color.font_primary'))
                   .onClick(() => {
                     this.showChangePasswordDialog = false;
@@ -268,7 +268,7 @@ export struct Settings {
             .select(this.webDavEnabled)
             .shape(CheckBoxShape.ROUNDED_SQUARE)
             .selectedColor($r('app.color.color_primary'))
-            .unselectedColor($r('sys.color.comp_background_gray'))
+            .unselectedColor($r('app.color.color_checkbox_unselected_outline'))
             .width(28)
             .height(28)
             .onChange((value: boolean) => {
@@ -360,7 +360,7 @@ export struct Settings {
     .width(44)
     .height(44)
     .type(ButtonType.Circle)
-    .backgroundColor($r('sys.color.comp_background_gray'))
+    .backgroundColor($r('app.color.color_control_surface'))
     .border({ width: 1, color: $r('sys.color.comp_background_tertiary') })
     .enabled(!this.isBackupBusy)
     .opacity(this.isBackupBusy ? 0.45 : 1)
@@ -399,7 +399,7 @@ export struct Settings {
         .fontSize(15)
         .fontColor($r('sys.color.font_primary'))
         .placeholderColor($r('app.color.color_placeholder'))
-        .backgroundColor($r('sys.color.comp_background_gray'))
+        .backgroundColor($r('app.color.color_control_surface'))
         .borderRadius(16)
         .padding({ left: 14, right: 14 })
         .onChange((value: string) => {
@@ -590,7 +590,7 @@ export struct Settings {
               Button($r('app.string.action_cancel'))
                 .height(42)
                 .layoutWeight(1)
-                .backgroundColor($r('sys.color.comp_background_gray'))
+                .backgroundColor($r('app.color.color_control_surface'))
                 .fontColor($r('sys.color.font_primary'))
                 .onClick(() => {
                   this.dismissImportPasswordDialog();

@@ -1,10 +1,15 @@
 import { ConfigurationConstant, UIAbility } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { UnlockService } from '../services/UnlockService';
+import { AppI18n } from '../utils/AppI18n';
 
 const VAULT_SESSION_LOCKED_EVENT: string = 'totpVaultSessionLocked';
 
 export default class EntryAbility extends UIAbility {
+  onCreate(): void {
+    AppI18n.setGlobalContext(this.context);
+  }
+
   onWindowStageCreate(windowStage: window.WindowStage): void {
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
@@ -27,6 +32,7 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageDestroy(): void {
     this.lockVaultSession();
+    AppI18n.clearGlobalContext();
   }
 
   private lockVaultSession(): void {

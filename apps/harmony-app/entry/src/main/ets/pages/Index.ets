@@ -1,11 +1,8 @@
 import { common } from '@kit.AbilityKit';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { KeyboardAvoidMode } from '@kit.ArkUI';
-import {
-  HdsTabs,
-  HdsTabsController,
-  hdsMaterial
-} from '@kit.UIDesignKit';
+import lazy { HdsMaterialTabs } from '../components/home/HdsMaterialTabs';
+import { CompatibleTabs } from '../components/home/CompatibleTabs';
 import { EditAccountPage } from '../components/home/EditAccountPage';
 import { HomeAccountSection } from '../components/home/HomeAccountSection';
 import { HomeFixedHeader } from '../components/home/HomeFixedHeader';
@@ -90,7 +87,6 @@ struct Index {
   private sessionLockedHandler: () => void = () => {
     this.handleSessionLocked();
   };
-  private tabsController: HdsTabsController = new HdsTabsController();
   private settingsStore: SettingsStore = new SettingsStore();
   private syncCoordinator: WebDavSyncCoordinator = new WebDavSyncCoordinator();
 
@@ -160,120 +156,116 @@ struct Index {
   @Builder
   private buildTabsContent(): void {
     Stack({ alignContent: Alignment.BottomEnd }) {
-      HdsTabs({ controller: this.tabsController }) {
-        TabContent() {
-          Scroll() {
-            Column({ space: 14 }) {
-              this.buildHomeMetaLine()
-              this.buildStatusCard()
-              this.buildAccountSection()
-              Blank()
-                .height(140)
-            }
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 6, bottom: 24 })
+      if (deviceInfo.distributionOSApiVersion >= 60100) {
+        HdsMaterialTabs({
+          activeTabIndex: $activeTabIndex,
+          homeContent: () => {
+            this.buildHomeTabContent()
+          },
+          addContent: () => {
+            this.buildAddTabContent()
+          },
+          settingsContent: () => {
+            this.buildSettingsTabContent()
           }
-          .width('100%')
-          .scrollBar(BarState.Auto)
-        }
-        .tabBar(BottomTabBarStyle.of($r('app.media.nav_home'), $r('app.string.nav_home'))
-          .iconStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() })
-          .labelStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() }))
-
-        TabContent() {
-          AddAccount({
-            showBackButton: false,
-            bottomInset: 116,
-            topInset: 0,
-            photoRequestToken: this.addPhotoRequestToken,
-            scanRequestToken: this.addScanRequestToken,
-            onSaved: (vault: LocalVault) => {
-              this.applyVault(vault);
-              this.syncStatusMessage = this.appString($r('app.string.home_syncing_status'), 'Syncing...');
-              this.syncAfterLocalChange();
-              this.activeTabIndex = 0;
-              this.tabsController.changeIndex(0);
-            },
-            onBack: () => {
-              this.activeTabIndex = 0;
-              this.tabsController.changeIndex(0);
-            }
-          })
-        }
-        .tabBar(BottomTabBarStyle.of($r('app.media.nav_add'), $r('app.string.nav_add'))
-          .iconStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() })
-          .labelStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() }))
-
-        TabContent() {
-          Settings({
-            syncStatusMessage: this.syncStatusMessage,
-            copyStatusMessage: this.copyStatusMessage,
-            lastUpdatedLabel: this.lastUpdatedLabel,
-            bottomInset: 116,
-            topInset: 0,
-            onSaved: (message: string, vault: LocalVault | undefined, alreadySynced: boolean) => {
-              if (vault !== undefined) {
-                this.applyVault(vault);
-              }
-              this.syncStatusMessage = message;
-              this.refreshSyncAvailability();
-              if (message === this.appString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.')) {
-                this.canSync = false;
-                this.hasSyncConflict = false;
-                this.showRemotePasswordDialog = false;
-                this.clearTransientStatusTimer();
-                this.copyStatusMessage = '';
-                this.errorMessage = '';
-                return;
-              }
-              if (this.canSync && !alreadySynced) {
-                this.handleManualSync();
-              }
-            },
-            onImported: (vault: LocalVault, message: string) => {
-              this.applyVault(vault);
-              this.syncStatusMessage = message;
-              this.refreshSyncAvailability();
-              if (this.canSync) {
-                this.syncAfterLocalChange();
-              }
-            },
-            onPasswordChanged: (vault: LocalVault, message: string) => {
-              this.applyVault(vault);
-              this.syncStatusMessage = message;
-              this.refreshSyncAvailability();
-            }
-          })
-        }
-        .tabBar(BottomTabBarStyle.of($r('app.media.nav_settings'), $r('app.string.nav_settings'))
-          .iconStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() })
-          .labelStyle({ selectedColor: this.resolveTabSelectedColor(), unselectedColor: this.resolveTabUnselectedColor() }))
+        })
+      } else {
+        CompatibleTabs({
+          activeTabIndex: $activeTabIndex,
+          homeContent: () => {
+            this.buildHomeTabContent()
+          },
+          addContent: () => {
+            this.buildAddTabContent()
+          },
+          settingsContent: () => {
+            this.buildSettingsTabContent()
+          }
+        })
       }
-      .barOverlap(true)
-      .barPosition(BarPosition.End)
-      .vertical(false)
-      .animationDuration(0)
-      .barFloatingStyle({
-        barWidth: {
-          smallWidth: 304,
-          mediumWidth: 404,
-          largeWidth: 504
-        },
-        barBottomMargin: 18,
-        systemMaterialEffect: {
-          materialType: hdsMaterial.MaterialType.IMMERSIVE,
-          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-        }
-      })
-      .width('100%')
-      .height('100%')
-      .onChange((index: number) => {
-        this.activeTabIndex = index;
-      })
-
     }
     .width('100%')
     .layoutWeight(1)
+  }
+
+  @Builder
+  private buildHomeTabContent(): void {
+    Scroll() {
+      Column({ space: 14 }) {
+        this.buildHomeMetaLine()
+        this.buildStatusCard()
+        this.buildAccountSection()
+        Blank()
+          .height(140)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 6, bottom: 24 })
+    }
+    .width('100%')
+    .scrollBar(BarState.Auto)
+  }
+
+  @Builder
+  private buildAddTabContent(): void {
+    AddAccount({
+      showBackButton: false,
+      bottomInset: 116,
+      topInset: 0,
+      photoRequestToken: this.addPhotoRequestToken,
+      scanRequestToken: this.addScanRequestToken,
+      onSaved: (vault: LocalVault) => {
+        this.applyVault(vault);
+        this.syncStatusMessage = this.appString($r('app.string.home_syncing_status'), 'Syncing...');
+        this.syncAfterLocalChange();
+        this.activeTabIndex = 0;
+      },
+      onBack: () => {
+        this.activeTabIndex = 0;
+      }
+    })
+  }
+
+  @Builder
+  private buildSettingsTabContent(): void {
+    Settings({
+      syncStatusMessage: this.syncStatusMessage,
+      copyStatusMessage: this.copyStatusMessage,
+      lastUpdatedLabel: this.lastUpdatedLabel,
+      bottomInset: 116,
+      topInset: 0,
+      onSaved: (message: string, vault: LocalVault | undefined, alreadySynced: boolean) => {
+        if (vault !== undefined) {
+          this.applyVault(vault);
+        }
+        this.syncStatusMessage = message;
+        this.refreshSyncAvailability();
+        if (message === this.appString($r('app.string.home_sync_disabled_status'), 'WebDAV sync is off. Local mode.')) {
+          this.canSync = false;
+          this.hasSyncConflict = false;
+          this.showRemotePasswordDialog = false;
+          this.clearTransientStatusTimer();
+          this.copyStatusMessage = '';
+          this.errorMessage = '';
+          return;
+        }
+        if (this.canSync && !alreadySynced) {
+          this.handleManualSync();
+        }
+      },
+      onImported: (vault: LocalVault, message: string) => {
+        this.applyVault(vault);
+        this.syncStatusMessage = message;
+        this.refreshSyncAvailability();
+        if (this.canSync) {
+          this.syncAfterLocalChange();
+        }
+      },
+      onPasswordChanged: (vault: LocalVault, message: string) => {
+        this.applyVault(vault);
+        this.syncStatusMessage = message;
+        this.refreshSyncAvailability();
+      }
+    })
   }
 
   @Builder
@@ -468,7 +460,6 @@ struct Index {
     this.hasSyncedOnOpen = false;
     this.isSyncing = false;
     this.stopSyncAnimation();
-    this.tabsController.changeIndex(0);
   }
 
   private applyVault(vault: LocalVault): void {
@@ -859,7 +850,7 @@ struct Index {
     }
     this.activeRoute = action.nextRoute;
     if (this.activeTabIndex !== action.nextTabIndex) {
-      this.tabsController.changeIndex(action.nextTabIndex);
+      this.activeTabIndex = action.nextTabIndex;
     }
     this.activeTabIndex = action.nextTabIndex;
     return true;

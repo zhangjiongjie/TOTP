@@ -33,7 +33,7 @@ export struct AccountForm {
         .height(108)
         .fontSize(14)
         .fontColor($r('sys.color.font_primary'))
-        .backgroundColor($r('sys.color.comp_background_gray'))
+        .backgroundColor($r('app.color.color_control_surface'))
         .borderRadius(18)
         .padding(14)
         .onChange((value: string) => {
@@ -90,7 +90,7 @@ export struct AccountForm {
             .height(46)
             .fontSize(14)
             .fontColor($r('sys.color.font_primary'))
-            .backgroundColor($r('sys.color.comp_background_gray'))
+            .backgroundColor($r('app.color.color_control_surface'))
             .borderRadius(16)
             .padding({ left: 14, right: 14 })
             .onChange((value: string) => {
@@ -110,7 +110,7 @@ export struct AccountForm {
             .height(46)
             .fontSize(14)
             .fontColor($r('sys.color.font_primary'))
-            .backgroundColor($r('sys.color.comp_background_gray'))
+            .backgroundColor($r('app.color.color_control_surface'))
             .borderRadius(16)
             .padding({ left: 14, right: 14 })
             .onChange((value: string) => {
@@ -159,7 +159,7 @@ export struct AccountForm {
         .height(46)
         .fontSize(14)
         .fontColor($r('sys.color.font_primary'))
-        .backgroundColor($r('sys.color.comp_background_gray'))
+        .backgroundColor($r('app.color.color_control_surface'))
         .borderRadius(16)
         .padding({ left: 14, right: 14 })
         .onChange((nextValue: string) => {
@@ -188,7 +188,7 @@ export struct AccountForm {
         .value(value)
         .width('100%')
         .height(46)
-        .backgroundColor($r('sys.color.comp_background_gray'))
+        .backgroundColor($r('app.color.color_control_surface'))
         .borderRadius(16)
         .font({ size: 14, weight: FontWeight.Medium })
         .fontColor($r('sys.color.font_primary'))
@@ -219,7 +219,7 @@ export struct AccountForm {
         .value(this.resolveGroupDisplayValue())
         .width('100%')
         .height(46)
-        .backgroundColor($r('sys.color.comp_background_gray'))
+        .backgroundColor($r('app.color.color_control_surface'))
         .borderRadius(16)
         .font({ size: 14, weight: FontWeight.Medium })
         .fontColor($r('sys.color.font_primary'))

@@ -33,6 +33,10 @@
       "value": "#1F344C"
     },
     {
+      "name": "color_control_surface",
+      "value": "#252933"
+    },
+    {
       "name": "color_danger",
       "value": "#FF6B6B"
     },
@@ -95,6 +99,10 @@
     {
       "name": "color_header_icon_border",
       "value": "#2F333A"
+    },
+    {
+      "name": "color_checkbox_unselected_outline",
+      "value": "#8A96A8"
     },
     {
       "name": "color_success",

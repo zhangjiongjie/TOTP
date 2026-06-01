@@ -14,6 +14,9 @@ import webDavSyncCoordinatorTest from './WebDavSyncCoordinator.test';
 import accountCopyPresentationPolicyTest from './AccountCopyPresentationPolicy.test';
 import homeSyncUiStatePolicyTest from './HomeSyncUiStatePolicy.test';
 import importBackupPasswordPromptPolicyTest from './ImportBackupPasswordPromptPolicy.test';
+import homeTabsCompatibilityPolicyTest from './HomeTabsCompatibilityPolicy.test';
+import appI18nTest from './AppI18n.test';
+import settingsCheckboxVisualPolicyTest from './SettingsCheckboxVisualPolicy.test';
 
 export default function testsuite(): void {
   webDavVaultSyncAlgorithmsTest();
@@ -32,5 +35,7 @@ export default function testsuite(): void {
   accountCopyPresentationPolicyTest();
   homeSyncUiStatePolicyTest();
   importBackupPasswordPromptPolicyTest();
+  homeTabsCompatibilityPolicyTest();
+  appI18nTest();
 }
 

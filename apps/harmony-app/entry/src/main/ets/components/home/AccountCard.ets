@@ -207,6 +207,7 @@ export struct AccountCard {
       .fontWeight(FontWeight.Medium)
       .fontColor('#24527E')
       .backgroundColor('#EFF5FB')
+      .border({ width: 1, color: '#CBD9E8' })
       .borderRadius(999)
       .padding({ left: 12, right: 12, top: 7, bottom: 7 })
       .onClick(() => {
@@ -229,7 +230,8 @@ export struct AccountCard {
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor('#24527E')
-          .backgroundColor($r('app.color.dialog_surface'))
+          .backgroundColor('#EFF5FB')
+          .border({ width: 1, color: '#CBD9E8' })
           .borderRadius(999)
           .padding({ left: 18, right: 18, top: 9, bottom: 9 })
           .onClick(() => {

@@ -32,7 +32,7 @@ export struct RemotePasswordDialog {
           .type(InputType.Password)
           .height(46)
           .fontSize(15)
-          .backgroundColor($r('sys.color.comp_background_gray'))
+          .backgroundColor($r('app.color.color_control_surface'))
           .borderRadius(14)
           .padding({ left: 14, right: 14 })
           .enabled(!this.isBusy)
@@ -53,7 +53,7 @@ export struct RemotePasswordDialog {
             .height(42)
             .layoutWeight(1)
             .enabled(!this.isBusy)
-            .backgroundColor($r('sys.color.comp_background_gray'))
+            .backgroundColor($r('app.color.color_control_surface'))
             .fontColor($r('sys.color.font_primary'))
             .onClick(() => {
               this.onCancel();
