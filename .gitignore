@@ -1,6 +1,7 @@
 .superpowers/
 .qoder/
 .claude/
+.codegraph/
 .worktrees/
 dist/
 node_modules/
