@@ -4,7 +4,7 @@ export function getAppName(): string {
     return localizedName;
   }
 
-  return isChineseLocale() ? '密令' : 'Keyring';
+  return isChineseLocale() ? 'TOTP密令' : 'TOTP Token';
 }
 
 function readChromeLocalizedAppName(): string | null {

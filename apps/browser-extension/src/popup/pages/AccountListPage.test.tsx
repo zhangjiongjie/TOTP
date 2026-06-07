@@ -21,7 +21,7 @@ describe('AccountListPage', () => {
 
     await screen.findAllByRole('button', { name: 'Edit account' });
 
-    expect(screen.getByRole('heading', { name: 'Keyring' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'TOTP Token' })).toBeInTheDocument();
     expect(screen.queryByText('Authenticator')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sync' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();

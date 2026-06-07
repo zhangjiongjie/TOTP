@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "EntryAbility_label",
-      "value": "Keyring"
+      "value": "TOTP Token"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Keyring HarmonyOS entry ability"
+      "value": "TOTP Token HarmonyOS entry ability"
     },
     {
       "name": "module_desc",
-      "value": "Keyring HarmonyOS entry module"
+      "value": "TOTP Token HarmonyOS entry module"
     },
     {
       "name": "action_cancel",

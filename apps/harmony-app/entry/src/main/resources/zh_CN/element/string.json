@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "EntryAbility_label",
-      "value": "密令"
+      "value": "TOTP密令"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "密令 HarmonyOS entry ability"
+      "value": "TOTP密令 HarmonyOS NEXT entry ability"
     },
     {
       "name": "module_desc",
-      "value": "密令 HarmonyOS entry module"
+      "value": "TOTP密令 HarmonyOS NEXT entry module"
     },
     {
       "name": "action_cancel",
